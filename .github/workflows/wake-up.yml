@@ -1,0 +1,22 @@
+name: Keep App Active
+
+on:
+  schedule:
+    # Elke 10 minuten (cron format: minuut uur dag maand dag-van-week)
+    - cron: '*/10 * * * *'
+  workflow_dispatch:  # Handmatig triggeren mogelijk
+
+jobs:
+  wake-up:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up frontend
+        run: |
+          echo "Waking up frontend..."
+          curl -f https://app-carrecommender-web-dev2.azurewebsites.net || echo "Frontend wake-up completed"
+      
+      - name: Wake up backend
+        run: |
+          echo "Waking up backend..."
+          curl -f https://app-carrecommender-dev-h0agdkbfbcb3fxg7.westeurope-01.azurewebsites.net || echo "Backend wake-up completed"
+
