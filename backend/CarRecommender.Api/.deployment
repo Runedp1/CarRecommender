@@ -1,0 +1,5 @@
+[config]
+SCM_DO_BUILD_DURING_DEPLOYMENT=true
+PROJECT=CarRecommender.Api/CarRecommender.Api.csproj
+
+

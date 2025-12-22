@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Conditionally set OutputType: Library when referenced by API, Exe when standalone -->
+    <OutputType Condition="'$(IsReferencedByApi)' != 'true'">Exe</OutputType>
+    <OutputType Condition="'$(IsReferencedByApi)' == 'true'">Library</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>CarRecommender</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+
+  <!-- Exclude backend and frontend project files from compilation -->
+  <ItemGroup>
+    <Compile Remove="backend/**" />
+    <Content Remove="backend/**" />
+    <EmbeddedResource Remove="backend/**" />
+    <None Remove="backend/**" />
+    <Compile Remove="frontend/**" />
+    <Content Remove="frontend/**" />
+    <EmbeddedResource Remove="frontend/**" />
+    <None Remove="frontend/**" />
+  </ItemGroup>
+
+  <!-- Exclude src/Program.cs when used as a library (when referenced by API) -->
+  <!-- This allows CarRecommender to be both a standalone exe and a library -->
+  <ItemGroup Condition="'$(IsReferencedByApi)' == 'true'">
+    <Compile Remove="src/Program.cs" />
+  </ItemGroup>
+
+</Project>

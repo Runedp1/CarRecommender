@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CarRecommender.csproj">
+      <Properties>IsReferencedByApi=true</Properties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Exclude src/Program.cs to avoid conflicts with top-level statements -->
+  <ItemGroup>
+    <Compile Remove="..\..\src\Program.cs" />
+  </ItemGroup>
+
+  <!-- Zorg dat data bestanden worden meegenomen tijdens deployment -->
+  <ItemGroup>
+    <Content Include="..\data\Cleaned_Car_Data_For_App_Fully_Enriched.csv">
+      <Link>data\Cleaned_Car_Data_For_App_Fully_Enriched.csv</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  
+  <!-- Zorg dat images folder wordt meegenomen tijdens deployment -->
+  <ItemGroup>
+    <Content Include="..\images\**\*">
+      <Link>images\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
+

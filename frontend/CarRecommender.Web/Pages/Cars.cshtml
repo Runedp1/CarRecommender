@@ -1,0 +1,165 @@
+@page
+@model CarsModel
+@{
+    ViewData["Title"] = "Blader door auto's";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4 mb-4">Blader door auto's</h1>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Fout:</strong> @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (Model.AllCars != null && Model.AllCars.Count > 0)
+    {
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Filters</h5>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="maxBudget" class="form-label">Maximaal budget: €<span id="budgetValue">@Model.AllCars.Max(c => c.Budget).ToString("N0")</span></label>
+                                <input type="range" class="form-range" id="maxBudget" min="0" max="@Model.AllCars.Max(c => c.Budget)" value="@Model.AllCars.Max(c => c.Budget)" step="1000">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="fuelFilter" class="form-label">Brandstof</label>
+                                <select class="form-select" id="fuelFilter">
+                                    <option value="">Alle</option>
+                                    @foreach (var fuel in Model.AllCars.Select(c => c.Fuel).Distinct().OrderBy(f => f))
+                                    {
+                                        <option value="@fuel">@fuel</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="minYear" class="form-label">Minimum bouwjaar: <span id="yearValue">@Model.AllCars.Min(c => c.Year)</span></label>
+                                <input type="range" class="form-range" id="minYear" min="@Model.AllCars.Min(c => c.Year)" max="@Model.AllCars.Max(c => c.Year)" value="@Model.AllCars.Min(c => c.Year)" step="1">
+                            </div>
+                            <div class="col-md-3">
+                                <button type="button" class="btn btn-secondary mt-4" onclick="resetFilters()">Reset filters</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row" id="carsContainer">
+            @foreach (var car in Model.AllCars)
+            {
+                <div class="col-md-6 col-lg-4 mb-4 car-card" 
+                     data-budget="@car.Budget" 
+                     data-fuel="@car.Fuel.ToLower()"
+                     data-year="@car.Year">
+                    <div class="card h-100 shadow-sm">
+                        @{
+                            // Probeer eerst ImageUrl van API
+                            var imageUrl = !string.IsNullOrEmpty(car.ImageUrl) 
+                                ? car.ImageUrl 
+                                : string.Empty;
+                            
+                            // Als geen ImageUrl, probeer Auto-Data.net URL
+                            if (string.IsNullOrEmpty(imageUrl))
+                            {
+                                var safeBrand = car.Brand?.Trim().Replace(" ", "-").Replace("&", "and").ToLower() ?? "";
+                                var safeModel = car.Model?.Trim().Replace(" ", "-").Replace("&", "and").ToLower() ?? "";
+                                imageUrl = $"https://www.auto-data.net/images/{safeBrand}/{safeModel}.jpg";
+                            }
+                            
+                            // Fallback naar placeholder met merk en model tekst
+                            var fallbackUrl = $"https://via.placeholder.com/400x300/0066CC/FFFFFF.png?text={Uri.EscapeDataString(car.Brand + " " + car.Model)}";
+                        }
+                        <img src="@imageUrl" 
+                             class="card-img-top" 
+                             alt="@car.Brand @car.Model"
+                             style="height: 200px; object-fit: cover; background-color: #1a1a1a; display: block; width: 100%;"
+                             onerror="if (this.src !== '@fallbackUrl') { this.src = '@fallbackUrl'; this.onerror = null; }"
+                             loading="lazy">
+                        <div class="card-body">
+                            <h5 class="card-title">@car.Brand @car.Model</h5>
+                            <p class="card-text">
+                                <strong>Prijs:</strong> €@car.Budget.ToString("N0")<br>
+                                <strong>Brandstof:</strong> @car.Fuel<br>
+                                <strong>Bouwjaar:</strong> @car.Year<br>
+                                <strong>Vermogen:</strong> @car.Power PK
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <p class="text-muted">
+                    <span id="filteredCount">@Model.AllCars.Count</span> van @Model.AllCars.Count auto's getoond
+                </p>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        const cars = @Html.Raw(Json.Serialize(Model.AllCars ?? new List<CarRecommender.Web.Models.Car>()));
+        
+        document.getElementById('maxBudget').addEventListener('input', function() {
+            document.getElementById('budgetValue').textContent = parseInt(this.value).toLocaleString('nl-NL');
+            filterCars();
+        });
+
+        document.getElementById('fuelFilter').addEventListener('change', filterCars);
+        document.getElementById('minYear').addEventListener('input', function() {
+            document.getElementById('yearValue').textContent = this.value;
+            filterCars();
+        });
+
+        function filterCars() {
+            const maxBudget = parseInt(document.getElementById('maxBudget').value);
+            const fuelFilter = document.getElementById('fuelFilter').value.toLowerCase();
+            const minYear = parseInt(document.getElementById('minYear').value);
+            
+            const carCards = document.querySelectorAll('.car-card');
+            let visibleCount = 0;
+            
+            carCards.forEach(card => {
+                const budget = parseFloat(card.dataset.budget);
+                const fuel = card.dataset.fuel;
+                const year = parseInt(card.dataset.year);
+                
+                const matchesBudget = budget <= maxBudget;
+                const matchesFuel = !fuelFilter || fuel === fuelFilter;
+                const matchesYear = year >= minYear;
+                
+                if (matchesBudget && matchesFuel && matchesYear) {
+                    card.style.display = '';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            
+            document.getElementById('filteredCount').textContent = visibleCount;
+        }
+
+        function resetFilters() {
+            document.getElementById('maxBudget').value = document.getElementById('maxBudget').max;
+            document.getElementById('budgetValue').textContent = parseInt(document.getElementById('maxBudget').max).toLocaleString('nl-NL');
+            document.getElementById('fuelFilter').value = '';
+            document.getElementById('minYear').value = document.getElementById('minYear').min;
+            document.getElementById('yearValue').textContent = document.getElementById('minYear').min;
+            filterCars();
+        }
+    </script>
+}
+

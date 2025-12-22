@@ -1,0 +1,102 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Zoek uw ideale auto";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4 mb-4">Zoek uw ideale auto</h1>
+            <p class="lead">Beschrijf uw wensen en wij vinden de perfecte auto voor u!</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Fout:</strong> @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <form method="post" class="mb-4">
+                <div class="mb-3">
+                    <label for="SearchText" class="form-label">Beschrijf uw ideale auto:</label>
+                    <textarea 
+                        class="form-control" 
+                        id="SearchText" 
+                        name="SearchText" 
+                        rows="4" 
+                        placeholder="Bijvoorbeeld: Ik zoek een auto met maximaal 25.000 euro budget, benzine, automaat, voor dagelijks woon-werkverkeer..."
+                        required>@Model.SearchText</textarea>
+                    <div class="form-text">
+                        Beschrijf uw voorkeuren zoals budget, brandstof, transmissie, gebruik, vermogen, etc.
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-search"></i> Zoek mijn ideale auto
+                </button>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.Recommendations != null && Model.Recommendations.Count > 0)
+    {
+        <div class="row mt-4">
+            <div class="col-12">
+                <h2 class="mb-4">Aanbevolen auto's</h2>
+            </div>
+        </div>
+
+        <div class="row">
+            @foreach (var recommendation in Model.Recommendations)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        @{
+                            // Probeer eerst ImageUrl van API
+                            var imageUrl = !string.IsNullOrEmpty(recommendation.Car.ImageUrl) 
+                                ? recommendation.Car.ImageUrl 
+                                : string.Empty;
+                            
+                            // Als geen ImageUrl, probeer Auto-Data.net URL
+                            if (string.IsNullOrEmpty(imageUrl))
+                            {
+                                var safeBrand = recommendation.Car.Brand?.Trim().Replace(" ", "-").Replace("&", "and").ToLower() ?? "";
+                                var safeModel = recommendation.Car.Model?.Trim().Replace(" ", "-").Replace("&", "and").ToLower() ?? "";
+                                imageUrl = $"https://www.auto-data.net/images/{safeBrand}/{safeModel}.jpg";
+                            }
+                            
+                            // Fallback naar placeholder met merk en model tekst
+                            var fallbackUrl = $"https://via.placeholder.com/400x300/0066CC/FFFFFF.png?text={Uri.EscapeDataString(recommendation.Car.Brand + " " + recommendation.Car.Model)}";
+                        }
+                        <img src="@imageUrl" 
+                             class="card-img-top" 
+                             alt="@recommendation.Car.Brand @recommendation.Car.Model"
+                             style="height: 200px; object-fit: cover; background-color: #1a1a1a; display: block; width: 100%;"
+                             onerror="if (this.src !== '@fallbackUrl') { this.src = '@fallbackUrl'; this.onerror = null; }"
+                             loading="lazy">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                @recommendation.Car.Brand @recommendation.Car.Model
+                            </h5>
+                            <p class="card-text">
+                                <strong>Prijs:</strong> €@recommendation.Car.Budget.ToString("N0")<br>
+                                <strong>Brandstof:</strong> @recommendation.Car.Fuel<br>
+                                <strong>Bouwjaar:</strong> @recommendation.Car.Year<br>
+                                <strong>Vermogen:</strong> @recommendation.Car.Power PK<br>
+                                <strong>Match:</strong> @((recommendation.SimilarityScore * 100).ToString("F1"))%
+                            </p>
+                            <div class="alert alert-info mb-0">
+                                <small><strong>Waarom deze auto?</strong><br>@recommendation.Explanation</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
