@@ -69,9 +69,10 @@ venv/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Data files (optioneel - uncomment als je CSV files niet wilt committen)
-# backend/data/*.csv
-# backend/data/*.xlsx
+# Data files - grote CSV bestanden uitsluiten (overschrijden GitHub's 100MB limiet)
+backend/data/*.csv
+backend/data/*.xlsx
+!backend/data/Cleaned_Car_Data_For_App_Fully_Enriched.csv
 
 # Images (optioneel - uncomment als je images niet wilt committen)
 # backend/images/**
