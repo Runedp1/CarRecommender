@@ -74,11 +74,29 @@ public class RuleBasedFilter
             });
         }
 
-        // Merk filter (exacte match, case-insensitive)
+        // Merk filter (flexibele match, case-insensitive, ondersteunt partial matches)
         if (!string.IsNullOrWhiteSpace(criteria.PreferredBrand))
         {
+            string brandLower = criteria.PreferredBrand.ToLower().Trim();
             filtered = filtered.Where(c => 
-                c.Brand.Equals(criteria.PreferredBrand, StringComparison.OrdinalIgnoreCase));
+            {
+                string carBrand = c.Brand.ToLower().Trim();
+                
+                // Exacte match
+                if (carBrand == brandLower)
+                    return true;
+                
+                // Partial match (bijv. "bmw" matcht "BMW", "bmw x5" matcht "BMW")
+                if (carBrand.Contains(brandLower) || brandLower.Contains(carBrand))
+                    return true;
+                
+                // Varianten (bijv. "mercedes" matcht "mercedes-benz")
+                if ((brandLower.Contains("mercedes") && carBrand.Contains("mercedes")) ||
+                    (brandLower.Contains("benz") && carBrand.Contains("mercedes")))
+                    return true;
+                
+                return false;
+            });
         }
 
         // Carrosserie filter

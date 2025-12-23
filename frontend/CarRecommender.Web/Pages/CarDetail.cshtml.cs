@@ -9,15 +9,19 @@ public class CarDetailModel : PageModel
 {
     private readonly CarApiClient _apiClient;
     private readonly ILogger<CarDetailModel> _logger;
+    private readonly IConfiguration _configuration;
 
     public Car? Car { get; set; }
     public List<string> Images { get; set; } = new();
     public string? ErrorMessage { get; set; }
+    public string ApiBaseUrl { get; set; } = string.Empty;
 
-    public CarDetailModel(CarApiClient apiClient, ILogger<CarDetailModel> logger)
+    public CarDetailModel(CarApiClient apiClient, ILogger<CarDetailModel> logger, IConfiguration configuration)
     {
         _apiClient = apiClient;
         _logger = logger;
+        _configuration = configuration;
+        ApiBaseUrl = _configuration["ApiSettings:BaseUrl"] ?? string.Empty;
     }
 
     public async Task<IActionResult> OnGetAsync(int id)

@@ -2,6 +2,7 @@
 @model CarDetailModel
 @{
     ViewData["Title"] = Model.Car != null ? $"{Model.Car.Brand} {Model.Car.Model}" : "Auto Details";
+    var apiBaseUrl = Model.ApiBaseUrl;
 }
 
 @functions {
@@ -55,8 +56,14 @@
                         <div class="carousel-inner">
                             @for (int i = 0; i < Model.Images.Count; i++)
                             {
+                                var imageSrc = Model.Images[i];
+                                // Als image relatief pad is (begint met /), voeg API base URL toe voor Azure
+                                if (!string.IsNullOrEmpty(imageSrc) && imageSrc.StartsWith("/") && !string.IsNullOrEmpty(apiBaseUrl))
+                                {
+                                    imageSrc = apiBaseUrl + imageSrc;
+                                }
                                 <div class="carousel-item @(i == 0 ? "active" : "")">
-                                    <img src="@Model.Images[i]" 
+                                    <img src="@imageSrc" 
                                          class="d-block w-100" 
                                          alt="@Model.Car.Brand @Model.Car.Model - Foto @(i + 1)"
                                          style="height: 400px; object-fit: cover; background-color: #1a1a1a;"

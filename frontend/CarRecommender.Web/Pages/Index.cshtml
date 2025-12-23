@@ -77,10 +77,18 @@
                 <div class="col-md-6 col-lg-4 mb-4">
                     <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@recommendation.Car.Id'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                         @{
-                            // Probeer eerst ImageUrl van API
+                            // Probeer eerst ImageUrl van API (kan Kaggle image zijn)
                             var imageUrl = !string.IsNullOrEmpty(recommendation.Car.ImageUrl) 
                                 ? recommendation.Car.ImageUrl 
                                 : string.Empty;
+                            
+                            // Als ImageUrl relatief pad is (begint met /), probeer lokaal eerst
+                            // Voor Azure: images zijn niet beschikbaar, gebruik fallback
+                            if (!string.IsNullOrEmpty(imageUrl) && imageUrl.StartsWith("/"))
+                            {
+                                // Skip - images zijn niet beschikbaar op Azure
+                                imageUrl = string.Empty;
+                            }
                             
                             // Als geen ImageUrl, probeer Auto-Data.net URL
                             if (string.IsNullOrEmpty(imageUrl))

@@ -15,6 +15,7 @@ builder.Services.AddHttpClient<CarApiClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
