@@ -12,6 +12,8 @@ public class Car
     public string Fuel { get; set; } = string.Empty;
     public decimal Budget { get; set; }
     public int Year { get; set; }
+    public string? Transmission { get; set; }  // transmissie (automatic/manual)
+    public string? BodyType { get; set; }  // carrosserie (suv/sedan/hatchback/etc.)
     public string ImagePath { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
 }

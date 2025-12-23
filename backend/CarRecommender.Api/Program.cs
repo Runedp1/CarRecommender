@@ -29,6 +29,21 @@ builder.Services.AddSingleton<ICarRepository>(sp => new CarRepository(csvFileNam
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 
 // ============================================================================
+// CORS CONFIGURATIE
+// ============================================================================
+// CORS is nodig zodat de frontend (op localhost:7000) kan communiceren met de API (op localhost:5283)
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:7000", "https://localhost:7001")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
+// ============================================================================
 // SWAGGER/OPENAPI CONFIGURATIE
 // ============================================================================
 // Swagger zorgt voor automatische API documentatie en test interface.
@@ -83,9 +98,51 @@ if (app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+// CORS middleware - moet vóór UseRouting/MapControllers komen
+app.UseCors();
+
 // Serve static files (voor lokale auto-afbeeldingen uit images/ directory)
-// Dit maakt afbeeldingen beschikbaar via /images/{brand}/{model}/{id}.jpg
+// Dit maakt afbeeldingen beschikbaar via /images/{filename}.jpg
 app.UseStaticFiles();
+
+// Serve images from backend/images directory
+// Probeer verschillende locaties (lokaal en Azure)
+string[] possibleImagePaths = new[]
+{
+    Path.Combine(builder.Environment.ContentRootPath, "..", "backend", "images"), // Lokaal development
+    Path.Combine(builder.Environment.ContentRootPath, "images"), // Azure deployment
+    Path.Combine(builder.Environment.ContentRootPath, "backend", "images"), // Alternatief lokaal
+    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "images"), // Azure runtime
+    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backend", "images") // Alternatief Azure
+};
+
+string? imagesPath = null;
+foreach (var path in possibleImagePaths)
+{
+    if (Directory.Exists(path))
+    {
+        imagesPath = path;
+        break;
+    }
+}
+
+if (!string.IsNullOrEmpty(imagesPath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(imagesPath),
+        RequestPath = "/images"
+    });
+    Console.WriteLine($"Images directory geconfigureerd: {imagesPath}");
+}
+else
+{
+    Console.WriteLine($"Waarschuwing: Images directory niet gevonden. Gezocht in:");
+    foreach (var path in possibleImagePaths)
+    {
+        Console.WriteLine($"  - {path}");
+    }
+}
 
 // ============================================================================
 // GLOBALE FOUTAFHANDELING VOOR AZURE PRODUCTION

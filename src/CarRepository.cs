@@ -102,6 +102,8 @@ public class CarRepository : ICarRepository
             int brandstofIndex = FindColumnIndex(headerColumns, new[] { "brandstof", "fuel", "fuel types" });
             int budgetIndex = FindColumnIndex(headerColumns, new[] { "budget", "prijs", "price", "cars prices" });
             int bouwjaarIndex = FindColumnIndex(headerColumns, new[] { "bouwjaar", "year", "jaar" });
+            int transmissionIndex = FindColumnIndex(headerColumns, new[] { "transmission", "transmissie" });
+            int bodyTypeIndex = FindColumnIndex(headerColumns, new[] { "type_auto", "bodytype", "body type", "carrosserie", "type" });
             int imagePathIndex = FindColumnIndex(headerColumns, new[] { "image_path", "Image_Path", "imagepath", "image name", "genmodel_id", "Image_ID" });
 
             // Verwerk alle data regels (skip header)
@@ -187,6 +189,18 @@ public class CarRepository : ICarRepository
                         {
                             car.Year = year;
                         }
+                    }
+
+                    // Parse Transmissie (Transmission)
+                    if (transmissionIndex >= 0 && transmissionIndex < columns.Length)
+                    {
+                        car.Transmission = columns[transmissionIndex]?.Trim();
+                    }
+
+                    // Parse Carrosserie (Body Type)
+                    if (bodyTypeIndex >= 0 && bodyTypeIndex < columns.Length)
+                    {
+                        car.BodyType = columns[bodyTypeIndex]?.Trim();
                     }
 
                     // Image path uit CSV (optioneel, anders wordt het later gegenereerd)
@@ -302,8 +316,17 @@ public class CarRepository : ICarRepository
             }
             else
             {
-                // Genereer externe ImageUrl als fallback
-                car.ImageUrl = GenerateImageUrl(car);
+                // Probeer Kaggle image te vinden (andere naamgeving)
+                string kaggleImagePath = FindKaggleImage(car);
+                if (!string.IsNullOrEmpty(kaggleImagePath))
+                {
+                    car.ImageUrl = kaggleImagePath;
+                }
+                else
+                {
+                    // Genereer externe ImageUrl als fallback
+                    car.ImageUrl = GenerateImageUrl(car);
+                }
             }
         }
     }
@@ -389,6 +412,136 @@ public class CarRepository : ICarRepository
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Zoekt een Kaggle image op basis van merk en model.
+    /// Kaggle images hebben naamgeving: Brand_Model_Year_... (bijv. Acura_ILX_2013_...)
+    /// </summary>
+    private string FindKaggleImage(Car car)
+    {
+        if (string.IsNullOrWhiteSpace(car.Brand) || string.IsNullOrWhiteSpace(car.Model))
+            return string.Empty;
+
+        try
+        {
+            // Probeer verschillende mogelijke image directories
+            string[] possibleDirs = new[]
+            {
+                Path.Combine(Directory.GetCurrentDirectory(), "backend", "images"),
+                Path.Combine(Directory.GetCurrentDirectory(), "images"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backend", "images"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "images")
+            };
+
+            string? imagesDir = null;
+            foreach (var dir in possibleDirs)
+            {
+                if (Directory.Exists(dir))
+                {
+                    imagesDir = dir;
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(imagesDir))
+                return string.Empty;
+
+            // Normaliseer merk en model voor matching
+            string brandNormalized = NormalizeForImageSearch(car.Brand);
+            string modelNormalized = NormalizeForImageSearch(car.Model);
+
+            // Get all image files
+            var allImages = Directory.GetFiles(imagesDir, "*.jpg", SearchOption.TopDirectoryOnly);
+            
+            // Zoek naar best match
+            string bestMatch = string.Empty;
+            int bestScore = 0;
+
+            foreach (var imagePath in allImages)
+            {
+                string fileName = Path.GetFileNameWithoutExtension(imagePath);
+                string[] parts = fileName.Split('_');
+                
+                if (parts.Length < 2)
+                    continue;
+
+                string imageBrand = NormalizeForImageSearch(parts[0]);
+                string imageModel = NormalizeForImageSearch(parts[1]);
+
+                int score = 0;
+                
+                // Exact brand match
+                if (imageBrand == brandNormalized)
+                    score += 10;
+                else if (imageBrand.Contains(brandNormalized) || brandNormalized.Contains(imageBrand))
+                    score += 5;
+
+                // Exact model match
+                if (imageModel == modelNormalized)
+                    score += 10;
+                else if (imageModel.Contains(modelNormalized) || modelNormalized.Contains(imageModel))
+                    score += 5;
+
+                // Year match (bonus)
+                if (parts.Length > 2 && int.TryParse(parts[2], out int imageYear))
+                {
+                    if (car.Year > 0 && Math.Abs(imageYear - car.Year) <= 2)
+                        score += 2;
+                }
+
+                if (score > bestScore && score >= 10) // Minimaal brand + model match nodig
+                {
+                    bestScore = score;
+                    bestMatch = imagePath;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(bestMatch))
+            {
+                // Converteer naar relatieve URL voor web server
+                // Images moeten beschikbaar zijn via /images/...
+                string fileName = Path.GetFileName(bestMatch);
+                
+                // Als image in backend/images staat, gebruik /images/...
+                if (bestMatch.Contains("backend" + Path.DirectorySeparatorChar + "images"))
+                {
+                    return $"/images/{fileName}";
+                }
+                else
+                {
+                    // Probeer relatieve path
+                    string relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), bestMatch);
+                    return $"/{relativePath.Replace('\\', '/')}";
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Stil falen, gebruik fallback
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Normaliseert merk/model naam voor image matching.
+    /// </summary>
+    private string NormalizeForImageSearch(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return string.Empty;
+
+        // Lowercase, trim, verwijder speciale tekens
+        string normalized = name.ToLower().Trim();
+        
+        // Vervang spaties en streepjes met underscores
+        normalized = normalized.Replace(" ", "_").Replace("-", "_");
+        
+        // Verwijder speciale tekens behalve underscores
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"[^a-z0-9_]", "");
+        
+        return normalized;
     }
 
     /// <summary>
@@ -586,6 +739,97 @@ public class CarRepository : ICarRepository
         }
 
         return filtered.ToList();
+    }
+
+    /// <summary>
+    /// Haalt alle images op voor een specifieke auto op basis van merk, model en jaar.
+    /// Retourneert een lijst van image URLs die matchen met de auto.
+    /// </summary>
+    public List<string> GetCarImages(Car car)
+    {
+        if (string.IsNullOrWhiteSpace(car.Brand) || string.IsNullOrWhiteSpace(car.Model))
+            return new List<string>();
+
+        var imageUrls = new List<string>();
+
+        try
+        {
+            // Probeer verschillende mogelijke image directories
+            string[] possibleDirs = new[]
+            {
+                Path.Combine(Directory.GetCurrentDirectory(), "backend", "images"),
+                Path.Combine(Directory.GetCurrentDirectory(), "images"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backend", "images"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "images")
+            };
+
+            string? imagesDir = null;
+            foreach (var dir in possibleDirs)
+            {
+                if (Directory.Exists(dir))
+                {
+                    imagesDir = dir;
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(imagesDir))
+                return imageUrls;
+
+            // Normaliseer merk en model voor matching
+            string brandNormalized = NormalizeForImageSearch(car.Brand);
+            string modelNormalized = NormalizeForImageSearch(car.Model);
+
+            // Get all image files
+            var allImages = Directory.GetFiles(imagesDir, "*.jpg", SearchOption.TopDirectoryOnly);
+
+            foreach (var imagePath in allImages)
+            {
+                string fileName = Path.GetFileNameWithoutExtension(imagePath);
+                string[] parts = fileName.Split('_');
+
+                if (parts.Length < 2)
+                    continue;
+
+                string imageBrand = NormalizeForImageSearch(parts[0]);
+                string imageModel = NormalizeForImageSearch(parts[1]);
+
+                bool brandMatches = imageBrand == brandNormalized || 
+                                   imageBrand.Contains(brandNormalized) || 
+                                   brandNormalized.Contains(imageBrand);
+                
+                bool modelMatches = imageModel == modelNormalized || 
+                                   imageModel.Contains(modelNormalized) || 
+                                   modelNormalized.Contains(imageModel);
+
+                // Als brand en model matchen, voeg toe aan lijst
+                if (brandMatches && modelMatches)
+                {
+                    string fileNameOnly = Path.GetFileName(imagePath);
+                    string imageUrl = $"/images/{fileNameOnly}";
+                    imageUrls.Add(imageUrl);
+                }
+            }
+
+            // Sorteer op jaar match (images met jaar match eerst)
+            imageUrls = imageUrls.OrderByDescending(url =>
+            {
+                string fileName = Path.GetFileNameWithoutExtension(url);
+                string[] parts = fileName.Split('_');
+                if (parts.Length > 2 && int.TryParse(parts[2], out int imageYear))
+                {
+                    if (car.Year > 0 && Math.Abs(imageYear - car.Year) <= 2)
+                        return 1;
+                }
+                return 0;
+            }).ToList();
+        }
+        catch (Exception)
+        {
+            // Stil falen, retourneer lege lijst
+        }
+
+        return imageUrls;
     }
 }
 

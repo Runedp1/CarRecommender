@@ -33,5 +33,10 @@ public interface ICarRepository
         int? minYear = null, 
         int? maxYear = null,
         string? fuel = null);
+
+    /// <summary>
+    /// Haalt alle images op voor een specifieke auto op basis van merk, model en jaar.
+    /// </summary>
+    List<string> GetCarImages(Car car);
 }
 

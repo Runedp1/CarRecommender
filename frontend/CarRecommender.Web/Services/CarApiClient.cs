@@ -111,6 +111,31 @@ public class CarApiClient
             throw;
         }
     }
+
+    /// <summary>
+    /// Haalt alle images op voor een specifieke auto via GET /api/cars/{id}/images
+    /// </summary>
+    public async Task<List<string>> GetCarImagesAsync(int id)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/cars/{id}/images");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return new List<string>();
+            }
+            
+            response.EnsureSuccessStatusCode();
+            var images = await response.Content.ReadFromJsonAsync<List<string>>(_jsonOptions);
+            return images ?? new List<string>();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Fout bij het ophalen van images voor auto {CarId} van de API", id);
+            return new List<string>();
+        }
+    }
 }
 
 

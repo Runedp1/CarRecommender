@@ -1,118 +1,173 @@
-# Kaggle Auto Images Setup
+# Kaggle Images Dataset Setup Guide
 
-## Overzicht
+Deze gids helpt je om de Kaggle Car Connection Picture Dataset te integreren in je applicatie.
 
-Deze guide legt uit hoe je de Kaggle `cars-image-dataset` gebruikt om echte auto-afbeeldingen toe te voegen aan de applicatie.
+## Vereisten
 
-## Stap 1: Kaggle Credentials Instellen
+1. **Kaggle Account**: Maak een account op [kaggle.com](https://www.kaggle.com)
+2. **Kaggle API**: Installeer en configureer Kaggle API credentials
+3. **Python**: Python 3.7+ met pip
 
-1. Ga naar https://www.kaggle.com/account
-2. Scroll naar "API" sectie
-3. Klik op "Create New Token"
-4. Download `kaggle.json`
-5. Plaats het bestand in:
-   - **Windows**: `C:\Users\<username>\.kaggle\kaggle.json`
-   - **Linux/Mac**: `~/.kaggle/kaggle.json`
+## Stap 1: Kaggle API Setup
 
-## Stap 2: Kagglehub Installeren
+### 1.1 Installeer Kaggle Hub
 
 ```bash
 pip install kagglehub
 ```
 
-## Stap 3: Dataset Downloaden en Koppelen
+### 1.2 Configureer Kaggle Credentials
 
-Run het setup script:
+1. Ga naar je Kaggle account settings: https://www.kaggle.com/account
+2. Scroll naar "API" sectie
+3. Klik op "Create New Token" - dit download `kaggle.json`
+4. Plaats dit bestand in:
+   - **Windows**: `C:\Users\<username>\.kaggle\kaggle.json`
+   - **Linux/Mac**: `~/.kaggle/kaggle.json`
 
-```bash
-python scripts/setup_car_images.py
+### 1.3 Verifieer Setup
+
+```python
+import kagglehub
+path = kagglehub.dataset_download("prondeau/the-car-connection-picture-dataset")
+print(f"Dataset gedownload naar: {path}")
 ```
 
-Dit script doet het volgende:
-1. ✅ Download de Kaggle dataset (`kshitij192/cars-image-dataset`)
-2. ✅ Verkent de dataset structuur
-3. ✅ Koppelt afbeeldingen aan auto's op basis van `Image_table.csv`
-4. ✅ Kopieert afbeeldingen naar `images/{brand}/{model}/` structuur
+## Stap 2: Download Images
 
-## Stap 4: Verificatie
-
-Controleer of afbeeldingen zijn gekopieerd:
+### Optie A: Via Python Script (Aanbevolen)
 
 ```bash
-# Windows PowerShell
-Get-ChildItem images -Recurse -Filter *.jpg | Measure-Object | Select-Object Count
-
-# Linux/Mac
-find images -name "*.jpg" | wc -l
+cd tools/scripts
+python download_kaggle_images.py
 ```
 
-## Stap 5: Applicatie Herstarten
+Dit script:
+- Download de dataset van Kaggle
+- Vindt de images directory
+- Kopieert images naar `backend/images/`
+- Maakt een mapping bestand
 
-Na het kopiëren van afbeeldingen:
+### Optie B: Handmatig
 
-1. Herstart de API server
-2. Herstart de Web app
-3. Test de applicatie - je zou nu echte auto-afbeeldingen moeten zien!
+1. Download de dataset van Kaggle:
+   - Ga naar: https://www.kaggle.com/datasets/prondeau/the-car-connection-picture-dataset
+   - Klik op "Download"
+   - Extract het ZIP bestand
 
-## Hoe het Werkt
+2. Kopieer images naar project:
+   ```bash
+   # Vind de images directory in de gedownloade dataset
+   # Kopieer naar backend/images/
+   ```
 
-### Image Koppeling
+## Stap 3: Match Images met Auto's
 
-De applicatie gebruikt `Image_table.csv` om afbeeldingen te koppelen:
+Run het matching script:
 
-- **Genmodel_ID**: Unieke ID voor merk+model combinatie (bijv. `2_1` voor Abarth 124 Spider)
-- **Image_name**: Bestandsnaam in format `Brand$$Model$$Year$$Color$$Genmodel_ID$$...$$image_X.jpg`
-- **Image_Path**: Pad naar afbeelding in `images/{brand}/{model}/{genmodel_id}.jpg`
+```bash
+cd tools/scripts
+python match_images_to_cars.py
+```
 
-### ImageUrl Generatie
+Dit script:
+- Laadt de CSV data
+- Analyseert image bestandsnamen
+- Matcht images met auto's op basis van merk/model/jaar
+- Maakt een mapping JSON bestand
 
-De applicatie probeert in deze volgorde:
+## Stap 4: Update CarRepository
 
-1. **Lokale afbeelding** (als `images/{brand}/{model}/{id}.jpg` bestaat)
-   - URL: `/images/{brand}/{model}/{id}.jpg`
-   
-2. **Externe service** (fallback)
-   - Auto-Data.net of Picsum Photos
+De `CarRepository` moet worden aangepast om de mapping te gebruiken. 
 
-## Handmatige Setup (Alternatief)
+**Huidige implementatie:**
+- Zoekt images in `images/{brand}/{model}/{id}.jpg`
+- Gebruikt fallback naar externe URLs
 
-Als het script niet werkt, kun je handmatig:
+**Nieuwe implementatie:**
+- Gebruikt de mapping JSON om juiste image te vinden
+- Valideert dat image bestaat
+- Gebruikt fallback als image niet gevonden
 
-1. Download de dataset van Kaggle
-2. Extract de afbeeldingen
-3. Kopieer naar `images/{brand}/{model}/` structuur
-4. Gebruik `Genmodel_ID` als bestandsnaam
+## Stap 5: Configureer Static Files
+
+Zorg dat de backend static files serveert:
+
+**In `backend/CarRecommender.Api/Program.cs`:**
+```csharp
+app.UseStaticFiles(); // Al aanwezig
+```
+
+**In `appsettings.json`:**
+```json
+{
+  "StaticFiles": {
+    "RequestPath": "/images",
+    "PhysicalPath": "./images"
+  }
+}
+```
+
+## Stap 6: Test
+
+1. Start de backend API
+2. Test een endpoint die images retourneert
+3. Check of images correct worden geladen in frontend
+
+## Image Structuur
+
+De Kaggle dataset heeft waarschijnlijk een structuur zoals:
+
+```
+images/
+  {brand}/
+    {model}/
+      {year}/
+        image_1.jpg
+        image_2.jpg
+```
+
+Of:
+
+```
+images/
+  {genmodel_id}/
+    {image_name}.jpg
+```
+
+Het matching script analyseert de structuur automatisch.
 
 ## Troubleshooting
 
-### "Kaggle credentials not found"
-- Zorg dat `kaggle.json` in de juiste directory staat
-- Check of de API token geldig is
+### Probleem: Kaggle API werkt niet
+**Oplossing:**
+- Check of `kaggle.json` op de juiste locatie staat
+- Verifieer dat credentials correct zijn
+- Check internet verbinding
 
-### "No images found"
-- Check of de dataset correct is gedownload
-- Verifieer de structuur van de dataset
-- Check of `Image_table.csv` correct wordt gelezen
+### Probleem: Images worden niet gevonden
+**Oplossing:**
+- Check of images in `backend/images/` staan
+- Verifieer dat static files correct geconfigureerd zijn
+- Check de mapping JSON voor correcte paths
 
-### "Images not showing in app"
-- Check of afbeeldingen in `images/` directory staan
-- Verifieer dat de Web app static files serveert (`app.UseStaticFiles()`)
-- Check browser console voor 404 errors
+### Probleem: Geen matches gevonden
+**Oplossing:**
+- Review de image bestandsnamen
+- Pas het matching algoritme aan in `match_images_to_cars.py`
+- Check of merk/model namen consistent zijn tussen CSV en images
 
-## Dataset Info
+## Volgende Stappen
 
-- **Dataset**: `kshitij192/cars-image-dataset`
-- **Source**: Kaggle
-- **License**: Check Kaggle dataset page voor licentie details
-- **Images**: Auto-afbeeldingen georganiseerd per merk/model
+1. ✅ Download Kaggle dataset
+2. ✅ Match images met auto's
+3. ⏳ Update CarRepository om mapping te gebruiken
+4. ⏳ Test image loading
+5. ⏳ Optimaliseer image paths voor productie
 
-## Next Steps
+## Notities
 
-Na setup:
-- ✅ Afbeeldingen worden automatisch gebruikt als ze bestaan
-- ✅ Fallback naar externe services als lokale afbeeldingen niet bestaan
-- ✅ Geen code changes nodig - alles werkt automatisch!
-
-
-
-
+- De dataset kan groot zijn (>1GB) - zorg voor voldoende schijfruimte
+- Images kunnen verschillende formaten hebben (jpg, png)
+- Overweeg image compression voor productie
+- Cache images voor betere performance

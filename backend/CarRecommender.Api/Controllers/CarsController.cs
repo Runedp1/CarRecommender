@@ -131,6 +131,36 @@ public class CarsController : ControllerBase
             throw;
         }
     }
+
+    /// <summary>
+    /// GET /api/cars/{id}/images
+    /// Haalt alle images op voor een specifieke auto.
+    /// </summary>
+    [HttpGet("{id}/images")]
+    [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public IActionResult GetCarImages(int id)
+    {
+        try
+        {
+            var car = _carRepository.GetCarById(id);
+
+            if (car == null)
+            {
+                _logger.LogWarning("Auto met ID {CarId} niet gevonden voor images", id);
+                return NotFound(new { error = $"Auto met ID {id} niet gevonden." });
+            }
+
+            var images = _carRepository.GetCarImages(car);
+            return Ok(images);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fout bij ophalen van images voor auto met ID {CarId}", id);
+            throw;
+        }
+    }
 }
 
 /// <summary>

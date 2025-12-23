@@ -75,7 +75,7 @@
             @foreach (var recommendation in Model.Recommendations)
             {
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100 shadow-sm">
+                    <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@recommendation.Car.Id'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                         @{
                             // Probeer eerst ImageUrl van API
                             var imageUrl = !string.IsNullOrEmpty(recommendation.Car.ImageUrl) 
@@ -101,7 +101,9 @@
                              loading="lazy">
                         <div class="card-body">
                             <h5 class="card-title">
-                                @recommendation.Car.Brand @recommendation.Car.Model
+                                <a href="/car/@recommendation.Car.Id" class="text-decoration-none text-dark" onclick="event.stopPropagation();">
+                                    @recommendation.Car.Brand @recommendation.Car.Model
+                                </a>
                             </h5>
                             <p class="card-text">
                                 <strong>Prijs:</strong> €@recommendation.Car.Budget.ToString("N0")<br>
@@ -115,9 +117,12 @@
                                 }
                                 <strong>Match:</strong> @((recommendation.SimilarityScore * 100).ToString("F1"))%
                             </p>
-                            <div class="alert alert-info mb-0">
+                            <div class="alert alert-info mb-2">
                                 <small><strong>Waarom deze auto?</strong><br>@recommendation.Explanation</small>
                             </div>
+                            <a href="/car/@recommendation.Car.Id" class="btn btn-primary btn-sm w-100" onclick="event.stopPropagation();">
+                                Bekijk alle foto's
+                            </a>
                         </div>
                     </div>
                 </div>

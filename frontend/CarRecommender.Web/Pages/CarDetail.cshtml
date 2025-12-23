@@ -1,0 +1,179 @@
+@page "/car/{id}"
+@model CarDetailModel
+@{
+    ViewData["Title"] = Model.Car != null ? $"{Model.Car.Brand} {Model.Car.Model}" : "Auto Details";
+}
+
+@functions {
+    string FormatTransmission(string? transmission)
+    {
+        if (string.IsNullOrWhiteSpace(transmission))
+            return "Niet opgegeven";
+        
+        string lower = transmission.ToLower().Trim();
+        
+        if (lower.Contains("automatic") || lower.Contains("automaat") || lower.Contains("automatisch") || lower.Contains("cvt") || lower.Contains("dct"))
+            return "Automaat";
+        
+        if (lower.Contains("manual") || lower.Contains("handmatig") || lower.Contains("schakel") || lower.Contains("handbak"))
+            return "Handmatig";
+        
+        return char.ToUpper(transmission[0]) + (transmission.Length > 1 ? transmission.Substring(1).ToLower() : "");
+    }
+}
+
+<div class="container mt-4">
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Fout:</strong> @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (Model.Car != null)
+    {
+        <div class="row mb-3">
+            <div class="col-12">
+                <a href="/" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Terug naar zoeken
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <h1 class="display-4 mb-4">@Model.Car.Brand @Model.Car.Model</h1>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                @if (Model.Images.Count > 0)
+                {
+                    <div id="carImageCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
+                        <div class="carousel-inner">
+                            @for (int i = 0; i < Model.Images.Count; i++)
+                            {
+                                <div class="carousel-item @(i == 0 ? "active" : "")">
+                                    <img src="@Model.Images[i]" 
+                                         class="d-block w-100" 
+                                         alt="@Model.Car.Brand @Model.Car.Model - Foto @(i + 1)"
+                                         style="height: 400px; object-fit: cover; background-color: #1a1a1a;"
+                                         onerror="this.src='https://via.placeholder.com/800x400/0066CC/FFFFFF.png?text=@Uri.EscapeDataString(Model.Car.Brand + " " + Model.Car.Model)'">
+                                </div>
+                            }
+                        </div>
+                        @if (Model.Images.Count > 1)
+                        {
+                            <button class="carousel-control-prev" type="button" data-bs-target="#carImageCarousel" data-bs-slide="prev">
+                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Vorige</span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#carImageCarousel" data-bs-slide="next">
+                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Volgende</span>
+                            </button>
+                        }
+                    </div>
+
+                    <div class="mb-4">
+                        <p class="text-muted">
+                            <strong>@Model.Images.Count</strong> foto@(Model.Images.Count != 1 ? "'s" : "") beschikbaar
+                        </p>
+                    </div>
+                }
+                else
+                {
+                    <div class="mb-4">
+                        <img src="https://via.placeholder.com/800x400/0066CC/FFFFFF.png?text=@Uri.EscapeDataString(Model.Car.Brand + " " + Model.Car.Model)" 
+                             class="img-fluid" 
+                             alt="@Model.Car.Brand @Model.Car.Model">
+                    </div>
+                }
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title mb-4">Auto Details</h3>
+                        <dl class="row">
+                            <dt class="col-sm-5">Prijs:</dt>
+                            <dd class="col-sm-7">€@Model.Car.Budget.ToString("N0")</dd>
+
+                            <dt class="col-sm-5">Brandstof:</dt>
+                            <dd class="col-sm-7">@Model.Car.Fuel</dd>
+
+                            <dt class="col-sm-5">Bouwjaar:</dt>
+                            <dd class="col-sm-7">@Model.Car.Year</dd>
+
+                            <dt class="col-sm-5">Vermogen:</dt>
+                            <dd class="col-sm-7">@Model.Car.Power PK</dd>
+
+                            <dt class="col-sm-5">Transmissie:</dt>
+                            <dd class="col-sm-7">@FormatTransmission(Model.Car.Transmission)</dd>
+
+                            @if (!string.IsNullOrWhiteSpace(Model.Car.BodyType))
+                            {
+                                <dt class="col-sm-5">Carrosserie:</dt>
+                                <dd class="col-sm-7">@Model.Car.BodyType</dd>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(Model.Car.DriveType))
+                            {
+                                <dt class="col-sm-5">Aandrijving:</dt>
+                                <dd class="col-sm-7">@Model.Car.DriveType</dd>
+                            }
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.Images.Count > 1)
+        {
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h3>Alle Foto's</h3>
+                    <div class="row">
+                        @foreach (var imageUrl in Model.Images)
+                        {
+                            <div class="col-md-3 col-sm-4 col-6 mb-3">
+                                <img src="@imageUrl" 
+                                     class="img-thumbnail" 
+                                     alt="@Model.Car.Brand @Model.Car.Model"
+                                     style="height: 200px; object-fit: cover; cursor: pointer;"
+                                     onclick="showImageModal('@imageUrl')"
+                                     onerror="this.src='https://via.placeholder.com/300x200/0066CC/FFFFFF.png?text=@Uri.EscapeDataString(Model.Car.Brand + " " + Model.Car.Model)'">
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@(Model.Car?.Brand) @(Model.Car?.Model)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" class="img-fluid" alt="@(Model.Car?.Brand) @(Model.Car?.Model)">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showImageModal(imageUrl) {
+        document.getElementById('modalImage').src = imageUrl;
+        var modal = new bootstrap.Modal(document.getElementById('imageModal'));
+        modal.show();
+    }
+</script>
+

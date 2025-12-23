@@ -2,12 +2,16 @@ namespace CarRecommender;
 
 /// <summary>
 /// Implementatie van IRecommendationService - coördineert het recommendation proces.
-/// Gebruikt RecommendationEngine voor de berekeningen en ICarRepository voor data toegang.
+/// Gebruikt nieuwe AI structuur: RuleBasedFilter (Old AI) + Content-based recommender (New AI).
 /// 
 /// Business logica laag:
 /// - Deze laag bevat alle recommendation algoritmes en business regels
 /// - Gebruikt dependency injection om ICarRepository te krijgen (data laag)
 /// - Onafhankelijk van hoe data wordt opgeslagen (CSV, SQL, etc.)
+/// 
+/// AI Architectuur:
+/// - Old AI: RuleBasedFilter bepaalt candidate set (harde filters)
+/// - New AI: CarFeatureVector + SimilarityService + RankingService voor content-based recommendations
 /// 
 /// Voor Azure deployment:
 /// - Deze service blijft hetzelfde werken
@@ -16,9 +20,17 @@ namespace CarRecommender;
 public class RecommendationService : IRecommendationService
 {
     private readonly ICarRepository _carRepository;
-    private readonly RecommendationEngine _engine;
+    private readonly RecommendationEngine _engine; // Behouden voor backward compatibility
     private readonly TextParserService _textParser;
     private readonly ExplanationBuilder _explanationBuilder;
+    
+    // Nieuwe AI componenten
+    private readonly RuleBasedFilter _ruleBasedFilter;
+    private readonly CarFeatureVectorFactory _featureVectorFactory;
+    private readonly SimilarityService _similarityService;
+    private readonly RankingService _rankingService;
+    
+    private bool _isInitialized = false;
 
     /// <summary>
     /// Constructor - initialiseert alle services met dependency injection.
@@ -26,9 +38,29 @@ public class RecommendationService : IRecommendationService
     public RecommendationService(ICarRepository carRepository)
     {
         _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
-        _engine = new RecommendationEngine();
+        _engine = new RecommendationEngine(); // Behouden voor backward compatibility
         _textParser = new TextParserService();
         _explanationBuilder = new ExplanationBuilder();
+        
+        // Initialiseer nieuwe AI componenten
+        _ruleBasedFilter = new RuleBasedFilter();
+        _featureVectorFactory = new CarFeatureVectorFactory();
+        _similarityService = new SimilarityService();
+        _rankingService = new RankingService();
+    }
+
+    /// <summary>
+    /// Initialiseert de feature vector factory met alle auto's.
+    /// Moet worden aangeroepen voordat RecommendFromText wordt gebruikt.
+    /// </summary>
+    private void EnsureInitialized()
+    {
+        if (_isInitialized)
+            return;
+
+        List<Car> allCars = _carRepository.GetAllCars();
+        _featureVectorFactory.Initialize(allCars);
+        _isInitialized = true;
     }
 
     /// <summary>
@@ -94,68 +126,63 @@ public class RecommendationService : IRecommendationService
 
     /// <summary>
     /// Genereert recommendations op basis van tekst input van gebruiker.
-    /// Parse tekst, filter auto's, pas gewichten aan en genereer explanations.
+    /// Gebruikt nieuwe AI structuur: Old AI (rule-based filters) + New AI (content-based similarity).
     /// </summary>
     public List<RecommendationResult> RecommendFromText(string inputText, int n = 5)
     {
+        EnsureInitialized();
+        
         List<Car> allCars = _carRepository.GetAllCars();
         
         // Parse tekst naar preferences
         UserPreferences prefs = _textParser.ParsePreferencesFromText(inputText);
 
-        // Filter auto's op basis van preferences
-        List<Car> filteredCars = FilterCarsByPreferences(allCars, prefs);
+        // OLD AI: Rule-based filtering - bepaal candidate set met harde filters
+        var filterCriteria = _ruleBasedFilter.ConvertPreferencesToCriteria(prefs);
+        List<Car> candidateCars = _ruleBasedFilter.FilterCars(allCars, filterCriteria);
 
-        if (filteredCars.Count == 0)
+        // Als geen auto's matchten filters, gebruik alle auto's (maar met lagere scores)
+        if (candidateCars.Count == 0)
         {
-            // Geen auto's matchten filters, gebruik alle auto's
-            filteredCars = allCars;
+            candidateCars = allCars;
         }
 
-        // Bepaal gewichten op basis van user preferences (gebruik gewichten uit prefs, of fallback)
-        var weights = CalculateWeightsFromPreferences(prefs);
+        // NEW AI: Content-based similarity
+        // Maak ideale feature vector op basis van preferences
+        CarFeatureVector idealVector = _featureVectorFactory.CreateIdealVector(prefs, candidateCars);
 
-        // Bereken min/max voor normalisatie
-        var validCars = filteredCars.Where(c => c.Power > 0 && c.Budget > 0 && c.Year > 1900).ToList();
-        if (validCars.Count == 0)
-        {
-            return new List<RecommendationResult>();
-        }
-
-        int minPower = validCars.Min(c => c.Power);
-        int maxPower = validCars.Max(c => c.Power);
-        decimal minBudget = validCars.Min(c => c.Budget);
-        decimal maxBudget = validCars.Max(c => c.Budget);
-        int minYear = validCars.Min(c => c.Year);
-        int maxYear = validCars.Max(c => c.Year);
-
-        // Maak een "ideale" target auto op basis van preferences
-        Car idealCar = CreateIdealCarFromPreferences(prefs, filteredCars);
-
-        // Bereken weighted similarity voor alle gefilterde auto's
+        // Bereken similarity en ranking scores voor alle candidate auto's
         List<RecommendationResult> results = new List<RecommendationResult>();
 
-        foreach (Car car in filteredCars)
+        foreach (Car car in candidateCars)
         {
-            // Gebruik weighted similarity berekening
-            double similarity = CalculateWeightedSimilarity(car, idealCar, prefs, 
-                minPower, maxPower, minBudget, maxBudget, minYear, maxYear);
+            // Skip auto's zonder geldige data
+            if (car.Power <= 0 || car.Budget <= 0 || car.Year < 1900)
+                continue;
 
-            string explanation = _explanationBuilder.BuildExplanation(car, prefs, similarity);
+            // Bereken cosine similarity tussen auto en ideale vector
+            double similarityScore = _similarityService.CalculateSimilarity(car, idealVector, _featureVectorFactory);
+
+            // Bereken gecombineerde score (similarity + preference matching + controlled randomness)
+            double combinedScore = _rankingService.CalculateCombinedScore(car, similarityScore, prefs);
+
+            string explanation = _explanationBuilder.BuildExplanation(car, prefs, combinedScore);
 
             results.Add(new RecommendationResult
             {
                 Car = car,
-                SimilarityScore = similarity,
+                SimilarityScore = combinedScore, // Gebruik gecombineerde score
                 Explanation = explanation
             });
         }
 
-        // Sorteer op similarity, verwijder dubbele modellen (behoud hoogste similarity per merk+model), en pak top N
-        return results
-            .OrderByDescending(r => r.SimilarityScore)
-            .GroupBy(r => new { r.Car.Brand, r.Car.Model }) // Groepeer alleen op merk + model (zonder brandstof voor meer diversiteit)
-            .Select(g => g.OrderByDescending(r => r.SimilarityScore).First()) // Behoud de auto met de hoogste similarity per groep
+        // Sorteer op score met controlled randomness
+        var rankedResults = _rankingService.RankWithControlledRandomness(results);
+
+        // Verwijder dubbele modellen (behoud hoogste score per merk+model) en pak top N
+        return rankedResults
+            .GroupBy(r => new { r.Car.Brand, r.Car.Model })
+            .Select(g => g.OrderByDescending(r => r.SimilarityScore).First())
             .Take(n)
             .ToList();
     }

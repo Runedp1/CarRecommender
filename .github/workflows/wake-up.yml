@@ -10,13 +10,13 @@ jobs:
   wake-up:
     runs-on: ubuntu-latest
     steps:
-      - name: Wake up frontend
+      - name: Wake up backend API
         run: |
-          echo "Waking up frontend..."
-          curl -f https://app-carrecommender-web-dev2.azurewebsites.net || echo "Frontend wake-up completed"
+          echo "Waking up backend API..."
+          curl -f https://app-carrecommender-dev.azurewebsites.net/api/health || echo "Backend wake-up completed"
       
-      - name: Wake up backend
+      - name: Wake up frontend Web
         run: |
-          echo "Waking up backend..."
-          curl -f https://app-carrecommender-dev-h0agdkbfbcb3fxg7.westeurope-01.azurewebsites.net || echo "Backend wake-up completed"
+          echo "Waking up frontend Web..."
+          curl -f https://pp-carrecommender-web-dev.azurewebsites.net/ || echo "Frontend wake-up completed"
 
