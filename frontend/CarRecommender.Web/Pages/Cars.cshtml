@@ -4,6 +4,26 @@
     ViewData["Title"] = "Blader door auto's";
 }
 
+@functions {
+    string FormatTransmission(string? transmission)
+    {
+        if (string.IsNullOrWhiteSpace(transmission))
+            return "Niet opgegeven";
+        
+        string lower = transmission.ToLower().Trim();
+        
+        // Normaliseer naar Nederlandse termen
+        if (lower.Contains("automatic") || lower.Contains("automaat") || lower.Contains("automatisch") || lower.Contains("cvt") || lower.Contains("dct"))
+            return "Automaat";
+        
+        if (lower.Contains("manual") || lower.Contains("handmatig") || lower.Contains("schakel") || lower.Contains("handbak"))
+            return "Handmatig";
+        
+        // Als het niet herkend wordt, retourneer de originele waarde met hoofdletter
+        return char.ToUpper(transmission[0]) + (transmission.Length > 1 ? transmission.Substring(1).ToLower() : "");
+    }
+}
+
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
@@ -91,7 +111,12 @@
                                 <strong>Prijs:</strong> €@car.Budget.ToString("N0")<br>
                                 <strong>Brandstof:</strong> @car.Fuel<br>
                                 <strong>Bouwjaar:</strong> @car.Year<br>
-                                <strong>Vermogen:</strong> @car.Power PK
+                                <strong>Vermogen:</strong> @car.Power PK<br>
+                                <strong>Transmissie:</strong> @FormatTransmission(car.Transmission)<br>
+                                @if (!string.IsNullOrWhiteSpace(car.BodyType))
+                                {
+                                    <strong>Carrosserie:</strong> @car.BodyType<br>
+                                }
                             </p>
                         </div>
                     </div>

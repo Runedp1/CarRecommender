@@ -15,6 +15,17 @@ public class ExplanationBuilder
         List<string> reasons = new List<string>();
 
         // Voeg redenen toe met gewichten
+        if (prefs.PreferredBrand != null)
+        {
+            string brandMatch = MatchBrand(car.Brand, prefs.PreferredBrand);
+            if (!string.IsNullOrEmpty(brandMatch))
+            {
+                double brandWeight = prefs.PreferenceWeights.GetValueOrDefault("brand", 1.0);
+                string weightText = GetWeightDescription(brandWeight);
+                reasons.Add($"{brandMatch} (belangrijkheid: {weightText})");
+            }
+        }
+
         if (prefs.PreferredFuel != null)
         {
             string fuelMatch = MatchFuel(car.Fuel, prefs.PreferredFuel);
@@ -118,6 +129,39 @@ public class ExplanationBuilder
         if (powerScore >= 0.7) return "veel vermogen";
         if (powerScore >= 0.4) return "voldoende vermogen";
         return "gemiddeld vermogen";
+    }
+
+    /// <summary>
+    /// Check of merk match en geef beschrijving terug.
+    /// </summary>
+    private string MatchBrand(string carBrand, string preferredBrand)
+    {
+        string carBrandLower = carBrand.ToLower().Trim();
+        string prefLower = preferredBrand.ToLower().Trim();
+
+        // Exacte match
+        if (carBrandLower == prefLower)
+        {
+            return $"is van het merk {carBrand}";
+        }
+
+        // Gedeeltelijke match (bijv. "mercedes" matcht "mercedes-benz")
+        if (carBrandLower.Contains(prefLower) || prefLower.Contains(carBrandLower))
+        {
+            return $"is van het merk {carBrand}";
+        }
+
+        // Speciale gevallen
+        if ((prefLower == "vw" || prefLower == "volks") && carBrandLower.Contains("volkswagen"))
+        {
+            return "is van het merk Volkswagen";
+        }
+        if (prefLower == "benz" && carBrandLower.Contains("mercedes"))
+        {
+            return "is van het merk Mercedes-Benz";
+        }
+
+        return string.Empty;
     }
 
     /// <summary>

@@ -13,6 +13,8 @@ public class Car
     public string Fuel { get; set; } = string.Empty;  // brandstof
     public decimal Budget { get; set; }  // budget/prijs
     public int Year { get; set; }  // bouwjaar
+    public string? Transmission { get; set; }  // transmissie (automatic/manual)
+    public string? BodyType { get; set; }  // carrosserie (suv/sedan/hatchback/etc.)
     public string ImagePath { get; set; } = string.Empty;  // pad naar de afbeelding (bijv. "images/brand/model/id.jpg")
     public string ImageUrl { get; set; } = string.Empty;  // URL naar een externe afbeelding van de auto
 }
@@ -35,6 +37,7 @@ public class UserPreferences
 {
     public double? MaxBudget { get; set; }  // Maximum budget in euro's
     public string? PreferredFuel { get; set; }  // Voorkeur brandstof (petrol/diesel/hybrid/electric)
+    public string? PreferredBrand { get; set; }  // Voorkeur merk (bijv. "bmw", "audi", "mercedes-benz")
     public bool? AutomaticTransmission { get; set; }  // true = automaat, false = schakel, null = geen voorkeur
     public double? MinPower { get; set; }  // Vermogen score (0.0 = laag, 1.0 = hoog) of exact KW als > 100
     public string? BodyTypePreference { get; set; }  // Voorkeur body type (suv/hatchback/sedan/station/etc.)
@@ -42,7 +45,7 @@ public class UserPreferences
     
     /// <summary>
     /// Gewichten per voorkeur om belang aan te geven.
-    /// Keys: "budget", "fuel", "transmission", "power", "bodytype", "comfort"
+    /// Keys: "budget", "fuel", "brand", "transmission", "power", "bodytype", "comfort"
     /// Values: 0.0 (optioneel) tot 1.5 (cruciaal/must-have)
     /// </summary>
     public Dictionary<string, double> PreferenceWeights { get; set; } = new Dictionary<string, double>();

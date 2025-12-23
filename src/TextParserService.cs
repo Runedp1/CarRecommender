@@ -20,6 +20,7 @@ public class TextParserService
         // Parse elke voorkeur met bijbehorende gewichten
         ExtractBudget(lowerText, prefs);
         ExtractFuelPreference(lowerText, prefs);
+        ExtractBrandPreference(lowerText, prefs);
         ExtractTransmissionPreference(lowerText, prefs);
         ExtractPowerPreference(lowerText, prefs);
         ExtractBodyTypePreference(lowerText, prefs);
@@ -110,6 +111,84 @@ public class TextParserService
             prefs.MaxBudget = maxBudget;
             double weight = DetectImportanceWeight(text, matchedContext);
             prefs.PreferenceWeights["budget"] = weight;
+        }
+    }
+
+    /// <summary>
+    /// Extraheert merk voorkeur met gewicht.
+    /// Herkent veelvoorkomende automerken in Nederlandse en Engelse tekst.
+    /// </summary>
+    private void ExtractBrandPreference(string text, UserPreferences prefs)
+    {
+        // Mapping van Nederlandse/Engelse merknamen naar genormaliseerde merknamen
+        var brandMappings = new Dictionary<string, string[]>
+        {
+            { "bmw", new[] { "bmw" } },
+            { "audi", new[] { "audi" } },
+            { "mercedes-benz", new[] { "mercedes", "mercedes-benz", "mercedes benz", "benz" } },
+            { "volkswagen", new[] { "volkswagen", "vw", "volks" } },
+            { "ford", new[] { "ford" } },
+            { "opel", new[] { "opel" } },
+            { "peugeot", new[] { "peugeot" } },
+            { "citroen", new[] { "citroen", "citroën" } },
+            { "renault", new[] { "renault" } },
+            { "toyota", new[] { "toyota" } },
+            { "honda", new[] { "honda" } },
+            { "nissan", new[] { "nissan" } },
+            { "mazda", new[] { "mazda" } },
+            { "volvo", new[] { "volvo" } },
+            { "skoda", new[] { "skoda", "škoda" } },
+            { "seat", new[] { "seat" } },
+            { "fiat", new[] { "fiat" } },
+            { "alfa romeo", new[] { "alfa romeo", "alfaromeo", "alfa" } },
+            { "jaguar", new[] { "jaguar" } },
+            { "land rover", new[] { "land rover", "landrover" } },
+            { "mini", new[] { "mini" } },
+            { "porsche", new[] { "porsche" } },
+            { "tesla", new[] { "tesla" } },
+            { "hyundai", new[] { "hyundai" } },
+            { "kia", new[] { "kia" } },
+            { "lexus", new[] { "lexus" } },
+            { "dacia", new[] { "dacia" } },
+            { "suzuki", new[] { "suzuki" } },
+            { "mitsubishi", new[] { "mitsubishi" } },
+            { "subaru", new[] { "subaru" } }
+        };
+
+        string? matchedBrand = null;
+        double weight = 1.0;
+
+        // Check op negaties eerst
+        bool isNegative = ContainsKeywords(text, new[] { "geen", "niet", "absoluut geen", "liever niet" });
+
+        // Zoek naar merken in de tekst
+        foreach (var brandMapping in brandMappings)
+        {
+            string normalizedBrand = brandMapping.Key;
+            string[] keywords = brandMapping.Value;
+
+            if (ContainsKeywords(text, keywords))
+            {
+                matchedBrand = normalizedBrand;
+                
+                // Als negatie, verhoog gewicht (must-not)
+                if (isNegative)
+                {
+                    weight = 1.5;
+                }
+                else
+                {
+                    // Detecteer gewicht uit context
+                    weight = DetectImportanceWeight(text, keywords[0]);
+                }
+                break; // Neem eerste match
+            }
+        }
+
+        if (matchedBrand != null)
+        {
+            prefs.PreferredBrand = matchedBrand;
+            prefs.PreferenceWeights["brand"] = weight;
         }
     }
 
