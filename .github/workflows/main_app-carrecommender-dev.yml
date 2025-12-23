@@ -33,10 +33,10 @@ jobs:
         run: |
           echo "Contents of publish directory:"
           dir ./publish
-          if not exist "./publish/CarRecommender.Api.dll" (
+          if (-not (Test-Path "./publish/CarRecommender.Api.dll")) {
             echo "ERROR: CarRecommender.Api.dll not found in publish output!"
             exit 1
-          )
+          }
           echo "Publish successful - DLL found"
 
       - name: Upload artifact for deployment job
@@ -65,10 +65,10 @@ jobs:
           dir ./publish
           echo "Looking for DLL:"
           dir ./publish/*.dll
-          if not exist "./publish/CarRecommender.Api.dll" (
+          if (-not (Test-Path "./publish/CarRecommender.Api.dll")) {
             echo "ERROR: CarRecommender.Api.dll not found!"
             exit 1
-          )
+          }
           echo "DLL found successfully"
       
       - name: Create deployment package
