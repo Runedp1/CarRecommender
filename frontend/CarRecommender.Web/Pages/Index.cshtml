@@ -99,61 +99,15 @@
         <div class="row">
             @foreach (var recommendation in Model.Recommendations)
             {
-                // BUG FIX: Zorg dat elke kaart een unieke identifier heeft op basis van de auto ID
-                // Dit voorkomt dat Razor dezelfde variabelen hergebruikt tussen iteraties
-                // Elke auto heeft een unieke Id property die gebruikt wordt voor routing en identificatie
                 var carId = recommendation.Car.Id;
                 var carBrand = recommendation.Car.Brand ?? "";
                 var carModel = recommendation.Car.Model ?? "";
-                
-                // BUG FIX: Genereer deterministische image URL per auto
-                // 
-                // Hoe het werkt:
-                // 1. Backend (CarRepository.AssignImagePaths) vult ImageUrl voor elke auto bij het laden
-                // 2. Backend zoekt naar matching foto's in backend/images/ op basis van merk+model
-                // 3. Als match gevonden: ImageUrl = "/images/{filename}.jpg"
-                // 4. Als geen match: ImageUrl = "" (lege string)
-                // 5. Frontend GetCarImageUrl() voegt API base URL toe aan relatieve paden
-                // 6. Als ImageUrl leeg/null is, gebruikt frontend SVG fallback
-                //
-                // Waarom dit werkt:
-                // - Elke auto krijgt zijn eigen ImageUrl op basis van merk+model matching
-                // - ImageUrl is deterministisch: zelfde merk+model = zelfde ImageUrl
-                // - Geen hardcoded URLs of willekeurige foto's - alleen echte auto foto's of SVG fallback
-                var imageUrl = Model.GetCarImageUrl(
-                    recommendation.Car.ImageUrl,  // ImageUrl van API (kan "/images/..." of "" zijn)
-                    carBrand, 
-                    carModel, 
-                    carId
-                );
-                
+                var imageUrl = Model.GetCarImageUrl(recommendation.Car.ImageUrl, carBrand, carModel, carId);
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <!-- BUG FIX: Dynamische link naar detailpagina op basis van car.Id -->
-                    <!-- 
-                        VOOR: Hardcoded of incorrect geïnterpoleerde carId in onclick handler leidde tot 
-                              alle kaarten die naar dezelfde detailpagina linkten (BMW X5).
-                        OORZAAK: Razor @carId werd mogelijk niet correct geïnterpoleerd in JavaScript string context.
-                        NU: Gebruik expliciete Razor interpolatie @(carId) met haakjes in de onclick handler 
-                            om te garanderen dat elke kaart naar de juiste auto detailpagina linkt.
-                            De @() syntax zorgt voor correcte server-side interpolatie van de variabele in elke iteratie.
-                    -->
                     <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@(carId)'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                        <!-- BUG FIX: Image display met robuuste fallback strategie -->
-                        <!-- 
-                            PROBLEEM: Alle kaarten toonden dezelfde afbeelding of verkeerde foto's
-                            OORZAAK: ImageUrl werd niet correct gebruikt of was leeg voor alle auto's
-                            OPLOSSING: 
-                            1. Gebruik ImageUrl van API (gevuld door backend op basis van merk+model matching)
-                            2. Voeg API base URL toe aan relatieve paden
-                            3. Gebruik SVG fallback alleen als ImageUrl echt leeg is
-                            4. Elke kaart krijgt zijn eigen imageUrl variabele per iteratie
-                        -->
                         <div style="height: 200px; background-color: #1a1a1a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
                             @if (!string.IsNullOrEmpty(imageUrl))
                             {
-                                <!-- BUG FIX: Echte auto foto beschikbaar - toon deze -->
-                                <!-- ImageUrl komt van backend en bevat "/images/{filename}.jpg" of volledige URL -->
-                                <!-- Elke auto krijgt zijn eigen ImageUrl op basis van merk+model matching -->
                                 <img src="@imageUrl" 
                                      class="card-img-top" 
                                      alt="@carBrand @carModel"
@@ -161,9 +115,6 @@
                                      onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';"
                                      loading="lazy">
                             }
-                            <!-- BUG FIX: Professionele SVG auto icon fallback - alleen als geen foto beschikbaar -->
-                            <!-- Dit wordt alleen getoond als ImageUrl leeg/null is (geen match gevonden door backend) -->
-                            <!-- Elke auto krijgt zijn eigen fallback met merk+model tekst -->
                             <div style="display: @(string.IsNullOrEmpty(imageUrl) ? "flex" : "none"); flex-direction: column; align-items: center; justify-content: center; color: #fff; padding: 20px; text-align: center; width: 100%; height: 100%;">
                                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom: 10px; opacity: 0.7;">
                                     <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z" fill="currentColor"/>
@@ -174,8 +125,6 @@
                         </div>
                         <div class="card-body">
                             <h5 class="card-title">
-                                <!-- BUG FIX: Dynamische link met expliciete carId voor correcte routing -->
-                                <!-- Gebruikt recommendation.Car.Id via carId variabele voor unieke route per auto -->
                                 <a href="/car/@carId" class="text-decoration-none text-dark" onclick="event.stopPropagation();">
                                     @carBrand @carModel
                                 </a>
@@ -195,8 +144,6 @@
                             <div class="alert alert-info mb-2">
                                 <small><strong>Waarom deze auto?</strong><br>@recommendation.Explanation</small>
                             </div>
-                            <!-- BUG FIX: Dynamische link naar detailpagina met expliciete carId -->
-                            <!-- Zorgt dat elke "Bekijk alle foto's" knop naar de juiste auto detailpagina gaat -->
                             <a href="/car/@carId" class="btn btn-primary btn-sm w-100" onclick="event.stopPropagation();">
                                 Bekijk alle foto's
                             </a>
