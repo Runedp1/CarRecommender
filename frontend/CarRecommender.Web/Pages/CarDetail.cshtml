@@ -1,3 +1,16 @@
+@* 
+    BUG FIX: Dynamische detailpagina route op basis van auto ID
+    ============================================================
+    
+    VOOR: Alle recommendation kaarten linkten naar dezelfde detailpagina (BMW X5) 
+          door hardcoded ID of incorrect geïnterpoleerde variabele in de link.
+    
+    NU: Route gebruikt {id} parameter die dynamisch wordt ingevuld vanuit de recommendation kaart.
+        Elke kaart gebruikt zijn eigen recommendation.Car.Id om een unieke URL te genereren (/car/{id}).
+        Deze id parameter wordt doorgegeven aan OnGetAsync(int id) die de juiste auto ophaalt via de API.
+    
+    ROUTING: /car/{id} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
+*@
 @page "/car/{id}"
 @model CarDetailModel
 @{
@@ -145,12 +158,18 @@
                     <div class="row">
                         @foreach (var imageUrl in Model.Images)
                         {
+                            var imageSrc = imageUrl;
+                            // Als image relatief pad is (begint met /), voeg API base URL toe voor Azure
+                            if (!string.IsNullOrEmpty(imageSrc) && imageSrc.StartsWith("/") && !string.IsNullOrEmpty(apiBaseUrl))
+                            {
+                                imageSrc = apiBaseUrl + imageSrc;
+                            }
                             <div class="col-md-3 col-sm-4 col-6 mb-3">
-                                <img src="@imageUrl" 
+                                <img src="@imageSrc" 
                                      class="img-thumbnail" 
                                      alt="@Model.Car.Brand @Model.Car.Model"
                                      style="height: 200px; object-fit: cover; cursor: pointer;"
-                                     onclick="showImageModal('@imageUrl')"
+                                     onclick="showImageModal('@imageSrc')"
                                      onerror="this.src='https://via.placeholder.com/300x200/0066CC/FFFFFF.png?text=@Uri.EscapeDataString(Model.Car.Brand + " " + Model.Car.Model)'">
                             </div>
                         }
