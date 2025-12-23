@@ -74,9 +74,19 @@ jobs:
       - name: Create deployment package
         run: |
           echo "Creating ZIP package for deployment..."
-          powershell Compress-Archive -Path ./publish/* -DestinationPath ./deploy.zip -Force
+          echo "Current directory:"
+          pwd
+          echo "Contents of publish directory:"
+          dir ./publish
+          echo "Creating ZIP from publish directory..."
+          # Maak ZIP met juiste structuur (bestanden direct in root van ZIP)
+          cd ./publish
+          powershell Compress-Archive -Path * -DestinationPath ../deploy.zip -Force
+          cd ..
           echo "ZIP package created"
           dir ./deploy.zip
+          echo "ZIP file size:"
+          powershell (Get-Item ./deploy.zip).Length
       
       - name: Login to Azure
         uses: azure/login@v2
@@ -92,4 +102,5 @@ jobs:
           app-name: 'app-carrecommender-dev'
           slot-name: 'Production'
           package: ./deploy.zip
+          startup-command: 'dotnet CarRecommender.Api.dll'
           
