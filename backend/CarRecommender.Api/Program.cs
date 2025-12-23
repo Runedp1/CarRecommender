@@ -31,12 +31,16 @@ builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 // ============================================================================
 // CORS CONFIGURATIE
 // ============================================================================
-// CORS is nodig zodat de frontend (op localhost:7000) kan communiceren met de API (op localhost:5283)
+// CORS is nodig zodat de frontend (lokaal en Azure) kan communiceren met de API
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:7000", "https://localhost:7001")
+        policy.WithOrigins(
+                "http://localhost:7000", 
+                "https://localhost:7001",
+                "https://pp-carrecommender-web-dev.azurewebsites.net"
+              )
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
