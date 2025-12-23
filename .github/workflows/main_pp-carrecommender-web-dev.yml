@@ -102,5 +102,4 @@ jobs:
           app-name: 'pp-carrecommender-web-dev'
           slot-name: 'Production'
           package: ./deploy.zip
-          startup-command: 'dotnet CarRecommender.Web.dll'
           
