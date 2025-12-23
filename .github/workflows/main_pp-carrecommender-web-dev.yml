@@ -24,16 +24,26 @@ jobs:
           dotnet-version: '9.x'
 
       - name: Build with dotnet
-        run: dotnet build --configuration Release
+        run: dotnet build frontend/CarRecommender.Web/CarRecommender.Web.csproj --configuration Release
 
       - name: dotnet publish
-        run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
+        run: dotnet publish frontend/CarRecommender.Web/CarRecommender.Web.csproj -c Release -o ./publish
+
+      - name: Verify publish output
+        run: |
+          echo "Contents of publish directory:"
+          dir ./publish
+          if not exist "./publish/CarRecommender.Web.dll" (
+            echo "ERROR: CarRecommender.Web.dll not found in publish output!"
+            exit 1
+          )
+          echo "Publish successful - DLL found"
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: .net-app
-          path: ${{env.DOTNET_ROOT}}/myapp
+          path: ./publish
 
   deploy:
     runs-on: windows-latest
@@ -47,6 +57,26 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: .net-app
+          path: ./publish
+      
+      - name: Verify publish output
+        run: |
+          echo "Contents of publish directory:"
+          dir ./publish
+          echo "Looking for DLL:"
+          dir ./publish/*.dll
+          if not exist "./publish/CarRecommender.Web.dll" (
+            echo "ERROR: CarRecommender.Web.dll not found!"
+            exit 1
+          )
+          echo "DLL found successfully"
+      
+      - name: Create deployment package
+        run: |
+          echo "Creating ZIP package for deployment..."
+          powershell Compress-Archive -Path ./publish/* -DestinationPath ./deploy.zip -Force
+          echo "ZIP package created"
+          dir ./deploy.zip
       
       - name: Login to Azure
         uses: azure/login@v2
@@ -61,5 +91,5 @@ jobs:
         with:
           app-name: 'pp-carrecommender-web-dev'
           slot-name: 'Production'
-          package: .
+          package: ./deploy.zip
           
