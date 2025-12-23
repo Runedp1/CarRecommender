@@ -14,6 +14,7 @@ public class Car
     public int Year { get; set; }
     public string? Transmission { get; set; }  // transmissie (automatic/manual)
     public string? BodyType { get; set; }  // carrosserie (suv/sedan/hatchback/etc.)
+    public string? DriveType { get; set; }  // aandrijving (FWD/RWD/AWD)
     public string ImagePath { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
 }
