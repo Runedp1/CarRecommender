@@ -78,11 +78,21 @@ jobs:
           pwd
           echo "Contents of publish directory:"
           dir ./publish
-          echo "Removing images folder from deployment (too large for Azure)..."
+          echo "Removing unnecessary files from deployment..."
           # Verwijder images folder uit publish directory (te groot voor deployment)
           if (Test-Path "./publish/images") {
             Remove-Item -Recurse -Force "./publish/images"
             echo "Images folder removed from deployment package"
+          }
+          # Verwijder debug symbolen en andere grote bestanden
+          if (Test-Path "./publish/*.pdb") {
+            Remove-Item -Force "./publish/*.pdb"
+            echo "PDB files removed"
+          }
+          # Verwijder XML documentation files (optioneel, maar kan groot zijn)
+          if (Test-Path "./publish/*.xml") {
+            Remove-Item -Force "./publish/*.xml"
+            echo "XML documentation files removed"
           }
           echo "Creating ZIP from publish directory..."
           # Maak ZIP met juiste structuur (bestanden direct in root van ZIP)
@@ -95,8 +105,14 @@ jobs:
           $zipSize = (Get-Item ./deploy.zip).Length
           $zipSizeMB = [math]::Round($zipSize / 1MB, 2)
           echo "$zipSizeMB MB"
-          if ($zipSizeMB -gt 500) {
-            Write-Warning "WARNING: Deployment package is still very large ($zipSizeMB MB)"
+          if ($zipSizeMB -gt 200) {
+            Write-Warning "WARNING: Deployment package is large ($zipSizeMB MB). Azure deployment may fail if package is too large."
+          }
+          # List largest files in publish directory
+          echo "Largest files in publish directory:"
+          Get-ChildItem ./publish -Recurse -File | Sort-Object Length -Descending | Select-Object -First 10 | ForEach-Object {
+            $sizeMB = [math]::Round($_.Length / 1MB, 2)
+            echo "  $($_.FullName): $sizeMB MB"
           }
       
       - name: Login to Azure
