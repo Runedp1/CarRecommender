@@ -85,19 +85,36 @@ jobs:
             echo "Images folder removed from deployment package"
           }
           # Verwijder debug symbolen en andere grote bestanden
-          if (Test-Path "./publish/*.pdb") {
-            Remove-Item -Force "./publish/*.pdb"
-            echo "PDB files removed"
+          Get-ChildItem ./publish -Recurse -Filter "*.pdb" | Remove-Item -Force
+          echo "PDB files removed"
+          # Verwijder XML documentation files
+          Get-ChildItem ./publish -Recurse -Filter "*.xml" | Remove-Item -Force
+          echo "XML documentation files removed"
+          # Verwijder .deps.json files (niet nodig voor runtime)
+          Get-ChildItem ./publish -Recurse -Filter "*.deps.json" | Remove-Item -Force
+          echo "Deps.json files removed"
+          # Verwijder runtimeconfig.dev.json (alleen voor development)
+          Get-ChildItem ./publish -Recurse -Filter "*.runtimeconfig.dev.json" | Remove-Item -Force
+          echo "Runtimeconfig.dev.json removed"
+          # List largest files BEFORE creating ZIP
+          echo "Largest files in publish directory (before ZIP):"
+          Get-ChildItem ./publish -Recurse -File | Sort-Object Length -Descending | Select-Object -First 15 | ForEach-Object {
+            $sizeMB = [math]::Round($_.Length / 1MB, 2)
+            $sizeKB = [math]::Round($_.Length / 1KB, 2)
+            if ($sizeMB -gt 1) {
+              echo "  $($_.Name): $sizeMB MB"
+            } else {
+              echo "  $($_.Name): $sizeKB KB"
+            }
           }
-          # Verwijder XML documentation files (optioneel, maar kan groot zijn)
-          if (Test-Path "./publish/*.xml") {
-            Remove-Item -Force "./publish/*.xml"
-            echo "XML documentation files removed"
-          }
+          # Calculate total size
+          $totalSize = (Get-ChildItem ./publish -Recurse -File | Measure-Object -Property Length -Sum).Sum
+          $totalSizeMB = [math]::Round($totalSize / 1MB, 2)
+          echo "Total size of publish directory: $totalSizeMB MB"
           echo "Creating ZIP from publish directory..."
           # Maak ZIP met juiste structuur (bestanden direct in root van ZIP)
           cd ./publish
-          powershell Compress-Archive -Path * -DestinationPath ../deploy.zip -Force
+          powershell Compress-Archive -Path * -DestinationPath ../deploy.zip -Force -CompressionLevel Optimal
           cd ..
           echo "ZIP package created"
           dir ./deploy.zip
@@ -105,14 +122,8 @@ jobs:
           $zipSize = (Get-Item ./deploy.zip).Length
           $zipSizeMB = [math]::Round($zipSize / 1MB, 2)
           echo "$zipSizeMB MB"
-          if ($zipSizeMB -gt 200) {
-            Write-Warning "WARNING: Deployment package is large ($zipSizeMB MB). Azure deployment may fail if package is too large."
-          }
-          # List largest files in publish directory
-          echo "Largest files in publish directory:"
-          Get-ChildItem ./publish -Recurse -File | Sort-Object Length -Descending | Select-Object -First 10 | ForEach-Object {
-            $sizeMB = [math]::Round($_.Length / 1MB, 2)
-            echo "  $($_.FullName): $sizeMB MB"
+          if ($zipSizeMB -gt 100) {
+            Write-Warning "WARNING: Deployment package is large ($zipSizeMB MB). Azure deployment may fail if package is too large (>100MB)."
           }
       
       - name: Login to Azure
@@ -129,6 +140,7 @@ jobs:
           app-name: 'app-carrecommender-dev'
           slot-name: 'Production'
           package: ./deploy.zip
+          startup-command: 'dotnet CarRecommender.Api.dll'
           startup-command: 'dotnet CarRecommender.Api.dll'
           enable-custom-container: false
           
