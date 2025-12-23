@@ -27,7 +27,7 @@ jobs:
         run: dotnet build backend/CarRecommender.Api/CarRecommender.Api.csproj --configuration Release
 
       - name: dotnet publish
-        run: dotnet publish backend/CarRecommender.Api/CarRecommender.Api.csproj -c Release -o ./publish
+        run: dotnet publish backend/CarRecommender.Api/CarRecommender.Api.csproj -c Release -o ./publish --no-self-contained /p:PublishReadyToRun=false /p:PublishSingleFile=false
 
       - name: Verify publish output
         run: |
@@ -129,4 +129,6 @@ jobs:
           app-name: 'app-carrecommender-dev'
           slot-name: 'Production'
           package: ./deploy.zip
+          startup-command: 'dotnet CarRecommender.Api.dll'
+          enable-custom-container: false
           
