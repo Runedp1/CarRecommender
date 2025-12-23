@@ -30,13 +30,9 @@
     </Content>
   </ItemGroup>
   
-  <!-- Zorg dat images folder wordt meegenomen tijdens deployment -->
-  <ItemGroup>
-    <Content Include="..\images\**\*">
-      <Link>images\%(RecursiveDir)%(Filename)%(Extension)</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+  <!-- Images worden NIET meegenomen in deployment package (te groot voor Azure) -->
+  <!-- Images moeten apart worden geüpload naar Azure Storage of via andere methode -->
+  <!-- Voor nu: images worden lokaal geladen vanuit backend/images/ directory -->
 
 </Project>
 

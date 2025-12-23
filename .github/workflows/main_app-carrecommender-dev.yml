@@ -78,6 +78,12 @@ jobs:
           pwd
           echo "Contents of publish directory:"
           dir ./publish
+          echo "Removing images folder from deployment (too large for Azure)..."
+          # Verwijder images folder uit publish directory (te groot voor deployment)
+          if (Test-Path "./publish/images") {
+            Remove-Item -Recurse -Force "./publish/images"
+            echo "Images folder removed from deployment package"
+          }
           echo "Creating ZIP from publish directory..."
           # Maak ZIP met juiste structuur (bestanden direct in root van ZIP)
           cd ./publish
@@ -86,7 +92,12 @@ jobs:
           echo "ZIP package created"
           dir ./deploy.zip
           echo "ZIP file size:"
-          powershell (Get-Item ./deploy.zip).Length
+          $zipSize = (Get-Item ./deploy.zip).Length
+          $zipSizeMB = [math]::Round($zipSize / 1MB, 2)
+          echo "$zipSizeMB MB"
+          if ($zipSizeMB -gt 500) {
+            Write-Warning "WARNING: Deployment package is still very large ($zipSizeMB MB)"
+          }
       
       - name: Login to Azure
         uses: azure/login@v2
