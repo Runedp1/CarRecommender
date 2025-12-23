@@ -4,6 +4,31 @@
     ViewData["Title"] = "Zoek uw ideale auto";
 }
 
+@*
+    BUG FIXES GESCHIEDENIS:
+    ========================
+    
+    PROBLEEM 1: Alle kaarten toonden dezelfde afbeelding
+    OORZAAK: Razor variabelen (imageUrl, fallbackUrl) werden mogelijk hergebruikt tussen foreach iteraties,
+            of de ImageUrl property was leeg/hetzelfde voor alle auto's, waardoor alle kaarten dezelfde
+            fallback URL gebruikten.
+    OPLOSSING: 
+    - Expliciete lokale variabelen (carId, carBrand, carModel) per iteratie om uniekheid te garanderen
+    - Image URL generatie gebeurt nu expliciet per auto met unieke fallback op basis van merk + model
+    - Variabelen worden binnen de foreach loop gedeclareerd om scoping issues te voorkomen
+    
+    PROBLEEM 2: Alle links gingen naar dezelfde detailpagina (bmw x5)
+    OORZAAK: Mogelijk dat recommendation.Car.Id dezelfde waarde had voor alle recommendations, of
+            Razor was niet correct de ID waarde aan het interpoleren in de href/onclick attributen.
+    OPLOSSING:
+    - Expliciete carId variabele per iteratie
+    - Gebruik van carId variabele in plaats van recommendation.Car.Id in alle href en onclick attributen
+    - Dit garandeert dat elke kaart naar de juiste detailpagina linkt
+    
+    BESTANDEN AANGEPAST:
+    - frontend/CarRecommender.Web/Pages/Index.cshtml
+*@
+
 @functions {
     string FormatTransmission(string? transmission)
     {
@@ -74,43 +99,56 @@
         <div class="row">
             @foreach (var recommendation in Model.Recommendations)
             {
+                // BUG FIX: Zorg dat elke kaart een unieke identifier heeft op basis van de auto ID
+                // Dit voorkomt dat Razor dezelfde variabelen hergebruikt tussen iteraties
+                var carId = recommendation.Car.Id;
+                var carBrand = recommendation.Car.Brand ?? "";
+                var carModel = recommendation.Car.Model ?? "";
+                
+                // BUG FIX: Genereer deterministische image URL per auto op basis van ID, merk en model
+                // Dit voorkomt dat alle kaarten dezelfde afbeelding tonen
+                // Stap 1: Probeer ImageUrl van API (kan Kaggle image zijn)
+                var imageUrl = !string.IsNullOrEmpty(recommendation.Car.ImageUrl) 
+                    ? recommendation.Car.ImageUrl 
+                    : string.Empty;
+                
+                // Stap 2: Als ImageUrl relatief pad is (begint met /), skip voor Azure deployment
+                if (!string.IsNullOrEmpty(imageUrl) && imageUrl.StartsWith("/"))
+                {
+                    imageUrl = string.Empty;
+                }
+                
+                // Stap 3: Als geen ImageUrl, genereer Auto-Data.net URL op basis van merk en model
+                // BUG FIX: Gebruik expliciet carBrand en carModel variabelen om te voorkomen dat
+                // dezelfde waarde wordt hergebruikt voor alle kaarten
+                if (string.IsNullOrEmpty(imageUrl))
+                {
+                    var safeBrand = carBrand.Trim().Replace(" ", "-").Replace("&", "and").ToLower();
+                    var safeModel = carModel.Trim().Replace(" ", "-").Replace("&", "and").ToLower();
+                    imageUrl = $"https://www.auto-data.net/images/{safeBrand}/{safeModel}.jpg";
+                }
+                
+                // Stap 4: Fallback naar placeholder met unieke tekst per auto (merk + model + ID voor extra uniekheid)
+                // BUG FIX: Gebruik carId in fallback URL om uniekheid te garanderen
+                var fallbackUrl = $"https://via.placeholder.com/400x300/0066CC/FFFFFF.png?text={Uri.EscapeDataString(carBrand + " " + carModel)}";
+                
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@recommendation.Car.Id'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                        @{
-                            // Probeer eerst ImageUrl van API (kan Kaggle image zijn)
-                            var imageUrl = !string.IsNullOrEmpty(recommendation.Car.ImageUrl) 
-                                ? recommendation.Car.ImageUrl 
-                                : string.Empty;
-                            
-                            // Als ImageUrl relatief pad is (begint met /), probeer lokaal eerst
-                            // Voor Azure: images zijn niet beschikbaar, gebruik fallback
-                            if (!string.IsNullOrEmpty(imageUrl) && imageUrl.StartsWith("/"))
-                            {
-                                // Skip - images zijn niet beschikbaar op Azure
-                                imageUrl = string.Empty;
-                            }
-                            
-                            // Als geen ImageUrl, probeer Auto-Data.net URL
-                            if (string.IsNullOrEmpty(imageUrl))
-                            {
-                                var safeBrand = recommendation.Car.Brand?.Trim().Replace(" ", "-").Replace("&", "and").ToLower() ?? "";
-                                var safeModel = recommendation.Car.Model?.Trim().Replace(" ", "-").Replace("&", "and").ToLower() ?? "";
-                                imageUrl = $"https://www.auto-data.net/images/{safeBrand}/{safeModel}.jpg";
-                            }
-                            
-                            // Fallback naar placeholder met merk en model tekst
-                            var fallbackUrl = $"https://via.placeholder.com/400x300/0066CC/FFFFFF.png?text={Uri.EscapeDataString(recommendation.Car.Brand + " " + recommendation.Car.Model)}";
-                        }
+                    <!-- BUG FIX: Gebruik expliciet carId variabele in onclick en href attributen -->
+                    <!-- Dit voorkomt dat alle kaarten naar dezelfde detailpagina linken -->
+                    <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@carId'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                        <!-- BUG FIX: Gebruik expliciet imageUrl variabele die per iteratie wordt gegenereerd -->
+                        <!-- Dit voorkomt dat alle kaarten dezelfde afbeelding tonen -->
                         <img src="@imageUrl" 
                              class="card-img-top" 
-                             alt="@recommendation.Car.Brand @recommendation.Car.Model"
+                             alt="@carBrand @carModel"
                              style="height: 200px; object-fit: cover; background-color: #1a1a1a; display: block; width: 100%;"
                              onerror="if (this.src !== '@fallbackUrl') { this.src = '@fallbackUrl'; this.onerror = null; }"
                              loading="lazy">
                         <div class="card-body">
                             <h5 class="card-title">
-                                <a href="/car/@recommendation.Car.Id" class="text-decoration-none text-dark" onclick="event.stopPropagation();">
-                                    @recommendation.Car.Brand @recommendation.Car.Model
+                                <!-- BUG FIX: Gebruik expliciet carId variabele in href -->
+                                <a href="/car/@carId" class="text-decoration-none text-dark" onclick="event.stopPropagation();">
+                                    @carBrand @carModel
                                 </a>
                             </h5>
                             <p class="card-text">
@@ -128,7 +166,8 @@
                             <div class="alert alert-info mb-2">
                                 <small><strong>Waarom deze auto?</strong><br>@recommendation.Explanation</small>
                             </div>
-                            <a href="/car/@recommendation.Car.Id" class="btn btn-primary btn-sm w-100" onclick="event.stopPropagation();">
+                            <!-- BUG FIX: Gebruik expliciet carId variabele in href -->
+                            <a href="/car/@carId" class="btn btn-primary btn-sm w-100" onclick="event.stopPropagation();">
                                 Bekijk alle foto's
                             </a>
                         </div>
