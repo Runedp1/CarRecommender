@@ -68,6 +68,28 @@ Dit project is een **hybride AI-aanbevelingssysteem** voor auto's met de volgend
 - **Response**: `List<RecommendationResult>` met auto's en explanations
 - **Status codes**: 200 OK, 400 Bad Request, 500 Internal Server Error
 
+#### 6. **POST /api/recommendations/hybrid/manual**
+- **Beschrijving**: Genereert recommendations op basis van manuele filters (zonder tekst parsing)
+- **Request body**: 
+  ```json
+  {
+    "minPrice": 10000,
+    "maxPrice": 30000,
+    "brand": "bmw",
+    "model": "x5",
+    "fuel": "diesel",
+    "transmission": true,
+    "bodyType": "suv",
+    "minYear": 2015,
+    "maxYear": 2023,
+    "minPower": 150,
+    "top": 5
+  }
+  ```
+- **Response**: `List<RecommendationResult>` met auto's en explanations
+- **Status codes**: 200 OK, 400 Bad Request, 500 Internal Server Error
+- **Verschil met tekst modus**: Geen NLP parsing, directe formulier velden
+
 ---
 
 ## Recommendation Engine - Componenten
@@ -150,13 +172,36 @@ Dit project is een **hybride AI-aanbevelingssysteem** voor auto's met de volgend
   - Image fallback systeem (ImageUrl → Auto-Data.net → Placeholder)
 - **Status**: ✅ Geïmplementeerd
 
-### 2. **Cars Overzicht**
+### 2. **Geavanceerde Filters**
+- **Route**: `/advanced-filters`
+- **Bestand**: `frontend/CarRecommender.Web/Pages/AdvancedFilters.cshtml`
+- **Functie**: 
+  - Manuele filters modus (zonder tekst parsing)
+  - Formulier met dropdowns en input velden
+  - Merk, model, brandstof, transmissie, carrosserie
+  - Min/max prijs, bouwjaar, vermogen
+  - Toont recommendations met cards
+- **Status**: ✅ Geïmplementeerd
+
+### 3. **Auto Detail Pagina**
+- **Route**: `/car/{id}` (dynamische route met parameter)
+- **Bestand**: `frontend/CarRecommender.Web/Pages/CarDetail.cshtml`
+- **Functie**: 
+  - Toont auto details op basis van route parameter `{id}`
+  - Image carousel
+  - Alle auto eigenschappen
+  - Dynamische routing: elke kaart linkt naar zijn eigen detailpagina
+- **Status**: ✅ Geïmplementeerd (volledig dynamisch)
+
+### 4. **Cars Overzicht**
 - **Route**: `/Cars`
 - **Bestand**: `frontend/CarRecommender.Web/Pages/Cars.cshtml`
-- **Functie**: Toont alle auto's uit de database
-- **Status**: ✅ Geïmplementeerd (basis functionaliteit)
+- **Functie**: 
+  - Toont alle auto's uit de database
+  - Elke kaart linkt naar `/car/{id}` detailpagina
+- **Status**: ✅ Geïmplementeerd
 
-### 3. **Error Page**
+### 5. **Error Page**
 - **Route**: `/Error`
 - **Functie**: Toont foutmeldingen
 - **Status**: ✅ Geïmplementeerd
@@ -289,41 +334,58 @@ Dit project is een **hybride AI-aanbevelingssysteem** voor auto's met de volgend
 Recommendation_System_New/
 ├── backend/
 │   ├── CarRecommender.Api/          # ASP.NET Core Web API
-│   │   ├── Controllers/             # API endpoints
+│   │   ├── Controllers/
 │   │   │   ├── CarsController.cs
-│   │   │   ├── RecommendationsController.cs
+│   │   │   ├── RecommendationsController.cs  # + POST /hybrid/manual
 │   │   │   └── HealthController.cs
-│   │   ├── Program.cs               # Dependency injection, middleware
-│   │   └── appsettings.json        # Configuratie
-│   └── data/                        # CSV datasets
-│       └── Cleaned_Car_Data_For_App_Fully_Enriched.csv
+│   │   ├── Program.cs
+│   │   └── appsettings.json
+│   ├── data/                        # CSV datasets
+│   │   └── Cleaned_Car_Data_For_App_Fully_Enriched.csv
+│   └── images/                      # Auto afbeeldingen (49k+)
 │
 ├── frontend/
 │   └── CarRecommender.Web/          # ASP.NET Core Razor Pages
-│       ├── Pages/                   # Razor Pages
-│       │   ├── Index.cshtml         # Homepage met tekst input
-│       │   └── Cars.cshtml          # Auto's overzicht
+│       ├── Pages/
+│       │   ├── Index.cshtml         # Tekst modus
+│       │   ├── AdvancedFilters.cshtml  # Manuele filters modus
+│       │   ├── CarDetail.cshtml    # Dynamische detailpagina /car/{id}
+│       │   ├── Cars.cshtml         # Auto's overzicht
+│       │   └── Shared/
+│       │       └── _Layout.cshtml  # Master layout
+│       ├── Models/
+│       │   ├── Car.cs
+│       │   ├── RecommendationResult.cs
+│       │   ├── RecommendationTextRequest.cs
+│       │   └── ManualFilterRequest.cs  # Nieuw
 │       ├── Services/
-│       │   └── CarApiClient.cs      # HTTP client voor API
-│       └── appsettings.json         # API URL configuratie
+│       │   └── CarApiClient.cs     # + GetRecommendationsFromManualFiltersAsync()
+│       └── appsettings.json
 │
 ├── src/                             # Core business logic library
-│   ├── Car.cs                       # Domain model
-│   ├── CarRepository.cs              # CSV data access
-│   ├── ICarRepository.cs            # Repository interface
-│   ├── RecommendationEngine.cs      # Similarity algoritmes
-│   ├── RecommendationService.cs     # Recommendation coordinatie
-│   ├── IRecommendationService.cs    # Service interface
-│   ├── TextParserService.cs         # NLP text parsing
-│   └── ExplanationBuilder.cs        # Explanation generation
+│   ├── Car.cs                       # + ManualFilterRequest
+│   ├── CarRepository.cs
+│   ├── ICarRepository.cs
+│   ├── RecommendationEngine.cs
+│   ├── RecommendationService.cs    # + RecommendFromManualFilters()
+│   ├── IRecommendationService.cs   # + RecommendFromManualFilters()
+│   ├── TextParserService.cs
+│   ├── RuleBasedFilter.cs
+│   ├── AdvancedScoringService.cs
+│   ├── RankingService.cs
+│   └── ExplanationBuilder.cs
 │
-├── tools/                           # Python scripts voor data processing
+├── docs/
+│   ├── PROJECT_STRUCTURE.md        # Nieuw: Volledige structuur
+│   ├── PROJECT_OVERVIEW.md         # Updated
+│   ├── MANUAL_FILTERS_DOCUMENTATION.md  # Nieuw
+│   └── [andere documentatie]
+│
+├── tools/
 │   ├── notebooks/
 │   └── scripts/
 │
-├── docs/                            # Documentatie
-│
-└── CarRecommender.sln               # Visual Studio solution
+└── CarRecommender.sln
 ```
 
 ---
