@@ -78,17 +78,17 @@
             @foreach (var car in Model.AllCars)
             {
                 // DYNAMISCHE ROUTING: Elke auto-kaart gebruikt zijn eigen unieke ID
+                // FIX: Check eerst of car niet null is
+                if (car == null)
+                {
+                    continue; // Skip null cars
+                }
+                
                 // FIX: Expliciete lokale variabele per iteratie om scope issues te voorkomen
                 // De car.Id wordt gebruikt in de URL om naar de detailpagina te linken
                 // Route: /car/{id:int} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
                 // Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
-                var carId = car?.Id ?? 0;
-                
-                // FIX: Valideer dat carId geldig is voordat we links genereren
-                if (carId <= 0)
-                {
-                    continue; // Skip auto's zonder geldige ID
-                }
+                var carId = car.Id;
                 
                 <div class="col-md-6 col-lg-4 mb-4 car-card" 
                      data-budget="@car.Budget" 
@@ -184,7 +184,8 @@
         // FIX: JavaScript functie voor dynamische routing met validatie
         function navigateToCarDetail(carId) {
             // FIX: Expliciete validatie en logging voor debugging
-            if (!carId || carId <= 0) {
+            // Let op: carId kan 0 zijn in sommige systemen, maar we checken alleen op null/undefined
+            if (carId == null || carId === undefined || isNaN(carId)) {
                 console.error('Invalid carId:', carId);
                 return;
             }
@@ -204,7 +205,7 @@
                 if (!element.onclick) {
                     element.addEventListener('click', function(e) {
                         const carId = parseInt(this.getAttribute('data-car-id'), 10);
-                        if (carId > 0) {
+                        if (!isNaN(carId)) {
                             navigateToCarDetail(carId);
                         }
                     });

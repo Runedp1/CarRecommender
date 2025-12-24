@@ -104,16 +104,16 @@
                 // De carId variabele wordt geëxtraheerd uit recommendation.Car.Id en gebruikt in de URL
                 // Route: /car/{id:int} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
                 // Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt (geen hardcoded ID meer)
-                var carId = recommendation.Car?.Id ?? 0;
-                var carBrand = recommendation.Car?.Brand ?? "";
-                var carModel = recommendation.Car?.Model ?? "";
-                var imageUrl = Model.GetCarImageUrl(recommendation.Car?.ImageUrl, carBrand, carModel, carId);
-                
-                // FIX: Valideer dat carId geldig is voordat we links genereren
-                if (carId <= 0)
+                // FIX: Check eerst of Car niet null is (belangrijker dan ID check)
+                if (recommendation?.Car == null)
                 {
-                    continue; // Skip auto's zonder geldige ID
+                    continue; // Skip null recommendations
                 }
+                
+                var carId = recommendation.Car.Id;
+                var carBrand = recommendation.Car.Brand ?? "";
+                var carModel = recommendation.Car.Model ?? "";
+                var imageUrl = Model.GetCarImageUrl(recommendation.Car.ImageUrl, carBrand, carModel, carId);
                 
                 <div class="col-md-6 col-lg-4 mb-4">
                     @* 
@@ -201,12 +201,13 @@
     - Gebruikt data-car-id attribute als backup
 *@
 <script>
-    function navigateToCarDetail(carId) {
-        // FIX: Expliciete validatie en logging voor debugging
-        if (!carId || carId <= 0) {
-            console.error('Invalid carId:', carId);
-            return;
-        }
+        function navigateToCarDetail(carId) {
+            // FIX: Expliciete validatie en logging voor debugging
+            // Let op: carId kan 0 zijn in sommige systemen, maar we checken alleen op null/undefined
+            if (carId == null || carId === undefined || isNaN(carId)) {
+                console.error('Invalid carId:', carId);
+                return;
+            }
         
         // FIX: Expliciete URL constructie met validatie
         const url = '/car/' + parseInt(carId, 10);
