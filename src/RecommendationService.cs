@@ -29,6 +29,7 @@ public class RecommendationService : IRecommendationService
     private readonly CarFeatureVectorFactory _featureVectorFactory;
     private readonly SimilarityService _similarityService;
     private readonly RankingService _rankingService;
+    private readonly AdvancedScoringService _advancedScoringService;
     
     private bool _isInitialized = false;
 
@@ -47,6 +48,9 @@ public class RecommendationService : IRecommendationService
         _featureVectorFactory = new CarFeatureVectorFactory();
         _similarityService = new SimilarityService();
         _rankingService = new RankingService();
+        _advancedScoringService = new AdvancedScoringService(
+            featureVectorFactory: _featureVectorFactory,
+            similarityService: _similarityService);
     }
 
     /// <summary>
@@ -147,11 +151,11 @@ public class RecommendationService : IRecommendationService
             candidateCars = allCars;
         }
 
-        // NEW AI: Content-based similarity
+        // NEW AI: Content-based similarity + Advanced scoring
         // Maak ideale feature vector op basis van preferences
         CarFeatureVector idealVector = _featureVectorFactory.CreateIdealVector(prefs, candidateCars);
 
-        // Bereken similarity en ranking scores voor alle candidate auto's
+        // Bereken similarity en ranking scores voor alle candidate auto's met geavanceerde scoring
         List<RecommendationResult> results = new List<RecommendationResult>();
 
         foreach (Car car in candidateCars)
@@ -160,19 +164,25 @@ public class RecommendationService : IRecommendationService
             if (car.Power <= 0 || car.Budget <= 0 || car.Year < 1900)
                 continue;
 
-            // Bereken cosine similarity tussen auto en ideale vector
-            double similarityScore = _similarityService.CalculateSimilarity(car, idealVector, _featureVectorFactory);
+            // Gebruik AdvancedScoringService voor slimmere scores met transparantie
+            var featureScores = _advancedScoringService.CalculateScores(car, prefs, idealVector, allCars);
 
-            // Bereken gecombineerde score (similarity + preference matching + controlled randomness)
-            double combinedScore = _rankingService.CalculateCombinedScore(car, similarityScore, prefs);
+            // Gebruik finale score uit AdvancedScoringService
+            double finalScore = featureScores.FinalScore;
 
-            string explanation = _explanationBuilder.BuildExplanation(car, prefs, combinedScore);
+            // Voeg ML-component toe (voor nu: placeholder, geen impact)
+            double userRatingComponent = _advancedScoringService.GetUserRatingComponent(car.Id);
+            // Voor nu: userRatingComponent is 0.0, dus geen impact
+            // In toekomst: finalScore = finalScore * 0.9 + userRatingComponent * 0.1
+
+            string explanation = _explanationBuilder.BuildExplanation(car, prefs, finalScore);
 
             results.Add(new RecommendationResult
             {
                 Car = car,
-                SimilarityScore = combinedScore, // Gebruik gecombineerde score
-                Explanation = explanation
+                SimilarityScore = finalScore, // Gebruik finale score uit AdvancedScoringService
+                Explanation = explanation,
+                FeatureScores = featureScores // Voeg feature-scores toe voor transparantie
             });
         }
 
@@ -367,23 +377,29 @@ public class RecommendationService : IRecommendationService
         }
 
         // Als er een max budget is (idealCar.Budget is het max budget), geef hogere score aan auto's dicht bij max budget
-        // Bijvoorbeeld: max 25k → auto van 23k krijgt hogere score dan auto van 15k
+        // Bijvoorbeeld: max 25k → auto van 24k krijgt hogere score dan auto van 15k
+        // BUG FIX: Verhoog threshold naar 90% en geef sterkere bonus voor auto's dicht bij budget
         if (idealCar.Budget > 0 && car.Budget <= idealCar.Budget)
         {
             // Bereken hoe dicht de auto bij het max budget ligt (0-1, waarbij 1 = dicht bij max budget)
-            // Auto's tussen 80-100% van max budget krijgen hogere score
+            // Auto's tussen 90-100% van max budget krijgen de hoogste score (optimaal bereik)
             double budgetRatio = (double)car.Budget / (double)idealCar.Budget;
             
-            // Geef bonus voor auto's dicht bij max budget (bijv. 0.8-1.0 ratio)
-            if (budgetRatio >= 0.8)
+            // Geef sterke bonus voor auto's dicht bij max budget (90-100% ratio = optimaal)
+            if (budgetRatio >= 0.90)
             {
-                // Auto's tussen 80-100% van max budget krijgen 0.8-1.0 score
-                return 0.8 + ((budgetRatio - 0.8) / 0.2) * 0.2; // Scale van 0.8-1.0
+                // Auto's tussen 90-100% van max budget krijgen 0.90-1.0 score (optimaal bereik)
+                return 0.90 + ((budgetRatio - 0.90) / 0.10) * 0.10; // Scale van 0.90-1.0
+            }
+            else if (budgetRatio >= 0.75)
+            {
+                // Auto's tussen 75-90% van max budget krijgen 0.70-0.90 score (goed bereik)
+                return 0.70 + ((budgetRatio - 0.75) / 0.15) * 0.20; // Scale van 0.70-0.90
             }
             else
             {
-                // Auto's onder 80% krijgen lagere score, maar nog steeds redelijk
-                return budgetRatio * 0.8; // Scale van 0-0.8
+                // Auto's onder 75% krijgen lagere score (nog steeds acceptabel maar niet optimaal)
+                return (budgetRatio / 0.75) * 0.70; // Scale van 0-0.70
             }
         }
 
