@@ -77,11 +77,23 @@
         <div class="row" id="carsContainer">
             @foreach (var car in Model.AllCars)
             {
+                // DYNAMISCHE ROUTING: Elke auto-kaart gebruikt zijn eigen unieke ID
+                // De car.Id wordt gebruikt in de URL om naar de detailpagina te linken
+                // Route: /car/{id} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
+                // Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
+                var carId = car.Id;
                 <div class="col-md-6 col-lg-4 mb-4 car-card" 
                      data-budget="@car.Budget" 
                      data-fuel="@car.Fuel.ToLower()"
                      data-year="@car.Year">
-                    <div class="card h-100 shadow-sm">
+                    @* 
+                        KAART COMPONENT - DYNAMISCHE ID DOORGEVEN:
+                        ==========================================
+                        - De kaart is klikbaar en navigeert naar /car/{carId} waar {carId} de unieke ID is
+                        - carId wordt per iteratie opnieuw geëxtraheerd uit car.Id
+                        - Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
+                    *@
+                    <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@carId'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                         @{
                             // Probeer eerst ImageUrl van API
                             var imageUrl = !string.IsNullOrEmpty(car.ImageUrl) 
@@ -106,7 +118,11 @@
                              onerror="if (this.src !== '@fallbackUrl') { this.src = '@fallbackUrl'; this.onerror = null; }"
                              loading="lazy">
                         <div class="card-body">
-                            <h5 class="card-title">@car.Brand @car.Model</h5>
+                            <h5 class="card-title">
+                                <a href="/car/@carId" class="text-decoration-none text-dark" onclick="event.stopPropagation();">
+                                    @car.Brand @car.Model
+                                </a>
+                            </h5>
                             <p class="card-text">
                                 <strong>Prijs:</strong> €@car.Budget.ToString("N0")<br>
                                 <strong>Brandstof:</strong> @car.Fuel<br>
@@ -118,6 +134,9 @@
                                     <strong>Carrosserie:</strong> @car.BodyType<br>
                                 }
                             </p>
+                            <a href="/car/@carId" class="btn btn-primary btn-sm w-100" onclick="event.stopPropagation();">
+                                Bekijk details
+                            </a>
                         </div>
                     </div>
                 </div>

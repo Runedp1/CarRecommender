@@ -1,15 +1,29 @@
 @* 
-    BUG FIX: Dynamische detailpagina route op basis van auto ID
-    ============================================================
+    DYNAMISCHE DETAILPAGINA - ROUTE MET PARAMETER:
+    ===============================================
     
-    VOOR: Alle recommendation kaarten linkten naar dezelfde detailpagina (BMW X5) 
-          door hardcoded ID of incorrect geïnterpoleerde variabele in de link.
+    ROUTE: @page "/car/{id}" 
+    - De {id} is een route parameter die dynamisch wordt ingevuld vanuit de auto-kaart
+    - Voorbeeld: /car/123 -> id = 123
     
-    NU: Route gebruikt {id} parameter die dynamisch wordt ingevuld vanuit de recommendation kaart.
-        Elke kaart gebruikt zijn eigen recommendation.Car.Id om een unieke URL te genereren (/car/{id}).
-        Deze id parameter wordt doorgegeven aan OnGetAsync(int id) die de juiste auto ophaalt via de API.
+    ID DOORGEVEN VAN KAART NAAR DETAILPAGINA:
+    ==========================================
+    1. In kaart componenten (Index.cshtml, AdvancedFilters.cshtml, Cars.cshtml):
+       - var carId = recommendation.Car.Id (of car.Id)
+       - Links gebruiken: href="/car/@carId" of onclick="window.location.href='/car/@(carId)'"
+       - Elke kaart heeft zijn eigen unieke carId uit recommendation.Car.Id
     
-    ROUTING: /car/{id} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
+    2. Route matching:
+       - URL /car/123 wordt gematcht met @page "/car/{id}"
+       - Razor Pages mapt automatisch {id} naar de int id parameter in OnGetAsync(int id)
+    
+    3. In CarDetailModel.OnGetAsync(int id):
+       - De id parameter bevat de waarde uit de URL (bijv. 123)
+       - Deze id wordt gebruikt om GET /api/cars/{id} aan te roepen
+       - De API retourneert de juiste auto data op basis van deze id
+    
+    VOOR: Hardcoded naar één BMW X5 (alle kaarten linkten naar dezelfde auto)
+    NU: Elke kaart linkt naar zijn eigen detailpagina via unieke car.Id
 *@
 @page "/car/{id}"
 @model CarDetailModel

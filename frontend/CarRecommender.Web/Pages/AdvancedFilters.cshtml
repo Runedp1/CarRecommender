@@ -181,11 +181,23 @@
         <div class="row">
             @foreach (var recommendation in Model.Recommendations)
             {
+                // DYNAMISCHE ROUTING: Elke auto-kaart gebruikt zijn eigen unieke ID
+                // De carId variabele wordt geëxtraheerd uit recommendation.Car.Id en gebruikt in de URL
+                // Route: /car/{id} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
+                // Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt (geen hardcoded ID meer)
                 var carId = recommendation.Car.Id;
                 var carBrand = recommendation.Car.Brand ?? "";
                 var carModel = recommendation.Car.Model ?? "";
                 var imageUrl = Model.GetCarImageUrl(recommendation.Car.ImageUrl, carBrand, carModel, carId);
                 <div class="col-md-6 col-lg-4 mb-4">
+                    @* 
+                        KAART COMPONENT - DYNAMISCHE ID DOORGEVEN:
+                        ==========================================
+                        - onclick: Navigeert naar /car/{carId} waar {carId} de unieke ID is van deze specifieke auto
+                        - href links: Alle links in de kaart gebruiken /car/@carId om naar de detailpagina te gaan
+                        - carId wordt per iteratie opnieuw geëxtraheerd uit recommendation.Car.Id
+                        - Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
+                    *@
                     <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@(carId)'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                         <div style="height: 200px; background-color: #1a1a1a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
                             @if (!string.IsNullOrEmpty(imageUrl))
