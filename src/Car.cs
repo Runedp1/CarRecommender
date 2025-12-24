@@ -21,12 +21,19 @@ public class Car
 
 /// <summary>
 /// Resultaat van een recommendation: de auto + hoe vergelijkbaar die is (score 0-1).
+/// Bevat ook gedetailleerde feature-scores voor transparantie.
 /// </summary>
 public class RecommendationResult
 {
     public Car Car { get; set; } = null!;
     public double SimilarityScore { get; set; }  // Score tussen 0 en 1 (1 = meest vergelijkbaar)
     public string Explanation { get; set; } = string.Empty;  // Uitleg waarom deze auto wordt aanbevolen
+    
+    /// <summary>
+    /// Gedetailleerde feature-scores voor transparantie (optioneel, alleen beschikbaar bij gebruik van AdvancedScoringService).
+    /// Bevat deel-scores per feature (prijs, vermogen, bouwjaar, etc.) en totale utility-score.
+    /// </summary>
+    public AdvancedScoringService.FeatureScoreResult? FeatureScores { get; set; }
 }
 
 /// <summary>

@@ -45,11 +45,29 @@ public class IndexModel : PageModel
     /// </summary>
     public string? GetCarImageUrl(string? imageUrl, string brand, string model, int carId)
     {
-        // BUG FIX: Stap 1 - Gebruik ImageUrl van API als primaire bron
-        // Dit is de belangrijkste stap: de backend heeft al geprobeerd een foto te vinden
-        // via FindKaggleImage() en heeft ImageUrl gevuld met "/images/{filename}.jpg" als match gevonden
+        // BUG FIX: Filter externe URLs die stockfoto's tonen - alleen lokale image paths of null gebruiken
+        // PROBLEEM: Backend geeft soms externe URLs (auto-data.net, unsplash, etc.) die stockfoto's tonen
+        // OPLOSSING: Negeer externe URLs die niet van onze eigen API komen, retourneer null voor SVG fallback
+        
         if (!string.IsNullOrWhiteSpace(imageUrl))
         {
+            // BUG FIX: Als ImageUrl een externe URL is (niet van onze eigen API), negeer deze
+            // Externe services zoals auto-data.net, unsplash, etc. geven vaak stockfoto's die niet bij de auto horen
+            if (imageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+                imageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                // Alleen onze eigen API base URL accepteren, alle andere externe URLs negeren
+                if (!string.IsNullOrEmpty(ApiBaseUrl) && imageUrl.StartsWith(ApiBaseUrl, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Dit is van onze eigen API - gebruik deze
+                    return imageUrl;
+                }
+                // Externe URL die niet van onze API komt - negeer en gebruik SVG fallback
+                _logger.LogWarning("Externe image URL genegeerd voor {Brand} {Model} (ID: {CarId}): {ImageUrl}. Gebruikt SVG fallback.", 
+                    brand, model, carId, imageUrl);
+                return null;
+            }
+            
             // BUG FIX: Als ImageUrl relatief pad is (begint met /), voeg API base URL toe
             // Bijvoorbeeld: "/images/Acura_MDX_2011_...jpg" -> "http://localhost:5000/images/Acura_MDX_2011_...jpg"
             if (imageUrl.StartsWith("/"))
@@ -61,14 +79,6 @@ public class IndexModel : PageModel
                     return $"{baseUrl}{imageUrl}";
                 }
                 // Als ApiBaseUrl leeg is, gebruik relatief pad (werkt als frontend en backend opzelfde domain)
-                return imageUrl;
-            }
-            
-            // BUG FIX: Als ImageUrl al volledig is (http/https), gebruik die direct
-            // Dit kan voorkomen als backend externe URL's gebruikt
-            if (imageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
-                imageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
                 return imageUrl;
             }
         }

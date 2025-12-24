@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 
 namespace CarRecommender;
 
@@ -16,6 +17,12 @@ public class CarRepository : ICarRepository
     private List<Car> _cars = new List<Car>();
     private readonly string _csvFileName;
     private readonly string _dataDirectory;
+    
+    // PERFORMANCE FIX: Index van foto's voor snelle lookup
+    // Dictionary key: "brand_model" (genormaliseerd), value: lijst van bestandsnamen
+    // Dit voorkomt dat we voor elke auto door alle 49,341 foto's moeten loopen
+    private Dictionary<string, List<string>>? _imageIndex = null;
+    private string? _imagesDirectory = null;
 
     /// <summary>
     /// Constructor - laadt auto's uit CSV bij initialisatie.
@@ -50,8 +57,30 @@ public class CarRepository : ICarRepository
         // Parse CSV naar Car objecten
         _cars = LoadCarsFromCsv(csvPath);
 
-        // Genereer image paths
-        AssignImagePaths(_cars);
+        // PERFORMANCE FIX: Laad permanente image mapping (als die bestaat)
+        // Dit voorkomt dat we bij elke start opnieuw moeten matchen
+        string mappingPath = GetImageMappingPath();
+        Dictionary<int, string>? imageMapping = LoadImageMapping(mappingPath);
+        
+        if (imageMapping != null && imageMapping.Count > 0)
+        {
+            // Mapping bestaat - gebruik deze direct
+            Console.WriteLine($"[LoadCarsFromCsv] Permanente image mapping geladen: {imageMapping.Count} auto's hebben ImageUrl");
+            ApplyImageMapping(_cars, imageMapping);
+        }
+        else
+        {
+            // Geen mapping gevonden - genereer nieuwe mapping en sla op
+            Console.WriteLine($"[LoadCarsFromCsv] Geen permanente mapping gevonden - genereer nieuwe mapping...");
+            AssignImagePaths(_cars);
+            SaveImageMapping(_cars, mappingPath);
+        }
+        
+        // Statistieken loggen
+        int carsWithImages = _cars.Count(c => !string.IsNullOrEmpty(c.ImageUrl));
+        Console.WriteLine($"Image matching resultaten:");
+        Console.WriteLine($"  Totaal auto's: {_cars.Count}");
+        Console.WriteLine($"  Auto's met foto: {carsWithImages} ({(carsWithImages * 100.0 / _cars.Count):F1}%)");
 
         Console.WriteLine($"Aantal ingelezen auto's: {_cars.Count}");
     }
@@ -212,11 +241,11 @@ public class CarRepository : ICarRepository
                         if (!string.IsNullOrWhiteSpace(imagePath) && imagePath.ToLower() != "none")
                         {
                             car.ImagePath = imagePath;
-                            // Als Image_Path een bestandsnaam bevat (bijv. "Lexus$$RX 350$$2007$$Black$$48_24$$6$$image_0.jpg"),
-                            // kunnen we dit gebruiken om een URL te genereren
-                            if (imagePath.Contains("$$") || imagePath.Contains(".jpg") || imagePath.Contains(".png"))
+                            
+                            // Als Image_Path een bestandsnaam bevat met $$ separator (bijv. "Lexus$$RX 350$$2007$$Black$$48_24$$6$$image_0.jpg"),
+                            // parse dit om merk en model te extraheren
+                            if (imagePath.Contains("$$"))
                             {
-                                // Parse Image_name om merk en model te extraheren voor betere image URL
                                 string[] parts = imagePath.Split(new[] { "$$" }, StringSplitOptions.RemoveEmptyEntries);
                                 if (parts.Length >= 2)
                                 {
@@ -226,6 +255,9 @@ public class CarRepository : ICarRepository
                                         car.Brand = parts[0].Trim();
                                     if (string.IsNullOrWhiteSpace(car.Model) && parts.Length > 1)
                                         car.Model = parts[1].Trim();
+                                    
+                                    // Sla de Image_Path op zodat FindKaggleImage deze kan gebruiken
+                                    // Format: "Lexus$$RX 350$$2007$$..." -> zoek naar "Lexus_RX_350" of "Lexus_RX350" in image bestanden
                                 }
                             }
                         }
@@ -286,91 +318,82 @@ public class CarRepository : ICarRepository
     /// </summary>
     public void AssignImagePaths(List<Car> cars)
     {
+        int matched = 0;
+        int skipped = 0;
+        
+        // PERFORMANCE FIX: Indexeer alle foto's ÉÉN KEER aan het begin
+        // Dit voorkomt dat we voor elke auto door alle 49,341 foto's moeten loopen
+        Console.WriteLine($"[AssignImagePaths] Start - {cars.Count} auto's");
+        Console.WriteLine($"[AssignImagePaths] Indexeren van foto's...");
+        
+        BuildImageIndex();
+        
+        if (_imageIndex == null || _imageIndex.Count == 0)
+        {
+            Console.WriteLine($"[AssignImagePaths] WAARSCHUWING: Geen foto's geïndexeerd! Alle auto's krijgen lege ImageUrl.");
+            foreach (Car car in cars)
+            {
+                car.ImageUrl = string.Empty;
+            }
+            return;
+        }
+        
+        Console.WriteLine($"[AssignImagePaths] Foto index gebouwd: {_imageIndex.Count} unieke brand_model combinaties gevonden");
+        
         foreach (Car car in cars)
         {
-            // Als er al een path is, skip deze auto
+            // Skip als geen merk of model
+            if (string.IsNullOrWhiteSpace(car.Brand) || string.IsNullOrWhiteSpace(car.Model))
+            {
+                skipped++;
+                car.ImageUrl = string.Empty;
+                continue;
+            }
+            
+            // Stap 1: Als ImagePath uit CSV bestaat, probeer deze eerst te gebruiken
             if (!string.IsNullOrWhiteSpace(car.ImagePath) && 
                 !car.ImagePath.Equals("None", StringComparison.OrdinalIgnoreCase))
             {
-                // Zorg dat ImageUrl ook gezet is, zelfs als ImagePath al bestaat
-                if (string.IsNullOrWhiteSpace(car.ImageUrl))
-                {
-                    car.ImageUrl = GenerateImageUrl(car);
-                }
-                continue; // Al een path, skip rest
-            }
-
-            // Maak veilige bestandsnamen (verwijder illegale tekens)
-            string cleanBrand = SanitizeFileName(car.Brand);
-            string cleanModel = SanitizeFileName(car.Model);
-            
-            // Genereer pad: images/brand/model/id.jpg
-            car.ImagePath = $"images/{cleanBrand}/{cleanModel}/{car.Id}.jpg";
-            
-            // Check of lokale afbeelding bestaat (van Kaggle dataset)
-            string localImagePath = Path.Combine(Directory.GetCurrentDirectory(), car.ImagePath);
-            if (File.Exists(localImagePath))
-            {
-                // Gebruik lokale afbeelding via relatieve URL (voor web server)
-                car.ImageUrl = $"/{car.ImagePath.Replace('\\', '/')}";
-            }
-            else
-            {
-                // Probeer Kaggle image te vinden (andere naamgeving)
-                string kaggleImagePath = FindKaggleImage(car);
+                string kaggleImagePath = FindKaggleImageByPath(car);
                 if (!string.IsNullOrEmpty(kaggleImagePath))
                 {
                     car.ImageUrl = kaggleImagePath;
-                }
-                else
-                {
-                    // Genereer externe ImageUrl als fallback
-                    car.ImageUrl = GenerateImageUrl(car);
+                    matched++;
+                    continue;
                 }
             }
+            
+            // PERFORMANCE FIX: Stap 2 - Gebruik index voor snelle lookup
+            // In plaats van door alle 49,341 foto's te loopen, gebruiken we de index
+            string kaggleImagePathByMatch = FindKaggleImageUsingIndex(car);
+            if (!string.IsNullOrEmpty(kaggleImagePathByMatch))
+            {
+                car.ImageUrl = kaggleImagePathByMatch;
+                matched++;
+            }
+            else
+            {
+                // Geen image gevonden - lege string (frontend gebruikt SVG fallback)
+                car.ImageUrl = string.Empty;
+            }
         }
+        
+        Console.WriteLine($"Image matching resultaten:");
+        Console.WriteLine($"  Totaal auto's: {cars.Count}");
+        Console.WriteLine($"  Auto's met foto: {matched} ({(matched * 100.0 / cars.Count):F1}%)");
+        Console.WriteLine($"  Auto's zonder foto: {cars.Count - matched} ({(cars.Count - matched) * 100.0 / cars.Count:F1}%)");
     }
 
     /// <summary>
     /// Genereert een ImageUrl voor een auto op basis van merk en model.
-    /// Gebruikt Auto-Data.net voor echte auto-afbeeldingen waar mogelijk.
+    /// GEEN fallback naar externe services - retourneert lege string als geen image gevonden.
+    /// De frontend gebruikt dan een professionele SVG icon fallback.
     /// </summary>
     private string GenerateImageUrl(Car car)
     {
-        if (string.IsNullOrWhiteSpace(car.Brand) || string.IsNullOrWhiteSpace(car.Model))
-        {
-            return string.Empty;
-        }
-
-        // Maak een veilige search query voor auto-afbeeldingen
-        string safeBrand = car.Brand.Trim().Replace(" ", "-").Replace("&", "and").ToLower();
-        string safeModel = car.Model.Trim().Replace(" ", "-").Replace("&", "and").ToLower();
-        
-        // Gebruik een deterministische seed op basis van merk+model voor consistente fallback afbeeldingen
-        int seed = Math.Abs((car.Brand + car.Model).GetHashCode());
-        
-        // Optie 1: Probeer Auto-Data.net image URL structuur
-        // Auto-Data.net heeft een image database, maar de exacte URL structuur is niet publiekelijk bekend
-        // We kunnen proberen een URL te construeren op basis van merk en model
-        // Format: https://www.auto-data.net/images/{brand}/{model}/...
-        // Dit is een gok, maar het kan werken voor veel modellen
-        
-        // Probeer eerst een directe Auto-Data.net image URL
-        string autoDataUrl = $"https://www.auto-data.net/images/{safeBrand}/{safeModel}.jpg";
-        
-        // Als alternatief kunnen we ook een search URL gebruiken die naar de auto pagina linkt
-        // Dit geeft de gebruiker toegang tot de auto-data.net pagina met afbeeldingen
-        // Maar voor nu gebruiken we een fallback naar Picsum Photos met seed voor consistente afbeeldingen
-        
-        // Fallback: Gebruik Lorem Picsum met seed voor consistente afbeeldingen
-        // Dit geeft altijd een werkende afbeelding (maar niet specifiek auto's)
-        // De frontend kan dit gebruiken als fallback als Auto-Data.net URL niet werkt
-        return $"https://picsum.photos/seed/{seed}/400/300";
-        
-        // TOEKOMSTIGE VERBETERING:
-        // 1. Gebruik Auto-Data.net API (vereist API key/offerte) voor echte auto foto's
-        // 2. Of gebruik Pexels API (gratis) voor auto foto's
-        // 3. Cache de resultaten om API calls te beperken
+        // GEEN willekeurige foto's meer - retourneer lege string
+        // De frontend zal dan de SVG icon fallback gebruiken
+        return string.Empty;
     }
 
     /// <summary>
@@ -415,8 +438,237 @@ public class CarRepository : ICarRepository
     }
 
     /// <summary>
-    /// Zoekt een Kaggle image op basis van merk en model.
+    /// PERFORMANCE FIX: Bouwt een index van alle foto's voor snelle lookup.
+    /// Indexeert foto's op basis van genormaliseerde brand_model combinaties.
+    /// Dit voorkomt dat we voor elke auto door alle 49,341 foto's moeten loopen.
+    /// </summary>
+    private void BuildImageIndex()
+    {
+        if (_imageIndex != null)
+        {
+            // Index al gebouwd, skip
+            return;
+        }
+        
+        _imageIndex = new Dictionary<string, List<string>>();
+        
+        // Zoek images directory (gebruik zelfde logica als FindKaggleImage)
+        string? imagesDir = FindImagesDirectory();
+        
+        if (string.IsNullOrEmpty(imagesDir))
+        {
+            Console.WriteLine($"[BuildImageIndex] GEEN images directory gevonden!");
+            return;
+        }
+        
+        _imagesDirectory = imagesDir;
+        
+        Console.WriteLine($"[BuildImageIndex] Indexeren van foto's in: {imagesDir}");
+        
+        // Haal alle foto's op
+        var allImages = Directory.GetFiles(imagesDir, "*.jpg", SearchOption.TopDirectoryOnly);
+        Console.WriteLine($"[BuildImageIndex] {allImages.Length} foto's gevonden, indexeren...");
+        
+        int indexedCount = 0;
+        
+        foreach (var imagePath in allImages)
+        {
+            string fileName = Path.GetFileNameWithoutExtension(imagePath);
+            string fileNameNormalized = fileName
+                .ToLowerInvariant()
+                .Replace("_", "")
+                .Replace("-", "")
+                .Replace(" ", "");
+            
+            // Extract brand en model uit bestandsnaam
+            // Bestandsnamen zijn zoals "Acura_MDX_2011..." -> "Acura" en "MDX"
+            string[] parts = fileName.Split('_');
+            if (parts.Length >= 2)
+            {
+                string brand = parts[0].Trim();
+                string model = parts[1].Trim();
+                
+                // Normaliseer brand en model voor index key
+                string brandNormalized = brand
+                    .ToLowerInvariant()
+                    .Replace(" ", "")
+                    .Replace("-", "")
+                    .Replace("_", "");
+                
+                string modelNormalized = model
+                    .ToLowerInvariant()
+                    .Replace(" ", "")
+                    .Replace("-", "")
+                    .Replace("_", "");
+                
+                if (!string.IsNullOrEmpty(brandNormalized) && !string.IsNullOrEmpty(modelNormalized))
+                {
+                    // Maak index key: "brand_model"
+                    string indexKey = $"{brandNormalized}_{modelNormalized}";
+                    
+                    // Voeg toe aan index
+                    if (!_imageIndex.ContainsKey(indexKey))
+                    {
+                        _imageIndex[indexKey] = new List<string>();
+                    }
+                    
+                    _imageIndex[indexKey].Add(Path.GetFileName(imagePath));
+                    indexedCount++;
+                }
+            }
+        }
+        
+        Console.WriteLine($"[BuildImageIndex] Index gebouwd: {_imageIndex.Count} unieke brand_model combinaties, {indexedCount} foto's geïndexeerd");
+    }
+    
+    /// <summary>
+    /// PERFORMANCE FIX: Zoekt foto's met behulp van de index in plaats van door alle foto's te loopen.
+    /// Dit is VEEL sneller: O(1) lookup in plaats van O(n) voor elke auto.
+    /// </summary>
+    private string FindKaggleImageUsingIndex(Car car)
+    {
+        if (_imageIndex == null || _imageIndex.Count == 0)
+        {
+            return string.Empty;
+        }
+        
+        if (string.IsNullOrWhiteSpace(car.Brand) || string.IsNullOrWhiteSpace(car.Model))
+        {
+            return string.Empty;
+        }
+        
+        // Normaliseer brand en model op dezelfde manier als in BuildImageIndex
+        string brandNormalized = (car.Brand ?? "")
+            .ToLowerInvariant()
+            .Replace(" ", "")
+            .Replace("-", "")
+            .Replace("_", "")
+            .Trim();
+        
+        string modelNormalized = (car.Model ?? "")
+            .ToLowerInvariant()
+            .Replace(" ", "")
+            .Replace("-", "")
+            .Replace("_", "")
+            .Trim();
+        
+        if (string.IsNullOrEmpty(brandNormalized) || string.IsNullOrEmpty(modelNormalized))
+        {
+            return string.Empty;
+        }
+        
+        // Zoek in index: probeer exacte match eerst
+        string indexKey = $"{brandNormalized}_{modelNormalized}";
+        
+        if (_imageIndex.ContainsKey(indexKey) && _imageIndex[indexKey].Count > 0)
+        {
+            // MATCH GEVONDEN! Gebruik eerste foto uit de lijst
+            string fileName = _imageIndex[indexKey][0];
+            return $"/images/{fileName}";
+        }
+        
+        // Als exacte match niet werkt, probeer partial matching
+        // Bijvoorbeeld: "bmwx5" vs "bmw_x5" -> beide normaliseren naar "bmwx5"
+        // Maar dit zou al moeten werken met de huidige normalisatie...
+        
+        // Probeer alternatieve keys (bijv. zonder underscore)
+        string altKey = $"{brandNormalized}{modelNormalized}";
+        foreach (var kvp in _imageIndex)
+        {
+            if (kvp.Key.Contains(brandNormalized) && kvp.Key.Contains(modelNormalized))
+            {
+                if (kvp.Value.Count > 0)
+                {
+                    string fileName = kvp.Value[0];
+                    return $"/images/{fileName}";
+                }
+            }
+        }
+        
+        return string.Empty;
+    }
+    
+    /// <summary>
+    /// Helper methode om images directory te vinden (gebruikt door BuildImageIndex en FindKaggleImage).
+    /// </summary>
+    private string? FindImagesDirectory()
+    {
+        // Bepaal project root door te zoeken naar bekende directories (data, backend, etc.)
+        string? projectRoot = null;
+        string currentDir = Directory.GetCurrentDirectory();
+        
+        // Zoek project root door omhoog te gaan tot we data/ of backend/ directory vinden
+        DirectoryInfo? dir = new DirectoryInfo(currentDir);
+        while (dir != null)
+        {
+            if (Directory.Exists(Path.Combine(dir.FullName, "data")) || 
+                Directory.Exists(Path.Combine(dir.FullName, "backend")))
+            {
+                projectRoot = dir.FullName;
+                break;
+            }
+            dir = dir.Parent;
+        }
+        
+        // Probeer verschillende mogelijke image directories
+        List<string> possibleDirs = new List<string>();
+        
+        // Van project root (als gevonden)
+        if (!string.IsNullOrEmpty(projectRoot))
+        {
+            possibleDirs.Add(Path.Combine(projectRoot, "backend", "images"));
+            possibleDirs.Add(Path.Combine(projectRoot, "images"));
+        }
+        
+        // Van current directory
+        possibleDirs.Add(Path.Combine(currentDir, "backend", "images"));
+        possibleDirs.Add(Path.Combine(currentDir, "images"));
+        possibleDirs.Add(Path.Combine(currentDir, "..", "backend", "images"));
+        possibleDirs.Add(Path.Combine(currentDir, "..", "..", "backend", "images"));
+        
+        // Van AppDomain BaseDirectory (runtime directory)
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        possibleDirs.Add(Path.Combine(baseDir, "backend", "images"));
+        possibleDirs.Add(Path.Combine(baseDir, "images"));
+        possibleDirs.Add(Path.Combine(baseDir, "..", "backend", "images"));
+        possibleDirs.Add(Path.Combine(baseDir, "..", "..", "backend", "images"));
+        
+        // Absolute pad als fallback (voor Azure deployment)
+        possibleDirs.Add(@"C:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\backend\images");
+
+        foreach (var dirPath in possibleDirs)
+        {
+            try
+            {
+                string normalizedPath = Path.GetFullPath(dirPath);
+                
+                if (Directory.Exists(normalizedPath))
+                {
+                    var jpgFiles = Directory.GetFiles(normalizedPath, "*.jpg", SearchOption.TopDirectoryOnly);
+                    var jpgFilesUpper = Directory.GetFiles(normalizedPath, "*.JPG", SearchOption.TopDirectoryOnly);
+                    var jpgFilesMixed = Directory.GetFiles(normalizedPath, "*.Jpg", SearchOption.TopDirectoryOnly);
+                    
+                    int totalJpgFiles = jpgFiles.Length + jpgFilesUpper.Length + jpgFilesMixed.Length;
+                    
+                    if (totalJpgFiles > 0)
+                    {
+                        return normalizedPath;
+                    }
+                }
+            }
+            catch
+            {
+                continue;
+            }
+        }
+        
+        return null;
+    }
+
+    /// <summary>
+    /// Zoekt een Kaggle image op basis van merk en model (OUDE METHODE - langzaam).
     /// Kaggle images hebben naamgeving: Brand_Model_Year_... (bijv. Acura_ILX_2013_...)
+    /// GEBRUIK FindKaggleImageUsingIndex() in plaats van deze methode voor betere performance!
     /// </summary>
     private string FindKaggleImage(Car car)
     {
@@ -425,7 +677,206 @@ public class CarRepository : ICarRepository
 
         try
         {
+            // BUG FIX: Probeer verschillende mogelijke image directories
+            // Het probleem was dat Directory.GetCurrentDirectory() niet altijd naar de juiste directory wijst
+            // We proberen nu meer locaties, inclusief relatieve paden vanaf verschillende startpunten
+            
+            // Bepaal project root door te zoeken naar bekende directories (data, backend, etc.)
+            string? projectRoot = null;
+            string currentDir = Directory.GetCurrentDirectory();
+            
+            // Zoek project root door omhoog te gaan tot we data/ of backend/ directory vinden
+            DirectoryInfo? dir = new DirectoryInfo(currentDir);
+            while (dir != null)
+            {
+                if (Directory.Exists(Path.Combine(dir.FullName, "data")) || 
+                    Directory.Exists(Path.Combine(dir.FullName, "backend")))
+                {
+                    projectRoot = dir.FullName;
+                    break;
+                }
+                dir = dir.Parent;
+            }
+            
             // Probeer verschillende mogelijke image directories
+            List<string> possibleDirs = new List<string>();
+            
+            // Van project root (als gevonden)
+            if (!string.IsNullOrEmpty(projectRoot))
+            {
+                possibleDirs.Add(Path.Combine(projectRoot, "backend", "images"));
+                possibleDirs.Add(Path.Combine(projectRoot, "images"));
+            }
+            
+            // Van current directory
+            possibleDirs.Add(Path.Combine(currentDir, "backend", "images"));
+            possibleDirs.Add(Path.Combine(currentDir, "images"));
+            possibleDirs.Add(Path.Combine(currentDir, "..", "backend", "images"));
+            possibleDirs.Add(Path.Combine(currentDir, "..", "..", "backend", "images"));
+            
+            // Van AppDomain BaseDirectory (runtime directory)
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            possibleDirs.Add(Path.Combine(baseDir, "backend", "images"));
+            possibleDirs.Add(Path.Combine(baseDir, "images"));
+            possibleDirs.Add(Path.Combine(baseDir, "..", "backend", "images"));
+            possibleDirs.Add(Path.Combine(baseDir, "..", "..", "backend", "images"));
+            
+            // Absolute pad als fallback (voor Azure deployment)
+            possibleDirs.Add(@"C:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\backend\images");
+
+            string? imagesDir = null;
+            foreach (var dirPath in possibleDirs)
+            {
+                try
+                {
+                    string normalizedPath = Path.GetFullPath(dirPath); // Normaliseer pad
+                    
+                    // BUG FIX: Case-insensitive directory check - probeer ook met verschillende case variaties
+                    if (Directory.Exists(normalizedPath))
+                    {
+                        // BUG FIX: Check of er daadwerkelijk .jpg bestanden in zitten (case-insensitive)
+                        // Directory.GetFiles is standaard case-insensitive op Windows, maar expliciet maken
+                        var jpgFiles = Directory.GetFiles(normalizedPath, "*.jpg", SearchOption.TopDirectoryOnly);
+                        var jpgFilesUpper = Directory.GetFiles(normalizedPath, "*.JPG", SearchOption.TopDirectoryOnly);
+                        var jpgFilesMixed = Directory.GetFiles(normalizedPath, "*.Jpg", SearchOption.TopDirectoryOnly);
+                        
+                        int totalJpgFiles = jpgFiles.Length + jpgFilesUpper.Length + jpgFilesMixed.Length;
+                        
+                        if (totalJpgFiles > 0)
+                        {
+                            imagesDir = normalizedPath;
+                            Console.WriteLine($"[FindKaggleImage] Images directory gevonden: {imagesDir} ({totalJpgFiles} .jpg bestanden gevonden)");
+                            break;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Skip invalid paths
+                    continue;
+                }
+            }
+
+            if (string.IsNullOrEmpty(imagesDir))
+            {
+                Console.WriteLine($"[FindKaggleImage] GEEN images directory gevonden! Gezocht in:");
+                foreach (var dirPath in possibleDirs.Take(10)) // Log eerste 10 voor debugging
+                {
+                    Console.WriteLine($"  - {dirPath}");
+                }
+                return string.Empty;
+            }
+
+            // BUG FIX: Case-insensitive matching met robuuste normalisatie
+            // Bestandsnamen zijn zoals "Acura_MDX_2011..." (met hoofdletters en underscores)
+            // We normaliseren alles naar lowercase en verwijderen speciale tekens voor matching
+            // Bijv: "BMW X5" -> "bmwx5", "Acura_MDX_2011..." -> "acuramdx2011..."
+            
+            // Normaliseer brand: lowercase, verwijder spaties, streepjes, underscores
+            string brandNormalized = (car.Brand ?? "")
+                .ToLowerInvariant()  // BUG FIX: ToLowerInvariant voor betere performance en consistentie
+                .Replace(" ", "")
+                .Replace("-", "")
+                .Replace("_", "")
+                .Trim();
+            
+            // Normaliseer model: lowercase, verwijder spaties, streepjes, underscores
+            string modelNormalized = (car.Model ?? "")
+                .ToLowerInvariant()  // BUG FIX: ToLowerInvariant voor betere performance
+                .Replace(" ", "")
+                .Replace("-", "")
+                .Replace("_", "")
+                .Trim();
+            
+            if (string.IsNullOrEmpty(brandNormalized) || string.IsNullOrEmpty(modelNormalized))
+            {
+                Console.WriteLine($"[FindKaggleImage] Lege brand of model: Brand='{car.Brand}', Model='{car.Model}'");
+                return string.Empty;
+            }
+            
+            // BUG FIX: Case-insensitive file search - gebruik SearchOption.AllDirectories NIET nodig, maar zorg dat we alle .jpg vinden
+            // Directory.GetFiles is standaard case-insensitive op Windows, maar expliciet maken voor duidelijkheid
+            var allImages = Directory.GetFiles(imagesDir, "*.jpg", SearchOption.TopDirectoryOnly);
+            Console.WriteLine($"[FindKaggleImage] Zoeken: '{brandNormalized}' + '{modelNormalized}' in {allImages.Length} foto's (directory: {imagesDir})");
+            
+            // BUG FIX: Robuuste matching - normaliseer bestandsnaam op dezelfde manier als brand/model
+            int checkedCount = 0;
+            int matchCount = 0;
+            
+            foreach (var imagePath in allImages)
+            {
+                checkedCount++;
+                
+                // BUG FIX: Normaliseer bestandsnaam op EXACT dezelfde manier als brand/model
+                // Bestandsnaam: "Acura_MDX_2011..." -> "acuramdx2011..."
+                string fileName = Path.GetFileNameWithoutExtension(imagePath)
+                    .ToLowerInvariant()  // BUG FIX: ToLowerInvariant voor consistentie
+                    .Replace("_", "")   // Verwijder underscores
+                    .Replace("-", "")   // Verwijder streepjes
+                    .Replace(" ", "");   // Verwijder spaties
+                
+                // BUG FIX: Case-insensitive Contains check (ToLowerInvariant zorgt hiervoor)
+                // Check of merk EN model beide voorkomen in genormaliseerde bestandsnaam
+                // Bijv: "acuramdx2011..." bevat "acura" en "mdx"
+                bool brandFound = fileName.Contains(brandNormalized, StringComparison.OrdinalIgnoreCase);
+                bool modelFound = fileName.Contains(modelNormalized, StringComparison.OrdinalIgnoreCase);
+                
+                if (brandFound && modelFound)
+                {
+                    // MATCH GEVONDEN! Gebruik deze foto
+                    string fileNameOnly = Path.GetFileName(imagePath);
+                    Console.WriteLine($"[FindKaggleImage] MATCH #{++matchCount}: {car.Brand} {car.Model} -> {fileNameOnly}");
+                    Console.WriteLine($"[FindKaggleImage]   Normalized: brand='{brandNormalized}', model='{modelNormalized}', filename='{fileName}'");
+                    
+                    // Gebruik eerste match
+                    return $"/images/{fileNameOnly}";
+                }
+                
+                // Log eerste paar checks voor debugging
+                if (checkedCount <= 5)
+                {
+                    string originalFileName = Path.GetFileName(imagePath);
+                    Console.WriteLine($"[FindKaggleImage] Check {checkedCount}: '{originalFileName}' -> normalized: '{fileName}' | brand: {brandFound} ('{brandNormalized}'), model: {modelFound} ('{modelNormalized}')");
+                }
+            }
+            
+            Console.WriteLine($"[FindKaggleImage] GEEN match voor {car.Brand} {car.Model} (gecheckt {checkedCount} foto's, brand='{brandNormalized}', model='{modelNormalized}')");
+            return string.Empty;
+        }
+        catch (Exception ex)
+        {
+            // Log exception voor debugging
+            Console.WriteLine($"[FindKaggleImage] Exception: {ex.Message}");
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Zoekt een image op basis van ImagePath uit CSV.
+    /// ImagePath formaat: "Lexus$$RX 350$$2007$$Black$$48_24$$6$$image_0.jpg"
+    /// Zoekt naar bestanden die beginnen met "Lexus_RX350" of "Lexus_RX_350" etc.
+    /// </summary>
+    private string FindKaggleImageByPath(Car car)
+    {
+        if (string.IsNullOrWhiteSpace(car.ImagePath))
+            return string.Empty;
+            
+        try
+        {
+            // Parse ImagePath: "Lexus$$RX 350$$2007$$..." -> merk="Lexus", model="RX 350"
+            string[] parts = car.ImagePath.Split(new[] { "$$" }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2)
+                return string.Empty;
+                
+            string brandFromPath = parts[0].Trim();
+            string modelFromPath = parts[1].Trim();
+            
+            // Normaliseer voor matching
+            string brandNormalized = NormalizeForImageSearch(brandFromPath);
+            string modelNormalized = NormalizeForImageSearch(modelFromPath);
+            
+            // Zoek image directories
             string[] possibleDirs = new[]
             {
                 Path.Combine(Directory.GetCurrentDirectory(), "backend", "images"),
@@ -433,7 +884,7 @@ public class CarRepository : ICarRepository
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backend", "images"),
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "images")
             };
-
+            
             string? imagesDir = null;
             foreach (var dir in possibleDirs)
             {
@@ -443,84 +894,41 @@ public class CarRepository : ICarRepository
                     break;
                 }
             }
-
+            
             if (string.IsNullOrEmpty(imagesDir))
                 return string.Empty;
-
-            // Normaliseer merk en model voor matching
-            string brandNormalized = NormalizeForImageSearch(car.Brand);
-            string modelNormalized = NormalizeForImageSearch(car.Model);
-
-            // Get all image files
+                
+            // Zoek naar bestanden die beginnen met brand_model
             var allImages = Directory.GetFiles(imagesDir, "*.jpg", SearchOption.TopDirectoryOnly);
             
-            // Zoek naar best match
-            string bestMatch = string.Empty;
-            int bestScore = 0;
-
             foreach (var imagePath in allImages)
             {
                 string fileName = Path.GetFileNameWithoutExtension(imagePath);
-                string[] parts = fileName.Split('_');
+                string[] fileNameParts = fileName.Split('_');
                 
-                if (parts.Length < 2)
+                if (fileNameParts.Length < 2)
                     continue;
-
-                string imageBrand = NormalizeForImageSearch(parts[0]);
-                string imageModel = NormalizeForImageSearch(parts[1]);
-
-                int score = 0;
+                    
+                string imageBrand = NormalizeForImageSearch(fileNameParts[0]);
+                string imageModel = NormalizeForImageSearch(fileNameParts[1]);
                 
-                // Exact brand match
-                if (imageBrand == brandNormalized)
-                    score += 10;
-                else if (imageBrand.Contains(brandNormalized) || brandNormalized.Contains(imageBrand))
-                    score += 5;
-
-                // Exact model match
-                if (imageModel == modelNormalized)
-                    score += 10;
-                else if (imageModel.Contains(modelNormalized) || modelNormalized.Contains(imageModel))
-                    score += 5;
-
-                // Year match (bonus)
-                if (parts.Length > 2 && int.TryParse(parts[2], out int imageYear))
+                // Exact match op brand + model
+                if (imageBrand == brandNormalized && 
+                    (imageModel == modelNormalized || 
+                     imageModel.Contains(modelNormalized) || 
+                     modelNormalized.Contains(imageModel)))
                 {
-                    if (car.Year > 0 && Math.Abs(imageYear - car.Year) <= 2)
-                        score += 2;
-                }
-
-                if (score > bestScore && score >= 10) // Minimaal brand + model match nodig
-                {
-                    bestScore = score;
-                    bestMatch = imagePath;
-                }
-            }
-
-            if (!string.IsNullOrEmpty(bestMatch))
-            {
-                // Converteer naar relatieve URL voor web server
-                // Images moeten beschikbaar zijn via /images/...
-                string fileName = Path.GetFileName(bestMatch);
-                
-                // Als image in backend/images staat, gebruik /images/...
-                if (bestMatch.Contains("backend" + Path.DirectorySeparatorChar + "images"))
-                {
-                    return $"/images/{fileName}";
-                }
-                else
-                {
-                    // Probeer relatieve path
-                    string relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), bestMatch);
-                    return $"/{relativePath.Replace('\\', '/')}";
+                    // Match gevonden!
+                    string fileNameOnly = Path.GetFileName(imagePath);
+                    return $"/images/{fileNameOnly}";
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Stil falen, gebruik fallback
+            Console.WriteLine($"[FindKaggleImageByPath] Exception: {ex.Message}");
         }
-
+        
         return string.Empty;
     }
 
@@ -542,6 +950,150 @@ public class CarRepository : ICarRepository
         normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"[^a-z0-9_]", "");
         
         return normalized;
+    }
+
+    /// <summary>
+    /// PERFORMANCE FIX: Bepaalt het pad naar het permanente image mapping bestand.
+    /// Mapping wordt opgeslagen in data/car_image_mapping.json
+    /// </summary>
+    private string GetImageMappingPath()
+    {
+        // Zoek data directory (zelfde logica als FindCsvFile)
+        string? dataDir = null;
+        
+        // Probeer verschillende locaties
+        string[] possibleDirs = new[]
+        {
+            Path.Combine(Directory.GetCurrentDirectory(), _dataDirectory),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _dataDirectory),
+            Path.Combine(Directory.GetCurrentDirectory(), "..", _dataDirectory),
+            Path.Combine(Directory.GetCurrentDirectory(), "..", "..", _dataDirectory),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", _dataDirectory),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", _dataDirectory)
+        };
+        
+        foreach (var dir in possibleDirs)
+        {
+            if (Directory.Exists(dir))
+            {
+                dataDir = dir;
+                break;
+            }
+        }
+        
+        // Als data directory niet gevonden, gebruik current directory
+        if (string.IsNullOrEmpty(dataDir))
+        {
+            dataDir = Directory.GetCurrentDirectory();
+        }
+        
+        return Path.Combine(dataDir, "car_image_mapping.json");
+    }
+    
+    /// <summary>
+    /// PERFORMANCE FIX: Laadt permanente image mapping uit JSON bestand.
+    /// Retourneert null als bestand niet bestaat.
+    /// </summary>
+    private Dictionary<int, string>? LoadImageMapping(string mappingPath)
+    {
+        try
+        {
+            if (!File.Exists(mappingPath))
+            {
+                return null;
+            }
+            
+            Console.WriteLine($"[LoadImageMapping] Laden van mapping: {mappingPath}");
+            string jsonContent = File.ReadAllText(mappingPath);
+            
+            // Deserialize JSON naar Dictionary<int, string>
+            var mapping = JsonSerializer.Deserialize<Dictionary<int, string>>(jsonContent);
+            
+            if (mapping != null)
+            {
+                Console.WriteLine($"[LoadImageMapping] Mapping geladen: {mapping.Count} auto's");
+            }
+            
+            return mapping;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LoadImageMapping] Fout bij laden van mapping: {ex.Message}");
+            return null;
+        }
+    }
+    
+    /// <summary>
+    /// PERFORMANCE FIX: Slaat permanente image mapping op naar JSON bestand.
+    /// Dit voorkomt dat we bij elke start opnieuw moeten matchen.
+    /// </summary>
+    private void SaveImageMapping(List<Car> cars, string mappingPath)
+    {
+        try
+        {
+            // Maak dictionary: carId -> ImageUrl
+            Dictionary<int, string> mapping = new Dictionary<int, string>();
+            
+            foreach (var car in cars)
+            {
+                if (!string.IsNullOrEmpty(car.ImageUrl))
+                {
+                    mapping[car.Id] = car.ImageUrl;
+                }
+            }
+            
+            // Serialize naar JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true, // Leesbaar formaat
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+            
+            string jsonContent = JsonSerializer.Serialize(mapping, options);
+            
+            // Zorg dat directory bestaat
+            string? directory = Path.GetDirectoryName(mappingPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            
+            // Schrijf naar bestand
+            File.WriteAllText(mappingPath, jsonContent);
+            
+            Console.WriteLine($"[SaveImageMapping] Mapping opgeslagen: {mapping.Count} auto's -> {mappingPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SaveImageMapping] Fout bij opslaan van mapping: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// PERFORMANCE FIX: Past permanente image mapping toe op auto's.
+    /// </summary>
+    private void ApplyImageMapping(List<Car> cars, Dictionary<int, string> mapping)
+    {
+        int applied = 0;
+        
+        foreach (var car in cars)
+        {
+            if (mapping.TryGetValue(car.Id, out string? imageUrl))
+            {
+                car.ImageUrl = imageUrl ?? string.Empty;
+                if (!string.IsNullOrEmpty(imageUrl))
+                {
+                    applied++;
+                }
+            }
+            else
+            {
+                // Geen mapping voor deze auto - lege ImageUrl
+                car.ImageUrl = string.Empty;
+            }
+        }
+        
+        Console.WriteLine($"[ApplyImageMapping] Mapping toegepast: {applied} auto's hebben ImageUrl");
     }
 
     /// <summary>

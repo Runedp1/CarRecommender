@@ -203,3 +203,4 @@ Met een wake-up service:
 **Status:** ✅ Oplossing voor Free Tier beschikbaar
 **Aanbevolen:** UptimeRobot (gratis, automatisch, 24/7)
 
+

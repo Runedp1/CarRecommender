@@ -204,3 +204,4 @@ print("2. Pas CarRepository aan om deze mapping te gebruiken")
 print("3. Test image loading in frontend")
 print("=" * 80)
 
+

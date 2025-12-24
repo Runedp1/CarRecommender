@@ -146,3 +146,4 @@ print("2. Pas CarRepository aan om images te vinden op basis van merk/model")
 print("3. Test de image loading in de frontend")
 print("=" * 80)
 
+

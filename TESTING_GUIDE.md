@@ -232,3 +232,4 @@ Na succesvol testen:
 3. Test met echte gebruikersscenario's
 4. Overweeg om unit tests toe te voegen voor `TextParserService.ExtractBrandPreference`
 
+

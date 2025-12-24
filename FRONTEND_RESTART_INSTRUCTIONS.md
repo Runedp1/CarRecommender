@@ -73,3 +73,4 @@ Na herstarten zou je moeten zien:
    - Bekijk Console tab voor JavaScript errors
    - Bekijk Network tab voor API call errors
 
+

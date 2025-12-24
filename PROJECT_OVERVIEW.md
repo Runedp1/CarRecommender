@@ -366,3 +366,4 @@ Het project heeft een **solide basis** met:
 Het project is **klaar voor verdere ontwikkeling** en kan gemakkelijk uitgebreid worden met de genoemde TODO's.
 
 
+
