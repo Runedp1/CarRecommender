@@ -141,6 +141,84 @@ public class RecommendationsController : ControllerBase
             throw;
         }
     }
+
+    /// <summary>
+    /// POST /api/recommendations/hybrid/manual
+    /// Genereert recommendations op basis van manuele filters (zonder tekst parsing).
+    /// 
+    /// Request body:
+    /// {
+    ///   "minPrice": 10000,
+    ///   "maxPrice": 30000,
+    ///   "brand": "bmw",
+    ///   "model": "x5",
+    ///   "fuel": "diesel",
+    ///   "transmission": true,
+    ///   "bodyType": "suv",
+    ///   "minYear": 2015,
+    ///   "maxYear": 2023,
+    ///   "minPower": 150,
+    ///   "top": 5
+    /// }
+    /// 
+    /// VERSCHIL MET TEKST MODUS:
+    /// - Tekst modus (/api/recommendations/text): Parseert vrije tekst met NLP
+    /// - Manuele modus (/api/recommendations/hybrid/manual): Directe formulier velden, geen parsing
+    /// - Alle velden zijn optioneel (null = geen filter)
+    /// - Geen km-stand ondersteund (zoals gevraagd)
+    /// </summary>
+    [HttpPost("hybrid/manual")]
+    [ProducesResponseType(typeof(List<RecommendationResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public IActionResult GetRecommendationsFromManualFilters([FromBody] ManualFilterRequest request)
+    {
+        try
+        {
+            // Valideer request
+            if (request == null)
+            {
+                return BadRequest(new { error = "Request body is verplicht." });
+            }
+
+            // Valideer top parameter (optioneel in request, standaard 5)
+            int top = request.Top ?? 5;
+            if (top < 1 || top > 20)
+            {
+                return BadRequest(new { error = "Top parameter moet tussen 1 en 20 zijn." });
+            }
+
+            // Valideer dat er ten minste één filter is ingesteld
+            bool hasAnyFilter = 
+                request.MinPrice.HasValue ||
+                request.MaxPrice.HasValue ||
+                !string.IsNullOrWhiteSpace(request.Brand) ||
+                !string.IsNullOrWhiteSpace(request.Model) ||
+                !string.IsNullOrWhiteSpace(request.Fuel) ||
+                request.Transmission.HasValue ||
+                !string.IsNullOrWhiteSpace(request.BodyType) ||
+                request.MinYear.HasValue ||
+                request.MaxYear.HasValue ||
+                request.MinPower.HasValue;
+
+            if (!hasAnyFilter)
+            {
+                return BadRequest(new { error = "Ten minste één filter moet worden ingesteld." });
+            }
+
+            // Genereer recommendations op basis van manuele filters via business logica service
+            var recommendations = _recommendationService.RecommendFromManualFilters(request, top);
+
+            return Ok(recommendations);
+        }
+        catch (Exception ex)
+        {
+            // Log de exception voor Azure App Service logs
+            _logger.LogError(ex, "Fout bij manuele filter-gebaseerde recommendations");
+            // Exception wordt opgevangen door globale exception handler die 500 teruggeeft
+            throw;
+        }
+    }
 }
 
 /// <summary>

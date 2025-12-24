@@ -510,6 +510,110 @@ public class RecommendationService : IRecommendationService
 
         return ideal;
     }
+
+    /// <summary>
+    /// Genereert recommendations op basis van manuele filters (zonder tekst parsing).
+    /// Gebruiker geeft expliciet alle voorkeuren op via formulier.
+    /// 
+    /// VERSCHIL MET TEKST MODUS:
+    /// - Tekst modus: Parseert vrije tekst met TextParserService
+    /// - Manuele modus: Directe mapping van formulier velden naar FilterCriteria
+    /// - Geen gewichten nodig (alle filters zijn even belangrijk)
+    /// </summary>
+    public List<RecommendationResult> RecommendFromManualFilters(ManualFilterRequest request, int n = 5)
+    {
+        EnsureInitialized();
+        
+        List<Car> allCars = _carRepository.GetAllCars();
+        
+        // Converteer ManualFilterRequest naar FilterCriteria (directe mapping, geen parsing)
+        var filterCriteria = new RuleBasedFilter.FilterCriteria
+        {
+            MinBudget = request.MinPrice,
+            MaxBudget = request.MaxPrice,
+            PreferredFuel = request.Fuel,
+            PreferredBrand = request.Brand,
+            PreferredBodyType = request.BodyType,
+            AutomaticTransmission = request.Transmission,
+            MinYear = request.MinYear,
+            MaxYear = request.MaxYear
+        };
+        
+        // Extra filter voor model (niet in FilterCriteria, dus apart toepassen)
+        if (!string.IsNullOrWhiteSpace(request.Model))
+        {
+            string modelLower = request.Model.ToLower().Trim();
+            allCars = allCars.Where(c => 
+                !string.IsNullOrWhiteSpace(c.Model) && 
+                c.Model.ToLower().Trim().Contains(modelLower)).ToList();
+        }
+        
+        // Extra filter voor minimum vermogen (niet in FilterCriteria, dus apart toepassen)
+        if (request.MinPower.HasValue)
+        {
+            allCars = allCars.Where(c => c.Power >= request.MinPower.Value).ToList();
+        }
+        
+        // OLD AI: Rule-based filtering - bepaal candidate set met harde filters
+        List<Car> candidateCars = _ruleBasedFilter.FilterCars(allCars, filterCriteria);
+        
+        // Als geen auto's matchten filters, gebruik alle auto's (maar met lagere scores)
+        if (candidateCars.Count == 0)
+        {
+            candidateCars = allCars;
+        }
+        
+        // NEW AI: Content-based similarity + Advanced scoring
+        // Maak UserPreferences object voor similarity berekening
+        UserPreferences prefs = new UserPreferences
+        {
+            MaxBudget = request.MaxPrice.HasValue ? (double)request.MaxPrice.Value : null,
+            PreferredFuel = request.Fuel,
+            PreferredBrand = request.Brand,
+            AutomaticTransmission = request.Transmission,
+            BodyTypePreference = request.BodyType,
+            MinPower = request.MinPower.HasValue ? request.MinPower.Value : null
+        };
+        
+        // Maak ideale feature vector op basis van preferences
+        CarFeatureVector idealVector = _featureVectorFactory.CreateIdealVector(prefs, candidateCars);
+        
+        // Bereken similarity en ranking scores voor alle candidate auto's met geavanceerde scoring
+        List<RecommendationResult> results = new List<RecommendationResult>();
+        
+        foreach (Car car in candidateCars)
+        {
+            // Skip auto's zonder geldige data
+            if (car.Power <= 0 || car.Budget <= 0 || car.Year < 1900)
+                continue;
+            
+            // Gebruik AdvancedScoringService voor slimmere scores met transparantie
+            var featureScores = _advancedScoringService.CalculateScores(car, prefs, idealVector, allCars);
+            
+            // Gebruik finale score uit AdvancedScoringService
+            double finalScore = featureScores.FinalScore;
+            
+            string explanation = _explanationBuilder.BuildExplanation(car, prefs, finalScore);
+            
+            results.Add(new RecommendationResult
+            {
+                Car = car,
+                SimilarityScore = finalScore,
+                Explanation = explanation,
+                FeatureScores = featureScores
+            });
+        }
+        
+        // Sorteer op score met controlled randomness
+        var rankedResults = _rankingService.RankWithControlledRandomness(results);
+        
+        // Verwijder dubbele modellen (behoud hoogste score per merk+model) en pak top N
+        return rankedResults
+            .GroupBy(r => new { r.Car.Brand, r.Car.Model })
+            .Select(g => g.OrderByDescending(r => r.SimilarityScore).First())
+            .Take(n)
+            .ToList();
+    }
 }
 
 

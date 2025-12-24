@@ -21,6 +21,12 @@ public interface IRecommendationService
     /// Parse tekst, filter auto's, pas gewichten aan en genereer explanations.
     /// </summary>
     List<RecommendationResult> RecommendFromText(string inputText, int n = 5);
+
+    /// <summary>
+    /// Genereert recommendations op basis van manuele filters (zonder tekst parsing).
+    /// Gebruiker geeft expliciet alle voorkeuren op via formulier.
+    /// </summary>
+    List<RecommendationResult> RecommendFromManualFilters(ManualFilterRequest request, int n = 5);
 }
 
 

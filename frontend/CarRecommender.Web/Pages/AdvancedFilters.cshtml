@@ -1,0 +1,239 @@
+@page "/advanced-filters"
+@model AdvancedFiltersModel
+@{
+    ViewData["Title"] = "Geavanceerde Filters";
+}
+
+@*
+    MANUELE FILTERS MODUS - VERSCHIL MET TEKST MODUS:
+    ==================================================
+    
+    TEKST MODUS (Index.cshtml):
+    - Gebruiker beschrijft wensen in vrije tekst
+    - TextParserService parseert tekst naar UserPreferences
+    - Endpoint: POST /api/recommendations/text
+    
+    MANUELE MODUS (AdvancedFilters.cshtml):
+    - Gebruiker geeft expliciet alle filters op via formulier
+    - Geen tekst parsing, directe mapping naar ManualFilterRequest
+    - Endpoint: POST /api/recommendations/hybrid/manual
+    - Alle velden zijn optioneel (null = geen filter)
+    - Geen km-stand ondersteund (zoals gevraagd)
+*@
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4 mb-4">Geavanceerde Filters</h1>
+            <p class="lead">Stel zelf alle filters in zonder tekst parsing - <strong>Manuele Filters Modus</strong></p>
+            <div class="alert alert-info">
+                <strong>Let op:</strong> Dit is de manuele filters modus. Alle velden zijn optioneel. 
+                Stel ten minste één filter in om te zoeken.
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Fout:</strong> @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <form method="post" class="mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Filter Instellingen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Prijs Range -->
+                            <div class="col-md-6 mb-3">
+                                <label for="MinPrice" class="form-label">Minimum Prijs (€)</label>
+                                <input type="number" class="form-control" id="MinPrice" name="FilterRequest.MinPrice" 
+                                       value="@Model.FilterRequest?.MinPrice" min="0" step="100" placeholder="Bijv. 10000">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="MaxPrice" class="form-label">Maximum Prijs (€)</label>
+                                <input type="number" class="form-control" id="MaxPrice" name="FilterRequest.MaxPrice" 
+                                       value="@Model.FilterRequest?.MaxPrice" min="0" step="100" placeholder="Bijv. 30000">
+                            </div>
+
+                            <!-- Merk en Model -->
+                            <div class="col-md-6 mb-3">
+                                <label for="Brand" class="form-label">Merk</label>
+                                <select class="form-select" id="Brand" name="FilterRequest.Brand">
+                                    @foreach (var brand in Model.Brands)
+                                    {
+                                        <option value="@(brand == "" ? "" : brand.ToLower())" 
+                                                selected="@(Model.FilterRequest?.Brand?.ToLower() == brand.ToLower())">
+                                            @(brand == "" ? "-- Selecteer merk --" : brand)
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="Model" class="form-label">Model</label>
+                                <input type="text" class="form-control" id="Model" name="FilterRequest.Model" 
+                                       value="@Model.FilterRequest?.Model" placeholder="Bijv. X5, A4">
+                            </div>
+
+                            <!-- Brandstof en Transmissie -->
+                            <div class="col-md-6 mb-3">
+                                <label for="Fuel" class="form-label">Brandstof</label>
+                                <select class="form-select" id="Fuel" name="FilterRequest.Fuel">
+                                    @foreach (var fuel in Model.FuelTypes)
+                                    {
+                                        <option value="@(fuel == "" ? "" : fuel)" 
+                                                selected="@(Model.FilterRequest?.Fuel == fuel)">
+                                            @(fuel == "" ? "-- Selecteer brandstof --" : 
+                                                fuel == "petrol" ? "Benzine" :
+                                                fuel == "diesel" ? "Diesel" :
+                                                fuel == "hybrid" ? "Hybride" :
+                                                fuel == "electric" ? "Elektrisch" : fuel)
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="TransmissionString" class="form-label">Transmissie</label>
+                                <select class="form-select" id="TransmissionString" name="TransmissionString">
+                                    <option value="">-- Selecteer transmissie --</option>
+                                    <option value="Automaat" selected="@(Model.FilterRequest?.Transmission == true)">Automaat</option>
+                                    <option value="Schakel" selected="@(Model.FilterRequest?.Transmission == false)">Schakel</option>
+                                </select>
+                            </div>
+
+                            <!-- Carrosserie -->
+                            <div class="col-md-6 mb-3">
+                                <label for="BodyType" class="form-label">Carrosserie</label>
+                                <select class="form-select" id="BodyType" name="FilterRequest.BodyType">
+                                    @foreach (var bodyType in Model.BodyTypes)
+                                    {
+                                        <option value="@(bodyType == "" ? "" : bodyType)" 
+                                                selected="@(Model.FilterRequest?.BodyType == bodyType)">
+                                            @(bodyType == "" ? "-- Selecteer carrosserie --" : 
+                                                bodyType == "suv" ? "SUV" :
+                                                bodyType == "sedan" ? "Sedan" :
+                                                bodyType == "hatchback" ? "Hatchback" :
+                                                bodyType == "station" ? "Station" :
+                                                bodyType == "cabrio" ? "Cabrio" :
+                                                bodyType == "coupe" ? "Coupé" : bodyType)
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Bouwjaar Range -->
+                            <div class="col-md-3 mb-3">
+                                <label for="MinYear" class="form-label">Minimum Bouwjaar</label>
+                                <input type="number" class="form-control" id="MinYear" name="FilterRequest.MinYear" 
+                                       value="@Model.FilterRequest?.MinYear" min="1900" max="@DateTime.Now.Year" 
+                                       placeholder="Bijv. 2015">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="MaxYear" class="form-label">Maximum Bouwjaar</label>
+                                <input type="number" class="form-control" id="MaxYear" name="FilterRequest.MaxYear" 
+                                       value="@Model.FilterRequest?.MaxYear" min="1900" max="@DateTime.Now.Year" 
+                                       placeholder="Bijv. 2023">
+                            </div>
+
+                            <!-- Minimum Vermogen -->
+                            <div class="col-md-6 mb-3">
+                                <label for="MinPower" class="form-label">Minimum Vermogen (KW)</label>
+                                <input type="number" class="form-control" id="MinPower" name="FilterRequest.MinPower" 
+                                       value="@Model.FilterRequest?.MinPower" min="0" step="10" placeholder="Bijv. 150">
+                            </div>
+
+                            <!-- Aantal Resultaten -->
+                            <div class="col-md-6 mb-3">
+                                <label for="Top" class="form-label">Aantal Resultaten</label>
+                                <input type="number" class="form-control" id="Top" name="FilterRequest.Top" 
+                                       value="@(Model.FilterRequest?.Top ?? 5)" min="1" max="20" step="1">
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-search"></i> Zoek met Manuele Filters
+                            </button>
+                            <a href="/" class="btn btn-secondary btn-lg ms-2">
+                                <i class="bi bi-arrow-left"></i> Terug naar Tekst Modus
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.Recommendations != null && Model.Recommendations.Count > 0)
+    {
+        <div class="row mt-4">
+            <div class="col-12">
+                <h2 class="mb-4">Aanbevolen auto's (Manuele Filters Modus)</h2>
+            </div>
+        </div>
+
+        <div class="row">
+            @foreach (var recommendation in Model.Recommendations)
+            {
+                var carId = recommendation.Car.Id;
+                var carBrand = recommendation.Car.Brand ?? "";
+                var carModel = recommendation.Car.Model ?? "";
+                var imageUrl = Model.GetCarImageUrl(recommendation.Car.ImageUrl, carBrand, carModel, carId);
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@(carId)'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                        <div style="height: 200px; background-color: #1a1a1a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                            @if (!string.IsNullOrEmpty(imageUrl))
+                            {
+                                <img src="@imageUrl" 
+                                     class="card-img-top" 
+                                     alt="@carBrand @carModel"
+                                     style="height: 100%; width: 100%; object-fit: cover; position: absolute; top: 0; left: 0;"
+                                     onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                     loading="lazy">
+                            }
+                            <div style="display: @(string.IsNullOrEmpty(imageUrl) ? "flex" : "none"); flex-direction: column; align-items: center; justify-content: center; color: #fff; padding: 20px; text-align: center; width: 100%; height: 100%;">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom: 10px; opacity: 0.7;">
+                                    <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z" fill="currentColor"/>
+                                </svg>
+                                <div style="font-size: 14px; font-weight: bold; margin-top: 5px;">@carBrand</div>
+                                <div style="font-size: 12px; opacity: 0.8;">@carModel</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <a href="/car/@carId" class="text-decoration-none text-dark" onclick="event.stopPropagation();">
+                                    @carBrand @carModel
+                                </a>
+                            </h5>
+                            <p class="card-text">
+                                <strong>Prijs:</strong> €@recommendation.Car.Budget.ToString("N0")<br>
+                                <strong>Brandstof:</strong> @recommendation.Car.Fuel<br>
+                                <strong>Bouwjaar:</strong> @recommendation.Car.Year<br>
+                                <strong>Vermogen:</strong> @recommendation.Car.Power PK<br>
+                                <strong>Transmissie:</strong> @Model.FormatTransmission(recommendation.Car.Transmission)<br>
+                                @if (!string.IsNullOrWhiteSpace(recommendation.Car.BodyType))
+                                {
+                                    <strong>Carrosserie:</strong> @recommendation.Car.BodyType<br>
+                                }
+                                <strong>Match:</strong> @((recommendation.SimilarityScore * 100).ToString("F1"))%
+                            </p>
+                            <div class="alert alert-info mb-2">
+                                <small><strong>Waarom deze auto?</strong><br>@recommendation.Explanation</small>
+                            </div>
+                            <a href="/car/@carId" class="btn btn-primary btn-sm w-100" onclick="event.stopPropagation();">
+                                Bekijk alle foto's
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+

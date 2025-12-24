@@ -136,6 +136,26 @@ public class CarApiClient
             return new List<string>();
         }
     }
+
+    /// <summary>
+    /// Stuurt een POST naar /api/recommendations/hybrid/manual met manuele filters
+    /// VERSCHIL MET TEKST MODUS: Geen tekst parsing, directe formulier velden
+    /// </summary>
+    public async Task<List<RecommendationResult>?> GetRecommendationsFromManualFiltersAsync(ManualFilterRequest request)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/recommendations/hybrid/manual", request, _jsonOptions);
+            response.EnsureSuccessStatusCode();
+            
+            return await response.Content.ReadFromJsonAsync<List<RecommendationResult>>(_jsonOptions);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Fout bij het ophalen van recommendations op basis van manuele filters");
+            throw;
+        }
+    }
 }
 
 
