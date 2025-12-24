@@ -141,6 +141,5 @@ jobs:
           slot-name: 'Production'
           package: ./deploy.zip
           startup-command: 'dotnet CarRecommender.Api.dll'
-          startup-command: 'dotnet CarRecommender.Api.dll'
           enable-custom-container: false
           
