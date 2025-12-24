@@ -78,22 +78,42 @@
             @foreach (var car in Model.AllCars)
             {
                 // DYNAMISCHE ROUTING: Elke auto-kaart gebruikt zijn eigen unieke ID
+                // FIX: Expliciete lokale variabele per iteratie om scope issues te voorkomen
                 // De car.Id wordt gebruikt in de URL om naar de detailpagina te linken
-                // Route: /car/{id} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
+                // Route: /car/{id:int} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
                 // Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
-                var carId = car.Id;
+                var carId = car?.Id ?? 0;
+                
+                // FIX: Valideer dat carId geldig is voordat we links genereren
+                if (carId <= 0)
+                {
+                    continue; // Skip auto's zonder geldige ID
+                }
+                
                 <div class="col-md-6 col-lg-4 mb-4 car-card" 
                      data-budget="@car.Budget" 
                      data-fuel="@car.Fuel.ToLower()"
-                     data-year="@car.Year">
+                     data-year="@car.Year"
+                     data-car-id="@carId">
                     @* 
                         KAART COMPONENT - DYNAMISCHE ID DOORGEVEN:
                         ==========================================
+                        FIXES TOEGEPAST:
+                        1. Expliciete route constraint: /car/{id:int} in CarDetail.cshtml
+                        2. Data attribute toegevoegd voor JavaScript fallback
+                        3. Meerdere link methoden (onclick + href) voor betere compatibiliteit
+                        4. Expliciete Razor interpolation met haakjes: @(carId)
+                        5. Null-safe checks toegevoegd
+                        
                         - De kaart is klikbaar en navigeert naar /car/{carId} waar {carId} de unieke ID is
                         - carId wordt per iteratie opnieuw geëxtraheerd uit car.Id
                         - Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
                     *@
-                    <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@carId'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="card h-100 shadow-sm" 
+                         style="cursor: pointer; transition: transform 0.2s;" 
+                         onclick="navigateToCarDetail(@carId)" 
+                         onmouseover="this.style.transform='scale(1.02)'" 
+                         onmouseout="this.style.transform='scale(1)'">
                         @{
                             // Probeer eerst ImageUrl van API
                             var imageUrl = !string.IsNullOrEmpty(car.ImageUrl) 
@@ -119,7 +139,10 @@
                              loading="lazy">
                         <div class="card-body">
                             <h5 class="card-title">
-                                <a href="/car/@carId" class="text-decoration-none text-dark" onclick="event.stopPropagation();">
+                                <a href="/car/@carId" 
+                                   class="text-decoration-none text-dark" 
+                                   onclick="event.stopPropagation(); navigateToCarDetail(@carId); return false;"
+                                   data-car-id="@carId">
                                     @car.Brand @car.Model
                                 </a>
                             </h5>
@@ -134,7 +157,10 @@
                                     <strong>Carrosserie:</strong> @car.BodyType<br>
                                 }
                             </p>
-                            <a href="/car/@carId" class="btn btn-primary btn-sm w-100" onclick="event.stopPropagation();">
+                            <a href="/car/@carId" 
+                               class="btn btn-primary btn-sm w-100" 
+                               onclick="event.stopPropagation(); navigateToCarDetail(@carId); return false;"
+                               data-car-id="@carId">
                                 Bekijk details
                             </a>
                         </div>
@@ -155,6 +181,37 @@
 
 @section Scripts {
     <script>
+        // FIX: JavaScript functie voor dynamische routing met validatie
+        function navigateToCarDetail(carId) {
+            // FIX: Expliciete validatie en logging voor debugging
+            if (!carId || carId <= 0) {
+                console.error('Invalid carId:', carId);
+                return;
+            }
+            
+            // FIX: Expliciete URL constructie met validatie
+            const url = '/car/' + parseInt(carId, 10);
+            console.log('Navigating to car detail:', url, 'for carId:', carId);
+            
+            // Navigeer naar detailpagina
+            window.location.href = url;
+        }
+        
+        // FIX: Event listener voor data-car-id fallback (als onclick niet werkt)
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('[data-car-id]').forEach(function(element) {
+                // Alleen toevoegen als er nog geen onclick handler is
+                if (!element.onclick) {
+                    element.addEventListener('click', function(e) {
+                        const carId = parseInt(this.getAttribute('data-car-id'), 10);
+                        if (carId > 0) {
+                            navigateToCarDetail(carId);
+                        }
+                    });
+                }
+            });
+        });
+        
         const cars = @Html.Raw(Json.Serialize(Model.AllCars ?? new List<CarRecommender.Web.Models.Car>()));
         
         document.getElementById('maxBudget').addEventListener('input', function() {

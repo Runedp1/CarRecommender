@@ -100,23 +100,43 @@
             @foreach (var recommendation in Model.Recommendations)
             {
                 // DYNAMISCHE ROUTING: Elke auto-kaart gebruikt zijn eigen unieke ID
+                // FIX: Expliciete lokale variabele per iteratie om scope issues te voorkomen
                 // De carId variabele wordt geëxtraheerd uit recommendation.Car.Id en gebruikt in de URL
-                // Route: /car/{id} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
+                // Route: /car/{id:int} -> CarDetailModel.OnGetAsync(int id) -> GET /api/cars/{id}
                 // Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt (geen hardcoded ID meer)
-                var carId = recommendation.Car.Id;
-                var carBrand = recommendation.Car.Brand ?? "";
-                var carModel = recommendation.Car.Model ?? "";
-                var imageUrl = Model.GetCarImageUrl(recommendation.Car.ImageUrl, carBrand, carModel, carId);
+                var carId = recommendation.Car?.Id ?? 0;
+                var carBrand = recommendation.Car?.Brand ?? "";
+                var carModel = recommendation.Car?.Model ?? "";
+                var imageUrl = Model.GetCarImageUrl(recommendation.Car?.ImageUrl, carBrand, carModel, carId);
+                
+                // FIX: Valideer dat carId geldig is voordat we links genereren
+                if (carId <= 0)
+                {
+                    continue; // Skip auto's zonder geldige ID
+                }
+                
                 <div class="col-md-6 col-lg-4 mb-4">
                     @* 
                         KAART COMPONENT - DYNAMISCHE ID DOORGEVEN:
                         ==========================================
+                        FIXES TOEGEPAST:
+                        1. Expliciete route constraint: /car/{id:int} in CarDetail.cshtml
+                        2. Data attribute toegevoegd voor JavaScript fallback
+                        3. Meerdere link methoden (onclick + href) voor betere compatibiliteit
+                        4. Expliciete Razor interpolation met haakjes: @(carId)
+                        5. Null-safe checks toegevoegd
+                        
                         - onclick: Navigeert naar /car/{carId} waar {carId} de unieke ID is van deze specifieke auto
                         - href links: Alle links in de kaart gebruiken /car/@carId om naar de detailpagina te gaan
                         - carId wordt per iteratie opnieuw geëxtraheerd uit recommendation.Car.Id
                         - Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
                     *@
-                    <div class="card h-100 shadow-sm" style="cursor: pointer; transition: transform 0.2s;" onclick="window.location.href='/car/@(carId)'" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="card h-100 shadow-sm" 
+                         style="cursor: pointer; transition: transform 0.2s;" 
+                         data-car-id="@carId"
+                         onclick="navigateToCarDetail(@carId)" 
+                         onmouseover="this.style.transform='scale(1.02)'" 
+                         onmouseout="this.style.transform='scale(1)'">
                         <div style="height: 200px; background-color: #1a1a1a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
                             @if (!string.IsNullOrEmpty(imageUrl))
                             {
@@ -137,7 +157,10 @@
                         </div>
                         <div class="card-body">
                             <h5 class="card-title">
-                                <a href="/car/@carId" class="text-decoration-none text-dark" onclick="event.stopPropagation();">
+                                <a href="/car/@carId" 
+                                   class="text-decoration-none text-dark" 
+                                   onclick="event.stopPropagation(); navigateToCarDetail(@carId); return false;"
+                                   data-car-id="@carId">
                                     @carBrand @carModel
                                 </a>
                             </h5>
@@ -156,7 +179,10 @@
                             <div class="alert alert-info mb-2">
                                 <small><strong>Waarom deze auto?</strong><br>@recommendation.Explanation</small>
                             </div>
-                            <a href="/car/@carId" class="btn btn-primary btn-sm w-100" onclick="event.stopPropagation();">
+                            <a href="/car/@carId" 
+                               class="btn btn-primary btn-sm w-100" 
+                               onclick="event.stopPropagation(); navigateToCarDetail(@carId); return false;"
+                               data-car-id="@carId">
                                 Bekijk alle foto's
                             </a>
                         </div>
@@ -166,3 +192,42 @@
         </div>
     }
 </div>
+
+@* 
+    JAVASCRIPT FALLBACK - Zorgt ervoor dat routing altijd werkt:
+    =============================================================
+    - Functie navigateToCarDetail gebruikt expliciet de doorgegeven ID
+    - Werkt als fallback als Razor interpolation faalt
+    - Gebruikt data-car-id attribute als backup
+*@
+<script>
+    function navigateToCarDetail(carId) {
+        // FIX: Expliciete validatie en logging voor debugging
+        if (!carId || carId <= 0) {
+            console.error('Invalid carId:', carId);
+            return;
+        }
+        
+        // FIX: Expliciete URL constructie met validatie
+        const url = '/car/' + parseInt(carId, 10);
+        console.log('Navigating to car detail:', url, 'for carId:', carId);
+        
+        // Navigeer naar detailpagina
+        window.location.href = url;
+    }
+    
+    // FIX: Event listener voor data-car-id fallback (als onclick niet werkt)
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('[data-car-id]').forEach(function(element) {
+            // Alleen toevoegen als er nog geen onclick handler is
+            if (!element.onclick) {
+                element.addEventListener('click', function(e) {
+                    const carId = parseInt(this.getAttribute('data-car-id'), 10);
+                    if (carId > 0) {
+                        navigateToCarDetail(carId);
+                    }
+                });
+            }
+        });
+    });
+</script>

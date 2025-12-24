@@ -53,13 +53,26 @@ public class CarDetailModel : PageModel
     {
         try
         {
-            // ID GEBRUIK: De id parameter komt uit de route {id} in de URL
+            // ID GEBRUIK: De id parameter komt uit de route {id:int} in de URL
             // Bijvoorbeeld: URL /car/123 -> id = 123
             // Deze id wordt doorgegeven vanuit de auto-kaart via href="/car/@carId"
             // Elke kaart heeft zijn eigen unieke carId uit recommendation.Car.Id of car.Id
             
+            // DEBUG: Log de ontvangen ID om te verifiëren dat routing correct werkt
+            _logger.LogInformation("CarDetail OnGetAsync aangeroepen met ID: {CarId} (URL: {RequestPath})", id, Request.Path);
+            
             // Haal de juiste auto op via de API met de id uit de route
             Car = await _apiClient.GetCarByIdAsync(id);
+            
+            // DEBUG: Log welke auto is opgehaald
+            if (Car != null)
+            {
+                _logger.LogInformation("Auto opgehaald: {Brand} {Model} (ID: {CarId})", Car.Brand, Car.Model, Car.Id);
+            }
+            else
+            {
+                _logger.LogWarning("Geen auto gevonden voor ID: {CarId}", id);
+            }
             
             if (Car == null)
             {

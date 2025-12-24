@@ -25,7 +25,7 @@
     VOOR: Hardcoded naar één BMW X5 (alle kaarten linkten naar dezelfde auto)
     NU: Elke kaart linkt naar zijn eigen detailpagina via unieke car.Id
 *@
-@page "/car/{id}"
+@page "/car/{id:int}"
 @model CarDetailModel
 @{
     ViewData["Title"] = Model.Car != null ? $"{Model.Car.Brand} {Model.Car.Model}" : "Auto Details";
