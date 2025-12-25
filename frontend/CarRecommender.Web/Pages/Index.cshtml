@@ -115,6 +115,15 @@
                 var carModel = recommendation.Car.Model ?? "";
                 var imageUrl = Model.GetCarImageUrl(recommendation.Car.ImageUrl, carBrand, carModel, carId);
                 
+                // #region agent log
+                // DEBUG HYPOTHESIS B: carId waarde tijdens Razor rendering
+                <text>
+                <script>
+                fetch('http://127.0.0.1:7242/ingest/2094f5f8-0204-461e-855e-4218adddf233',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Index.cshtml:107',message:'carId rendered in Razor',data:{carId:@carId,brand:'@carBrand',model:'@carModel'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                </script>
+                </text>
+                // #endregion
+                
                 <div class="col-md-6 col-lg-4 mb-4">
                     @* 
                         KAART COMPONENT - DYNAMISCHE ID DOORGEVEN:
@@ -134,7 +143,7 @@
                     <div class="card h-100 shadow-sm" 
                          style="cursor: pointer; transition: transform 0.2s;" 
                          data-car-id="@carId"
-                         onclick="navigateToCarDetail(@carId)" 
+                         onclick="navigateToCarDetail(@carId); fetch('http://127.0.0.1:7242/ingest/2094f5f8-0204-461e-855e-4218adddf233',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Index.cshtml:137',message:'Card onclick triggered',data:{carId:@carId,dataCarId:this.getAttribute('data-car-id')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});" 
                          onmouseover="this.style.transform='scale(1.02)'" 
                          onmouseout="this.style.transform='scale(1)'">
                         <div style="height: 200px; background-color: #1a1a1a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
@@ -159,7 +168,7 @@
                             <h5 class="card-title">
                                 <a href="/car/@carId" 
                                    class="text-decoration-none text-dark" 
-                                   onclick="event.stopPropagation(); navigateToCarDetail(@carId); return false;"
+                                   onclick="fetch('http://127.0.0.1:7242/ingest/2094f5f8-0204-461e-855e-4218adddf233',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Index.cshtml:160',message:'Title link clicked',data:{carId:@carId,href:this.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{}); event.stopPropagation(); navigateToCarDetail(@carId); return false;"
                                    data-car-id="@carId">
                                     @carBrand @carModel
                                 </a>
@@ -202,20 +211,51 @@
 *@
 <script>
         function navigateToCarDetail(carId) {
+            // #region agent log
+            // DEBUG HYPOTHESIS A: JavaScript functie entry
+            console.log('[DEBUG HYP A] navigateToCarDetail called with carId:', carId, 'type:', typeof carId);
+            fetch('http://127.0.0.1:7242/ingest/2094f5f8-0204-461e-855e-4218adddf233',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Index.cshtml:navigateToCarDetail',message:'Function entry',data:{carId:carId,type:typeof carId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('[DEBUG] Fetch failed:', e));
+            // #endregion
+            
             // FIX: Expliciete validatie en logging voor debugging
             // Let op: carId kan 0 zijn in sommige systemen, maar we checken alleen op null/undefined
             if (carId == null || carId === undefined || isNaN(carId)) {
+                // #region agent log
+                // DEBUG HYPOTHESIS A: Invalid carId
+                fetch('http://127.0.0.1:7242/ingest/2094f5f8-0204-461e-855e-4218adddf233',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Index.cshtml:navigateToCarDetail',message:'Invalid carId check failed',data:{carId:carId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
                 console.error('Invalid carId:', carId);
                 return;
             }
+            
+            // FIX: Expliciete URL constructie met validatie
+            const url = '/car/' + parseInt(carId, 10);
+            
+            // #region agent log
+            // DEBUG HYPOTHESIS H: URL generatie
+            console.log('[DEBUG HYP H] URL generated:', url, 'from carId:', carId, 'parsed:', parseInt(carId, 10));
+            fetch('http://127.0.0.1:7242/ingest/2094f5f8-0204-461e-855e-4218adddf233',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Index.cshtml:navigateToCarDetail',message:'URL generated',data:{carId:carId,url:url,parsedId:parseInt(carId,10)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch((e)=>console.error('[DEBUG] Fetch failed:', e));
+            // #endregion
+            
+            console.log('Navigating to car detail:', url, 'for carId:', carId);
+            
+            // #region agent log
+            // DEBUG HYPOTHESIS A: Before navigation
+            console.log('[DEBUG HYP A] Before navigation - url:', url, 'currentUrl:', window.location.href);
+            fetch('http://127.0.0.1:7242/ingest/2094f5f8-0204-461e-855e-4218adddf233',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Index.cshtml:navigateToCarDetail',message:'Before window.location.href',data:{url:url,currentUrl:window.location.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('[DEBUG] Fetch failed:', e));
+            // #endregion
+            
+            // Navigeer naar detailpagina
+            console.log('[DEBUG] Setting window.location.href to:', url);
+            window.location.href = url;
+        }
         
-        // FIX: Expliciete URL constructie met validatie
-        const url = '/car/' + parseInt(carId, 10);
-        console.log('Navigating to car detail:', url, 'for carId:', carId);
-        
-        // Navigeer naar detailpagina
-        window.location.href = url;
-    }
+        // #region agent log
+        // DEBUG HYPOTHESIS F: JavaScript errors
+        window.addEventListener('error', function(e) {
+            fetch('http://127.0.0.1:7242/ingest/2094f5f8-0204-461e-855e-4218adddf233',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Index.cshtml:global-error-handler',message:'JavaScript error caught',data:{message:e.message,filename:e.filename,lineno:e.lineno,error:e.error?.toString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        });
+        // #endregion
     
     // FIX: Event listener voor data-car-id fallback (als onclick niet werkt)
     document.addEventListener('DOMContentLoaded', function() {

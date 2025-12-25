@@ -467,3 +467,4 @@ public class ManualFilterRequest
 - Dynamische detailpagina routing geïmplementeerd
 - Comments toegevoegd aan alle kaart componenten
 
+

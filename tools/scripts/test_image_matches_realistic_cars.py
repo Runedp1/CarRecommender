@@ -130,3 +130,4 @@ else:
     print(f"\nFOUT: Images directory niet gevonden: {images_dir}")
 
 
+

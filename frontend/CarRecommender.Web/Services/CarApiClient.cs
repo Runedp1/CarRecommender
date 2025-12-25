@@ -49,9 +49,73 @@ public class CarApiClient
     /// </summary>
     public async Task<Car?> GetCarByIdAsync(int id)
     {
+        // #region agent log
+        // DEBUG HYPOTHESIS E: API call entry
+        try {
+            var workspacePath = @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New";
+            var logPath = Path.Combine(workspacePath, ".cursor", "debug.log");
+            var logDir = Path.GetDirectoryName(logPath);
+            if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
+            var logEntry = new {
+                location = "CarApiClient.cs:GetCarByIdAsync",
+                message = "API call entry",
+                data = new { id = id, baseUrl = _httpClient.BaseAddress?.ToString() },
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "E"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch (Exception ex) {
+            _logger.LogError(ex, "Failed to write debug log");
+        }
+        // #endregion
+        
         try
         {
-            var response = await _httpClient.GetAsync($"/api/cars/{id}");
+            var url = $"/api/cars/{id}";
+            
+            // #region agent log
+            // DEBUG HYPOTHESIS E: URL constructed
+            try {
+                var workspacePath = @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New";
+                var logPath = Path.Combine(workspacePath, ".cursor", "debug.log");
+                var logEntry2 = new {
+                    location = "CarApiClient.cs:GetCarByIdAsync",
+                    message = "URL constructed",
+                    data = new { id = id, url = url, fullUrl = _httpClient.BaseAddress + url },
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    sessionId = "debug-session",
+                    runId = "run1",
+                    hypothesisId = "E"
+                };
+                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry2) + Environment.NewLine);
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Failed to write debug log");
+            }
+            // #endregion
+            
+            var response = await _httpClient.GetAsync(url);
+            
+            // #region agent log
+            // DEBUG HYPOTHESIS E: Response received
+            try {
+                var workspacePath = @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New";
+                var logPath = Path.Combine(workspacePath, ".cursor", "debug.log");
+                var logEntry3 = new {
+                    location = "CarApiClient.cs:GetCarByIdAsync",
+                    message = "Response received",
+                    data = new { id = id, statusCode = (int)response.StatusCode, isNotFound = response.StatusCode == System.Net.HttpStatusCode.NotFound },
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    sessionId = "debug-session",
+                    runId = "run1",
+                    hypothesisId = "E"
+                };
+                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry3) + Environment.NewLine);
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Failed to write debug log");
+            }
+            // #endregion
             
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
@@ -59,10 +123,50 @@ public class CarApiClient
             }
             
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<Car>(_jsonOptions);
+            var car = await response.Content.ReadFromJsonAsync<Car>(_jsonOptions);
+            
+            // #region agent log
+            // DEBUG HYPOTHESIS E: Car deserialized
+            try {
+                var workspacePath = @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New";
+                var logPath = Path.Combine(workspacePath, ".cursor", "debug.log");
+                var logEntry4 = new {
+                    location = "CarApiClient.cs:GetCarByIdAsync",
+                    message = "Car deserialized",
+                    data = new { id = id, carFound = car != null, carId = car?.Id, carBrand = car?.Brand },
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    sessionId = "debug-session",
+                    runId = "run1",
+                    hypothesisId = "E"
+                };
+                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry4) + Environment.NewLine);
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Failed to write debug log");
+            }
+            // #endregion
+            
+            return car;
         }
         catch (HttpRequestException ex)
         {
+            // #region agent log
+            // DEBUG HYPOTHESIS E: Exception caught
+            try {
+                var workspacePath = @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New";
+                var logPath = Path.Combine(workspacePath, ".cursor", "debug.log");
+                var logEntry5 = new {
+                    location = "CarApiClient.cs:GetCarByIdAsync",
+                    message = "Exception caught",
+                    data = new { id = id, exception = ex.Message, stackTrace = ex.StackTrace },
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    sessionId = "debug-session",
+                    runId = "run1",
+                    hypothesisId = "E"
+                };
+                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry5) + Environment.NewLine);
+            } catch {}
+            // #endregion
+            
             _logger.LogError(ex, "Fout bij het ophalen van auto {CarId} van de API", id);
             throw;
         }

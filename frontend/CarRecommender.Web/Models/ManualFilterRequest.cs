@@ -49,3 +49,4 @@ public class ManualFilterRequest
     // Dit veld is opzettelijk weggelaten zoals gevraagd door de gebruiker
 }
 
+

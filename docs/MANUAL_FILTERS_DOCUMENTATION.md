@@ -209,3 +209,4 @@ Mogelijke verbeteringen:
 - Sorteer opties (prijs, bouwjaar, vermogen)
 - Paginatie voor grote result sets
 
+

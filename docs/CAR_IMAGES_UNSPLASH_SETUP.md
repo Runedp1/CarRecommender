@@ -98,3 +98,4 @@ De huidige implementatie gebruikt Picsum Photos als fallback.
 Zie `frontend/CarRecommender.Web/Pages/Index.cshtml.cs` voor de `GetCarImageUrl` methode.
 
 
+
