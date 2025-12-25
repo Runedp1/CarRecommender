@@ -154,16 +154,50 @@ public class CarRepository : ICarRepository
                     Car car = new Car();
 
                     // Parse en valideer Id
-                    if (idIndex >= 0 && idIndex < columns.Length && 
-                        int.TryParse(columns[idIndex]?.Trim(), out int id))
+                    // FIX: Als ID kolom bestaat maar waarde is 0 of leeg, gebruik rijnummer als fallback
+                    // Dit voorkomt dat alle auto's ID 0 krijgen (wat routing problemen veroorzaakt)
+                    if (idIndex >= 0 && idIndex < columns.Length)
                     {
-                        car.Id = id;
+                        string? idValue = columns[idIndex]?.Trim();
+                        if (!string.IsNullOrWhiteSpace(idValue) && 
+                            int.TryParse(idValue, out int id) && id > 0)
+                        {
+                            car.Id = id;
+                        }
+                        else
+                        {
+                            // ID kolom bestaat maar waarde is leeg/0/invalid - gebruik rijnummer
+                            car.Id = i;
+                        }
                     }
-                    else if (idIndex < 0)
+                    else
                     {
                         // Geen id kolom gevonden, gebruik rijnummer als ID
                         car.Id = i;
                     }
+                    
+                    // #region agent log
+                    // DEBUG: Log eerste 5 auto's om ID toewijzing te verifiëren
+                    if (cars.Count < 5)
+                    {
+                        try {
+                            var workspacePath = @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New";
+                            var logPath = Path.Combine(workspacePath, ".cursor", "debug.log");
+                            var logDir = Path.GetDirectoryName(logPath);
+                            if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
+                            var logEntry = new {
+                                location = "CarRepository.cs:LoadCarsFromCsv",
+                                message = "Car ID assigned",
+                                data = new { carId = car.Id, rowIndex = i, brand = car.Brand, model = car.Model, idIndex = idIndex, idValue = idIndex >= 0 && idIndex < columns.Length ? columns[idIndex]?.Trim() : "N/A" },
+                                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                                sessionId = "debug-session",
+                                runId = "post-fix",
+                                hypothesisId = "ID_ASSIGNMENT"
+                            };
+                            System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+                        } catch {}
+                    }
+                    // #endregion
 
                     // Parse Merk (Brand)
                     if (merkIndex >= 0 && merkIndex < columns.Length)
