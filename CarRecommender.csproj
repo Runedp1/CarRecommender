@@ -23,11 +23,28 @@
     <EmbeddedResource Remove="frontend/**" />
     <None Remove="frontend/**" />
   </ItemGroup>
+  
+  <!-- Explicitly exclude Program.cs files from backend and frontend to avoid multiple entry points -->
+  <ItemGroup>
+    <Compile Remove="backend/CarRecommender.Api/Program.cs" />
+    <Compile Remove="frontend/CarRecommender.Web/Program.cs" />
+  </ItemGroup>
+
+  <!-- Exclude test scripts and tools from compilation -->
+  <ItemGroup>
+    <Compile Remove="tools/**" />
+  </ItemGroup>
 
   <!-- Exclude src/Program.cs when used as a library (when referenced by API) -->
   <!-- This allows CarRecommender to be both a standalone exe and a library -->
   <ItemGroup Condition="'$(IsReferencedByApi)' == 'true'">
     <Compile Remove="src/Program.cs" />
+  </ItemGroup>
+
+  <!-- ML.NET packages voor MlRecommendationService -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML" Version="3.0.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

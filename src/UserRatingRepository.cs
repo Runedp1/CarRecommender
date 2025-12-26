@@ -9,8 +9,8 @@ namespace CarRecommender;
 /// </summary>
 public class UserRatingRepository : IUserRatingRepository
 {
-    private readonly string _connectionString;
-    private readonly string _dbPath;
+    private string _connectionString;
+    private string _dbPath;
 
     public UserRatingRepository(string? dbPath = null)
     {
