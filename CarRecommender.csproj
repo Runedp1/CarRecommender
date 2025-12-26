@@ -30,4 +30,15 @@
     <Compile Remove="src/Program.cs" />
   </ItemGroup>
 
+  <!-- ML.NET packages voor machine learning -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML" Version="3.0.1" />
+    <PackageReference Include="Microsoft.ML.Recommender" Version="0.20.1" />
+  </ItemGroup>
+
+  <!-- Database packages voor user ratings -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+  </ItemGroup>
+
 </Project>

@@ -23,10 +23,72 @@ var dataDirectory = builder.Configuration["DataSettings:DataDirectory"] ?? "data
 // Geef configuratie door aan CarRepository via factory pattern
 builder.Services.AddSingleton<ICarRepository>(sp => new CarRepository(csvFileName, dataDirectory));
 
+// Registreer feedback services voor continue learning
+builder.Services.AddSingleton<IFeedbackRepository, FeedbackRepository>();
+builder.Services.AddSingleton<FeedbackTrackingService>();
+builder.Services.AddSingleton<MlRecommendationService>();
+
+// Registreer session service voor user ID management (GEEN echte authentication)
+builder.Services.AddSingleton<SessionUserService>();
+
+// Registreer session middleware (voor session-based user IDs)
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(24); // Session blijft 24 uur actief
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// Registreer user rating services voor collaborative filtering
+builder.Services.AddSingleton<IUserRatingRepository>(sp =>
+{
+    // Haal database pad op uit configuratie
+    var dbPath = builder.Configuration["DatabaseSettings:RatingsDatabasePath"];
+    var ratingRepo = new UserRatingRepository(dbPath);
+    
+    // Log database locatie
+    var logger = sp.GetService<ILogger<Program>>();
+    logger?.LogInformation("User Ratings Database locatie: {DbPath}", ((UserRatingRepository)ratingRepo).DatabasePath);
+    
+    // Initialiseer database asynchroon bij startup
+    Task.Run(async () => await ratingRepo.InitializeDatabaseAsync());
+    return ratingRepo;
+});
+builder.Services.AddSingleton<CollaborativeFilteringService>(sp =>
+{
+    var ratingRepo = sp.GetRequiredService<IUserRatingRepository>();
+    var carRepo = sp.GetRequiredService<ICarRepository>();
+    return new CollaborativeFilteringService(ratingRepo, carRepo);
+});
+builder.Services.AddScoped<ModelRetrainingService>(sp =>
+{
+    var mlService = sp.GetRequiredService<MlRecommendationService>();
+    var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
+    var carRepo = sp.GetRequiredService<ICarRepository>();
+    var recService = sp.GetRequiredService<IRecommendationService>();
+    return new ModelRetrainingService(mlService, feedbackService, carRepo, recService);
+});
+builder.Services.AddSingleton<ModelPerformanceMonitor>(sp =>
+{
+    var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
+    var mlService = sp.GetRequiredService<MlRecommendationService>();
+    var retrainingService = sp.GetRequiredService<ModelRetrainingService>();
+    return new ModelPerformanceMonitor(feedbackService, mlService, retrainingService);
+});
+
 // Registreer IRecommendationService als scoped (één per HTTP request)
 // Scoped betekent dat er één instantie is per HTTP request.
 // Dit is geschikt voor services die per request gebruikt worden.
-builder.Services.AddScoped<IRecommendationService, RecommendationService>();
+builder.Services.AddScoped<IRecommendationService>(sp =>
+{
+    var carRepo = sp.GetRequiredService<ICarRepository>();
+    var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
+    var retrainingService = sp.GetRequiredService<ModelRetrainingService>();
+    var collaborativeService = sp.GetService<CollaborativeFilteringService>();
+    var ratingRepo = sp.GetService<IUserRatingRepository>();
+    return new RecommendationService(carRepo, feedbackService, retrainingService, collaborativeService, ratingRepo);
+});
 
 // ML Pipeline services - registreer voor ML evaluatie, hyperparameter tuning en forecasting
 // HyperparameterTuningService en ForecastingService zijn stateless en kunnen als singleton
@@ -35,6 +97,9 @@ builder.Services.AddSingleton<ForecastingService>();
 
 // MlEvaluationService is scoped omdat het IRecommendationService gebruikt (ook scoped)
 builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
+
+// Background service voor automatische retraining
+builder.Services.AddHostedService<CarRecommender.Api.Services.RetrainingBackgroundService>();
 
 // ============================================================================
 // CORS CONFIGURATIE
@@ -109,6 +174,9 @@ if (app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
+
+// Session middleware (voor session-based user IDs)
+app.UseSession();
 
 // CORS middleware - moet vóór UseRouting/MapControllers komen
 app.UseCors();

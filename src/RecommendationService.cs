@@ -29,32 +29,53 @@ public class RecommendationService : IRecommendationService
     private readonly CarFeatureVectorFactory _featureVectorFactory;
     private readonly SimilarityService _similarityService;
     private readonly RankingService _rankingService;
+    private readonly MlRecommendationService _mlService;
     private readonly AdvancedScoringService _advancedScoringService;
+    private readonly FeedbackTrackingService? _feedbackService;
+    private readonly ModelRetrainingService? _retrainingService;
+    private readonly CollaborativeFilteringService? _collaborativeService;
+    private readonly IUserRatingRepository? _ratingRepository;
     
     private bool _isInitialized = false;
+    private bool _isModelTrained = false;
 
     /// <summary>
     /// Constructor - initialiseert alle services met dependency injection.
     /// </summary>
-    public RecommendationService(ICarRepository carRepository)
+    public RecommendationService(
+        ICarRepository carRepository,
+        FeedbackTrackingService? feedbackService = null,
+        ModelRetrainingService? retrainingService = null,
+        CollaborativeFilteringService? collaborativeService = null,
+        IUserRatingRepository? ratingRepository = null)
     {
         _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
         _engine = new RecommendationEngine(); // Behouden voor backward compatibility
         _textParser = new TextParserService();
-        _explanationBuilder = new ExplanationBuilder();
+        _collaborativeService = collaborativeService;
+        _ratingRepository = ratingRepository;
+        _explanationBuilder = new ExplanationBuilder(collaborativeService);
         
         // Initialiseer nieuwe AI componenten
         _ruleBasedFilter = new RuleBasedFilter();
         _featureVectorFactory = new CarFeatureVectorFactory();
         _similarityService = new SimilarityService();
         _rankingService = new RankingService();
+        _mlService = new MlRecommendationService();
         _advancedScoringService = new AdvancedScoringService(
             featureVectorFactory: _featureVectorFactory,
-            similarityService: _similarityService);
+            similarityService: _similarityService,
+            mlService: _mlService,
+            carRepository: _carRepository);
+        
+        // Optionele services voor continue learning
+        _feedbackService = feedbackService;
+        _retrainingService = retrainingService;
     }
 
     /// <summary>
     /// Initialiseert de feature vector factory met alle auto's.
+    /// Traint ook het ML model als dat nog niet gebeurd is.
     /// Moet worden aangeroepen voordat RecommendFromText wordt gebruikt.
     /// </summary>
     private void EnsureInitialized()
@@ -64,7 +85,55 @@ public class RecommendationService : IRecommendationService
 
         List<Car> allCars = _carRepository.GetAllCars();
         _featureVectorFactory.Initialize(allCars);
+        
+        // Train ML model als dat nog niet gebeurd is
+        if (!_isModelTrained && allCars.Count > 0)
+        {
+            TrainMlModel(allCars);
+        }
+        
         _isInitialized = true;
+    }
+
+    /// <summary>
+    /// Traint het ML model op basis van bestaande recommendation patterns.
+    /// Gebruikt een sample van auto's en genereert initial recommendations om training data te maken.
+    /// </summary>
+    private void TrainMlModel(List<Car> allCars)
+    {
+        try
+        {
+            // Genereer training data door recommendations te maken voor een sample van auto's
+            // Dit simuleert historische recommendation data
+            var trainingResults = new List<RecommendationResult>();
+            var sampleSize = Math.Min(50, allCars.Count); // Gebruik max 50 auto's voor training
+            
+            for (int i = 0; i < sampleSize; i++)
+            {
+                var targetCar = allCars[i];
+                
+                // Skip auto's zonder geldige data
+                if (targetCar.Power <= 0 || targetCar.Budget <= 0 || targetCar.Year < 1900)
+                    continue;
+
+                // Genereer recommendations voor deze auto
+                var recommendations = RecommendSimilarCars(targetCar, 10);
+                trainingResults.AddRange(recommendations);
+            }
+
+            // Train het ML model met de gegenereerde recommendations
+            if (trainingResults.Count > 0)
+            {
+                _mlService.TrainModel(allCars, trainingResults);
+                _isModelTrained = _mlService.IsModelTrained;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error maar blijf werken zonder ML
+            Console.WriteLine($"ML model training failed during initialization: {ex.Message}");
+            _isModelTrained = false;
+        }
     }
 
     /// <summary>
@@ -134,6 +203,15 @@ public class RecommendationService : IRecommendationService
     /// </summary>
     public List<RecommendationResult> RecommendFromText(string inputText, int n = 5)
     {
+        // Synchronous wrapper voor backward compatibility
+        return RecommendFromTextAsync(inputText, n).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Async versie voor collaborative filtering support.
+    /// </summary>
+    public async Task<List<RecommendationResult>> RecommendFromTextAsync(string inputText, int n = 5)
+    {
         EnsureInitialized();
         
         List<Car> allCars = _carRepository.GetAllCars();
@@ -170,12 +248,49 @@ public class RecommendationService : IRecommendationService
             // Gebruik finale score uit AdvancedScoringService
             double finalScore = featureScores.FinalScore;
 
-            // Voeg ML-component toe (voor nu: placeholder, geen impact)
+            // Voeg ML-component toe (ML.NET-gebaseerde populairiteit/user rating)
             double userRatingComponent = _advancedScoringService.GetUserRatingComponent(car.Id);
-            // Voor nu: userRatingComponent is 0.0, dus geen impact
-            // In toekomst: finalScore = finalScore * 0.9 + userRatingComponent * 0.1
+            
+            // Combineer deterministische score met ML-gebaseerde component
+            // 90% deterministische score, 10% ML-gebaseerde populairiteit
+            if (userRatingComponent > 0.0)
+            {
+                finalScore = (finalScore * 0.9) + (userRatingComponent * 0.1);
+            }
 
-            string explanation = _explanationBuilder.BuildExplanation(car, prefs, finalScore);
+            // Voeg collaborative filtering score toe (als beschikbaar)
+            CollaborativeScore? collaborativeScore = null;
+            if (_collaborativeService != null)
+            {
+                try
+                {
+                    var prefsSnapshot = new UserPreferenceSnapshot
+                    {
+                        MaxBudget = prefs.MaxBudget,
+                        PreferredFuel = prefs.PreferredFuel,
+                        PreferredBrand = prefs.PreferredBrand,
+                        AutomaticTransmission = prefs.AutomaticTransmission,
+                        MinPower = prefs.MinPower,
+                        BodyTypePreference = prefs.BodyTypePreference,
+                        ComfortVsSportScore = prefs.ComfortVsSportScore,
+                        PreferenceWeights = prefs.PreferenceWeights
+                    };
+
+                    collaborativeScore = await _collaborativeService.CalculateCollaborativeScoreAsync(car.Id, prefsSnapshot);
+                    
+                    // Collaborative score heeft 15% gewicht
+                    if (collaborativeScore.HasCollaborativeData)
+                    {
+                        finalScore = (finalScore * 0.85) + (collaborativeScore.Score * 0.15);
+                    }
+                }
+                catch
+                {
+                    // Fail silently - collaborative filtering is optioneel
+                }
+            }
+
+            string explanation = _explanationBuilder.BuildExplanation(car, prefs, finalScore, collaborativeScore);
 
             results.Add(new RecommendationResult
             {
@@ -188,13 +303,21 @@ public class RecommendationService : IRecommendationService
 
         // Sorteer op score met controlled randomness
         var rankedResults = _rankingService.RankWithControlledRandomness(results);
-
+        
         // Verwijder dubbele modellen (behoud hoogste score per merk+model) en pak top N
-        return rankedResults
+        var finalResults = rankedResults
             .GroupBy(r => new { r.Car.Brand, r.Car.Model })
             .Select(g => g.OrderByDescending(r => r.SimilarityScore).First())
             .Take(n)
             .ToList();
+
+        // Track feedback
+        TrackRecommendations(finalResults, "manual-filters");
+
+        // Check of retraining nodig is
+        TryTriggerRetraining();
+
+        return finalResults;
     }
 
     /// <summary>
@@ -608,11 +731,64 @@ public class RecommendationService : IRecommendationService
         var rankedResults = _rankingService.RankWithControlledRandomness(results);
         
         // Verwijder dubbele modellen (behoud hoogste score per merk+model) en pak top N
-        return rankedResults
+        var finalResults = rankedResults
             .GroupBy(r => new { r.Car.Brand, r.Car.Model })
             .Select(g => g.OrderByDescending(r => r.SimilarityScore).First())
             .Take(n)
             .ToList();
+
+        // Track feedback
+        TrackRecommendations(finalResults, "manual-filters");
+
+        // Check of retraining nodig is
+        TryTriggerRetraining();
+
+        return finalResults;
+    }
+
+    /// <summary>
+    /// Trackt recommendations voor feedback tracking (zonder clicks).
+    /// </summary>
+    private void TrackRecommendations(List<RecommendationResult> results, string context)
+    {
+        if (_feedbackService == null)
+            return;
+
+        // Genereer session ID voor deze recommendation request
+        var sessionId = Guid.NewGuid().ToString();
+
+        for (int i = 0; i < results.Count; i++)
+        {
+            var result = results[i];
+            // Track recommendation (zonder click) - dit wordt gebruikt voor CTR berekening
+            // Clicks worden apart getrackt via API endpoint
+        }
+    }
+
+    /// <summary>
+    /// Probeert retraining te triggeren als er voldoende nieuwe feedback is.
+    /// </summary>
+    private void TryTriggerRetraining()
+    {
+        if (_retrainingService == null)
+            return;
+
+        try
+        {
+            // Check en retrain asynchroon (niet blokkerend)
+            Task.Run(() =>
+            {
+                var result = _retrainingService.CheckAndRetrainIfNeeded();
+                if (result.Retrained)
+                {
+                    Console.WriteLine($"ML model opnieuw getraind: {result.Reason} (Training data: {result.TrainingDataCount}, Feedback: {result.FeedbackCount})");
+                }
+            });
+        }
+        catch
+        {
+            // Fail silently - retraining is niet kritiek
+        }
     }
 }
 

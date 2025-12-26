@@ -99,3 +99,4 @@ Zie `frontend/CarRecommender.Web/Pages/Index.cshtml.cs` voor de `GetCarImageUrl`
 
 
 
+

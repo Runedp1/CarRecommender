@@ -21,6 +21,11 @@ public interface IRecommendationService
     /// Parse tekst, filter auto's, pas gewichten aan en genereer explanations.
     /// </summary>
     List<RecommendationResult> RecommendFromText(string inputText, int n = 5);
+    
+    /// <summary>
+    /// Async versie voor collaborative filtering support.
+    /// </summary>
+    Task<List<RecommendationResult>> RecommendFromTextAsync(string inputText, int n = 5);
 
     /// <summary>
     /// Genereert recommendations op basis van manuele filters (zonder tekst parsing).

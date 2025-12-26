@@ -163,16 +163,22 @@ public class AdvancedScoringService
     private readonly ScoringWeights _weights;
     private readonly CarFeatureVectorFactory _featureVectorFactory;
     private readonly SimilarityService _similarityService;
+    private readonly MlRecommendationService? _mlService;
+    private readonly ICarRepository? _carRepository; // Voor ML service die alle auto's nodig heeft
 
     public AdvancedScoringService(
         ScoringWeights? weights = null,
         CarFeatureVectorFactory? featureVectorFactory = null,
-        SimilarityService? similarityService = null)
+        SimilarityService? similarityService = null,
+        MlRecommendationService? mlService = null,
+        ICarRepository? carRepository = null)
     {
         _weights = weights ?? new ScoringWeights();
         _weights.Normalize();
         _featureVectorFactory = featureVectorFactory ?? new CarFeatureVectorFactory();
         _similarityService = similarityService ?? new SimilarityService();
+        _mlService = mlService;
+        _carRepository = carRepository;
     }
 
     /// <summary>
@@ -488,20 +494,42 @@ public class AdvancedScoringService
     }
 
     /// <summary>
-    /// Haak voor toekomstige ML-laag: voegt user-rating component toe aan score.
-    /// Voor nu: placeholder die altijd 0.0 retourneert (geen impact).
+    /// ML-gebaseerde user-rating component: gebruikt ML.NET om populairiteit te voorspellen.
     /// 
-    /// TOEKOMSTIGE IMPLEMENTATIE:
-    /// - Verzamel user ratings per auto (1-5 sterren)
-    /// - Bereken gemiddelde rating per auto
-    /// - Normaliseer naar 0-1 bereik
-    /// - Voeg toe als extra component in finale score
+    /// IMPLEMENTATIE:
+    /// - Gebruikt ML.NET model om score te voorspellen op basis van car features
+    /// - Leert van historische recommendation patterns
+    /// - Retourneert genormaliseerde score (0-1) die gebruikt kan worden als extra component
+    /// 
+    /// TOEKOMSTIGE UITBREIDING:
+    /// - Kan uitgebreid worden met echte user ratings wanneer beschikbaar
+    /// - Kan collaborative filtering toevoegen voor personalisatie
     /// </summary>
     public double GetUserRatingComponent(int carId)
     {
-        // TODO: Implementeer user rating logica wanneer ratings beschikbaar zijn
-        // Voor nu: retourneer 0.0 (geen impact op score)
-        return 0.0;
+        // Als ML service niet beschikbaar is, retourneer neutrale score
+        if (_mlService == null || !_mlService.IsModelTrained)
+        {
+            return 0.0; // Geen impact als ML niet beschikbaar is
+        }
+
+        // Haal auto op (als repository beschikbaar is)
+        if (_carRepository == null)
+        {
+            return 0.0;
+        }
+
+        var car = _carRepository.GetCarById(carId);
+        if (car == null)
+        {
+            return 0.0;
+        }
+
+        // Haal alle auto's op voor normalisatie
+        var allCars = _carRepository.GetAllCars();
+        
+        // Gebruik ML service om user rating component te berekenen
+        return _mlService.GetUserRatingComponent(carId, car, allCars);
     }
 }
 

@@ -41,26 +41,6 @@ public class CarRepository : ICarRepository
     /// </summary>
     private void LoadCarsFromCsv()
     {
-        // #region agent log
-        // DEBUG: Log that CSV loading started (to verify backend restart)
-        try {
-            var workspacePath = @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New";
-            var logPath = Path.Combine(workspacePath, ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
-            var logEntry = new {
-                location = "CarRepository.cs:LoadCarsFromCsv",
-                message = "CSV loading started - backend restarted",
-                data = new { csvFileName = _csvFileName, dataDirectory = _dataDirectory },
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                sessionId = "debug-session",
-                runId = "post-fix",
-                hypothesisId = "BACKEND_RESTART"
-            };
-            System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-        } catch {}
-        // #endregion
-        
         string csvPath = FindCsvFile(_csvFileName, _dataDirectory);
         
         if (string.IsNullOrEmpty(csvPath) || !File.Exists(csvPath))
@@ -195,29 +175,6 @@ public class CarRepository : ICarRepository
                         // Geen id kolom gevonden, gebruik rijnummer als ID
                         car.Id = i;
                     }
-                    
-                    // #region agent log
-                    // DEBUG: Log eerste 5 auto's om ID toewijzing te verifiëren
-                    if (cars.Count < 5)
-                    {
-                        try {
-                            var workspacePath = @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New";
-                            var logPath = Path.Combine(workspacePath, ".cursor", "debug.log");
-                            var logDir = Path.GetDirectoryName(logPath);
-                            if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
-                            var logEntry = new {
-                                location = "CarRepository.cs:LoadCarsFromCsv",
-                                message = "Car ID assigned",
-                                data = new { carId = car.Id, rowIndex = i, brand = car.Brand, model = car.Model, idIndex = idIndex, idValue = idIndex >= 0 && idIndex < columns.Length ? columns[idIndex]?.Trim() : "N/A" },
-                                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                                sessionId = "debug-session",
-                                runId = "post-fix",
-                                hypothesisId = "ID_ASSIGNMENT"
-                            };
-                            System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-                        } catch {}
-                    }
-                    // #endregion
 
                     // Parse Merk (Brand)
                     if (merkIndex >= 0 && merkIndex < columns.Length)

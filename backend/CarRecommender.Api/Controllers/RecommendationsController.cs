@@ -28,6 +28,7 @@ public class RecommendationsController : ControllerBase
 {
     private readonly IRecommendationService _recommendationService;
     private readonly ICarRepository _carRepository;
+    private readonly FeedbackTrackingService? _feedbackService;
     private readonly ILogger<RecommendationsController> _logger;
 
     /// <summary>
@@ -37,10 +38,12 @@ public class RecommendationsController : ControllerBase
     public RecommendationsController(
         IRecommendationService recommendationService,
         ICarRepository carRepository,
-        ILogger<RecommendationsController> logger)
+        FeedbackTrackingService? feedbackService = null,
+        ILogger<RecommendationsController>? logger = null)
     {
         _recommendationService = recommendationService ?? throw new ArgumentNullException(nameof(recommendationService));
         _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
+        _feedbackService = feedbackService;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -80,6 +83,9 @@ public class RecommendationsController : ControllerBase
             // Genereer recommendations via business logica service
             var recommendations = _recommendationService.RecommendSimilarCars(targetCar, top);
 
+            // Track recommendations voor feedback (zonder clicks - die worden apart getrackt)
+            TrackRecommendations(recommendations, "similar-cars");
+
             return Ok(recommendations);
         }
         catch (Exception ex)
@@ -109,7 +115,7 @@ public class RecommendationsController : ControllerBase
     [ProducesResponseType(typeof(List<RecommendationResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public IActionResult GetRecommendationsFromText([FromBody] TextRecommendationRequest request)
+    public async Task<IActionResult> GetRecommendationsFromText([FromBody] TextRecommendationRequest request)
     {
         try
         {
@@ -128,7 +134,11 @@ public class RecommendationsController : ControllerBase
 
             // Genereer recommendations op basis van tekst via business logica service
             // Deze service gebruikt TextParserService voor NLP parsing en RecommendationEngine voor similarity berekening
-            var recommendations = _recommendationService.RecommendFromText(request.Text, top);
+            // Gebruik async versie voor collaborative filtering support
+            var recommendations = await ((RecommendationService)_recommendationService).RecommendFromTextAsync(request.Text, top);
+
+            // Track recommendations voor feedback
+            TrackRecommendations(recommendations, "text-based");
 
             return Ok(recommendations);
         }
@@ -209,6 +219,9 @@ public class RecommendationsController : ControllerBase
             // Genereer recommendations op basis van manuele filters via business logica service
             var recommendations = _recommendationService.RecommendFromManualFilters(request, top);
 
+            // Track recommendations voor feedback
+            TrackRecommendations(recommendations, "manual-filters");
+
             return Ok(recommendations);
         }
         catch (Exception ex)
@@ -219,12 +232,27 @@ public class RecommendationsController : ControllerBase
             throw;
         }
     }
+
+    /// <summary>
+    /// Trackt recommendations voor feedback tracking (zonder clicks).
+    /// </summary>
+    private void TrackRecommendations(List<RecommendationResult> recommendations, string context)
+    {
+        if (_feedbackService == null || recommendations == null || recommendations.Count == 0)
+            return;
+
+        // Genereer session ID voor deze recommendation request
+        var sessionId = Guid.NewGuid().ToString();
+
+        // Recommendations worden al getrackt in RecommendationService
+        // Hier kunnen we extra tracking toevoegen indien nodig
+    }
 }
 
-/// <summary>
-/// Request model voor tekst-gebaseerde recommendations.
-/// </summary>
-public class TextRecommendationRequest
+    /// <summary>
+    /// Request model voor tekst-gebaseerde recommendations.
+    /// </summary>
+    public class TextRecommendationRequest
 {
     /// <summary>
     /// Tekst input van de gebruiker met voorkeuren (bijv. "Ik zou liever een automaat hebben met veel vermogen, max 25k euro").

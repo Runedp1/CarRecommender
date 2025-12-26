@@ -3,14 +3,23 @@ namespace CarRecommender;
 /// <summary>
 /// Bouwt uitleg teksten voor recommendations op basis van echte data.
 /// Gebruikt alleen informatie uit Car en UserPreferences.
+/// Kan ook collaborative filtering data gebruiken.
 /// </summary>
 public class ExplanationBuilder
 {
+    private readonly CollaborativeFilteringService? _collaborativeService;
+
+    public ExplanationBuilder(CollaborativeFilteringService? collaborativeService = null)
+    {
+        _collaborativeService = collaborativeService;
+    }
+
     /// <summary>
     /// Genereert een Nederlandstalige uitleg waarom een auto wordt aanbevolen.
     /// Toont gewichten voor transparantie over belangrijke voorkeuren.
+    /// Kan ook collaborative filtering uitleg toevoegen.
     /// </summary>
-    public string BuildExplanation(Car car, UserPreferences prefs, double similarityScore)
+    public string BuildExplanation(Car car, UserPreferences prefs, double similarityScore, CollaborativeScore? collaborativeScore = null)
     {
         List<string> reasons = new List<string>();
 
@@ -103,6 +112,31 @@ public class ExplanationBuilder
         else
         {
             explanation += " op basis van algemene similarity";
+        }
+
+        // Voeg collaborative filtering uitleg toe als beschikbaar
+        if (collaborativeScore != null && collaborativeScore.HasCollaborativeData && _collaborativeService != null)
+        {
+            var prefsSnapshot = new UserPreferenceSnapshot
+            {
+                MaxBudget = prefs.MaxBudget,
+                PreferredFuel = prefs.PreferredFuel,
+                PreferredBrand = prefs.PreferredBrand,
+                AutomaticTransmission = prefs.AutomaticTransmission,
+                MinPower = prefs.MinPower,
+                BodyTypePreference = prefs.BodyTypePreference,
+                ComfortVsSportScore = prefs.ComfortVsSportScore,
+                PreferenceWeights = prefs.PreferenceWeights
+            };
+
+            var collaborativeExplanation = _collaborativeService.GenerateCollaborativeExplanation(
+                collaborativeScore, 
+                prefsSnapshot);
+
+            if (!string.IsNullOrEmpty(collaborativeExplanation))
+            {
+                explanation += $". {collaborativeExplanation}";
+            }
         }
 
         explanation += $". Similarity score: {similarityScore:F3}";
