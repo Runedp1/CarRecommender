@@ -15,7 +15,8 @@ public class CollaborativeFilteringService
         IUserRatingRepository ratingRepository,
         ICarRepository carRepository)
     {
-        _ratingRepository = ratingRepository ?? throw new ArgumentNullException(nameof(ratingRepository));
+        // Maak ratingRepository optioneel - als null, werkt collaborative filtering gewoon niet
+        _ratingRepository = ratingRepository; // Kan null zijn - service zal dan gewoon geen collaborative filtering doen
         _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
     }
 
@@ -42,26 +43,39 @@ public class CollaborativeFilteringService
             await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
         } catch {}
         // #endregion
-        // Vind ratings van gebruikers met gelijkaardige preferences
-        var similarRatings = await _ratingRepository.FindSimilarUserRatingsAsync(
-            currentUserPreferences, 
-            limit: 100);
-        // #region agent log
-        var queryEndTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        try {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-            var logEntry = new {
-                location = "CollaborativeFilteringService.cs:CalculateCollaborativeScoreAsync",
-                message = "Database query completed",
-                data = new { carId = carId, ratingCount = similarRatings?.Count ?? 0, queryDurationMs = queryEndTime - startTime },
-                timestamp = queryEndTime,
-                sessionId = "debug-session",
-                runId = "run1",
-                hypothesisId = "A"
+        
+        // Als rating repository niet beschikbaar is, retourneer neutrale score
+        if (_ratingRepository == null)
+        {
+            return new CollaborativeScore
+            {
+                Score = 0.0,
+                Explanation = "Collaborative filtering niet beschikbaar (rating repository niet geïnitialiseerd)"
             };
-            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-        } catch {}
-        // #endregion
+        }
+        
+        try
+        {
+            // Vind ratings van gebruikers met gelijkaardige preferences
+            var similarRatings = await _ratingRepository.FindSimilarUserRatingsAsync(
+                currentUserPreferences, 
+                limit: 100);
+            // #region agent log
+            var queryEndTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            try {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+                var logEntry = new {
+                    location = "CollaborativeFilteringService.cs:CalculateCollaborativeScoreAsync",
+                    message = "Database query completed",
+                    data = new { carId = carId, ratingCount = similarRatings?.Count ?? 0, queryDurationMs = queryEndTime - startTime },
+                    timestamp = queryEndTime,
+                    sessionId = "debug-session",
+                    runId = "run1",
+                    hypothesisId = "A"
+                };
+                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+            } catch {}
+            // #endregion
 
         // Filter op deze specifieke auto
         var carRatings = similarRatings

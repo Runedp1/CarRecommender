@@ -90,9 +90,9 @@ jobs:
           # Verwijder XML documentation files
           Get-ChildItem ./publish -Recurse -Filter "*.xml" | Remove-Item -Force
           echo "XML documentation files removed"
-          # Verwijder .deps.json files (niet nodig voor runtime)
-          Get-ChildItem ./publish -Recurse -Filter "*.deps.json" | Remove-Item -Force
-          echo "Deps.json files removed"
+          # BEHOUD .deps.json files - deze zijn VERPLICHT voor .NET runtime dependency resolution!
+          # Zonder deze files kan de applicatie niet starten (error 0x8007023e)
+          echo "Keeping .deps.json files (required for runtime)"
           # Verwijder runtimeconfig.dev.json (alleen voor development)
           Get-ChildItem ./publish -Recurse -Filter "*.runtimeconfig.dev.json" | Remove-Item -Force
           echo "Runtimeconfig.dev.json removed"
