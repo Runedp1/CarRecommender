@@ -282,14 +282,36 @@
     }
 
     // Rating functionaliteit
-    (function() {
-        const carId = @Model.Car?.Id ?? 0;
+    document.addEventListener('DOMContentLoaded', function() {
+        const carId = @(Model.Car?.Id ?? 0);
+        if (carId === 0) return; // Geen auto, skip rating functionaliteit
+        
         let selectedRating = 0;
         const stars = document.querySelectorAll('.rating-star');
         const submitButton = document.getElementById('submit-rating');
         const ratingText = document.getElementById('rating-text');
         const ratingMessage = document.getElementById('rating-message');
         const apiBaseUrl = '@Model.ApiBaseUrl';
+        const ratingStarsContainer = document.querySelector('.rating-stars');
+
+        if (!stars.length || !submitButton || !ratingText || !ratingStarsContainer) {
+            console.error('Rating elements not found');
+            return;
+        }
+
+        function highlightStars(count) {
+            stars.forEach((star, index) => {
+                if (index < count) {
+                    star.classList.remove('bi-star');
+                    star.classList.add('bi-star-fill');
+                    star.style.color = '#ffc107';
+                } else {
+                    star.classList.remove('bi-star-fill');
+                    star.classList.add('bi-star');
+                    star.style.color = '#ccc';
+                }
+            });
+        }
 
         // Star hover en click events
         stars.forEach((star, index) => {
@@ -306,23 +328,9 @@
         });
 
         // Reset stars op mouseleave (behoud geselecteerde rating)
-        document.querySelector('.rating-stars').addEventListener('mouseleave', function() {
+        ratingStarsContainer.addEventListener('mouseleave', function() {
             highlightStars(selectedRating);
         });
-
-        function highlightStars(count) {
-            stars.forEach((star, index) => {
-                if (index < count) {
-                    star.classList.remove('bi-star');
-                    star.classList.add('bi-star-fill');
-                    star.style.color = '#ffc107';
-                } else {
-                    star.classList.remove('bi-star-fill');
-                    star.classList.add('bi-star');
-                    star.style.color = '#ccc';
-                }
-            });
-        }
 
         // Submit rating
         submitButton.addEventListener('click', async function() {
@@ -361,6 +369,6 @@
                 submitButton.textContent = 'Beoordeling verzenden';
             }
         });
-    })();
+    });
 </script>
 
