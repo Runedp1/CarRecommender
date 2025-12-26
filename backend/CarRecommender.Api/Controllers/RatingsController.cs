@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Hosting;
 using CarRecommender;
 using System.Text.Json;
+using System.IO;
 
 namespace CarRecommender.Api.Controllers;
 
@@ -52,6 +53,28 @@ public class RatingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> AddRating([FromBody] RatingRequest request)
     {
+        // #region agent log
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logDir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                Directory.CreateDirectory(logDir);
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "RatingsController.cs:AddRating",
+                message = "AddRating endpoint called",
+                data = new { carId = request?.CarId, rating = request?.Rating },
+                sessionId = "debug-session",
+                runId = "runtime",
+                hypothesisId = "E"
+            });
+            System.IO.File.AppendAllText(logPath, logEntry + Environment.NewLine);
+        }
+        catch { }
+        // #endregion
         try
         {
             if (request == null || request.CarId <= 0)

@@ -316,8 +316,51 @@ public class UserRatingRepository : IUserRatingRepository
 
     public async Task AddRatingAsync(UserRating rating)
     {
-        using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
+        // #region agent log
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logDir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                Directory.CreateDirectory(logDir);
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "UserRatingRepository.cs:AddRatingAsync",
+                message = "AddRatingAsync start",
+                data = new { carId = rating.CarId, rating = rating.Rating, dbPath = _dbPath },
+                sessionId = "debug-session",
+                runId = "runtime",
+                hypothesisId = "E"
+            });
+            File.AppendAllText(logPath, logEntry + Environment.NewLine);
+        }
+        catch { }
+        // #endregion
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "UserRatingRepository.cs:AddRatingAsync",
+                    message = "Opening database connection",
+                    data = new { connectionString = _connectionString },
+                    sessionId = "debug-session",
+                    runId = "runtime",
+                    hypothesisId = "E"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            await connection.OpenAsync();
 
         var insertCommand = @"
             INSERT INTO UserRatings (CarId, Rating, UserId, OriginalPrompt, UserPreferencesJson, RecommendationContext, Timestamp)
@@ -332,7 +375,69 @@ public class UserRatingRepository : IUserRatingRepository
         command.Parameters.AddWithValue("@RecommendationContext", (object?)rating.RecommendationContext ?? DBNull.Value);
         command.Parameters.AddWithValue("@Timestamp", rating.Timestamp);
 
-        await command.ExecuteNonQueryAsync();
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "UserRatingRepository.cs:AddRatingAsync",
+                    message = "Executing insert command",
+                    data = new { },
+                    sessionId = "debug-session",
+                    runId = "runtime",
+                    hypothesisId = "E"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            await command.ExecuteNonQueryAsync();
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "UserRatingRepository.cs:AddRatingAsync",
+                    message = "AddRatingAsync success",
+                    data = new { },
+                    sessionId = "debug-session",
+                    runId = "runtime",
+                    hypothesisId = "E"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+        }
+        catch (Exception ex)
+        {
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "UserRatingRepository.cs:AddRatingAsync",
+                    message = "AddRatingAsync failed",
+                    data = new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name, dbPath = _dbPath },
+                    sessionId = "debug-session",
+                    runId = "runtime",
+                    hypothesisId = "E"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            throw;
+        }
     }
 
     public async Task<List<UserRating>> GetRatingsForCarAsync(int carId)
@@ -407,46 +512,132 @@ public class UserRatingRepository : IUserRatingRepository
 
     public async Task<AggregatedRating?> GetAggregatedRatingForCarAsync(int carId)
     {
-        using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
-
-        var aggregateCommand = @"
-            SELECT 
-                CarId,
-                AVG(Rating) as AverageRating,
-                COUNT(*) as TotalRatings,
-                SUM(CASE WHEN Rating = 5 THEN 1 ELSE 0 END) as FiveStarRatings,
-                SUM(CASE WHEN Rating = 4 THEN 1 ELSE 0 END) as FourStarRatings,
-                SUM(CASE WHEN Rating = 3 THEN 1 ELSE 0 END) as ThreeStarRatings,
-                SUM(CASE WHEN Rating = 2 THEN 1 ELSE 0 END) as TwoStarRatings,
-                SUM(CASE WHEN Rating = 1 THEN 1 ELSE 0 END) as OneStarRatings
-            FROM UserRatings
-            WHERE CarId = @CarId
-            GROUP BY CarId";
-
-        using var command = new SqliteCommand(aggregateCommand, connection);
-        command.Parameters.AddWithValue("@CarId", carId);
-
-        using var reader = await command.ExecuteReaderAsync();
-        
-        if (await reader.ReadAsync())
+        // #region agent log
+        try
         {
-            var avgRating = reader.GetDouble(1);
-            return new AggregatedRating
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logDir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                Directory.CreateDirectory(logDir);
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
             {
-                CarId = carId,
-                AverageRating = avgRating,
-                TotalRatings = reader.GetInt32(2),
-                FiveStarRatings = reader.GetInt32(3),
-                FourStarRatings = reader.GetInt32(4),
-                ThreeStarRatings = reader.GetInt32(5),
-                TwoStarRatings = reader.GetInt32(6),
-                OneStarRatings = reader.GetInt32(7),
-                NormalizedRating = (avgRating - 1) / 4.0 // Normaliseer 1-5 naar 0-1
-            };
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "UserRatingRepository.cs:GetAggregatedRatingForCarAsync",
+                message = "GetAggregatedRatingForCarAsync start",
+                data = new { carId, dbPath = _dbPath },
+                sessionId = "debug-session",
+                runId = "runtime",
+                hypothesisId = "E"
+            });
+            File.AppendAllText(logPath, logEntry + Environment.NewLine);
         }
+        catch { }
+        // #endregion
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync();
 
-        return null;
+            var aggregateCommand = @"
+                SELECT 
+                    CarId,
+                    AVG(Rating) as AverageRating,
+                    COUNT(*) as TotalRatings,
+                    SUM(CASE WHEN Rating = 5 THEN 1 ELSE 0 END) as FiveStarRatings,
+                    SUM(CASE WHEN Rating = 4 THEN 1 ELSE 0 END) as FourStarRatings,
+                    SUM(CASE WHEN Rating = 3 THEN 1 ELSE 0 END) as ThreeStarRatings,
+                    SUM(CASE WHEN Rating = 2 THEN 1 ELSE 0 END) as TwoStarRatings,
+                    SUM(CASE WHEN Rating = 1 THEN 1 ELSE 0 END) as OneStarRatings
+                FROM UserRatings
+                WHERE CarId = @CarId
+                GROUP BY CarId";
+
+            using var command = new SqliteCommand(aggregateCommand, connection);
+            command.Parameters.AddWithValue("@CarId", carId);
+
+            using var reader = await command.ExecuteReaderAsync();
+            
+            if (await reader.ReadAsync())
+            {
+                var avgRating = reader.GetDouble(1);
+                // #region agent log
+                try
+                {
+                    var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                    var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                        timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        location = "UserRatingRepository.cs:GetAggregatedRatingForCarAsync",
+                        message = "GetAggregatedRatingForCarAsync found ratings",
+                        data = new { carId, avgRating, totalRatings = reader.GetInt32(2) },
+                        sessionId = "debug-session",
+                        runId = "runtime",
+                        hypothesisId = "E"
+                    });
+                    File.AppendAllText(logPath, logEntry + Environment.NewLine);
+                }
+                catch { }
+                // #endregion
+                return new AggregatedRating
+                {
+                    CarId = carId,
+                    AverageRating = avgRating,
+                    TotalRatings = reader.GetInt32(2),
+                    FiveStarRatings = reader.GetInt32(3),
+                    FourStarRatings = reader.GetInt32(4),
+                    ThreeStarRatings = reader.GetInt32(5),
+                    TwoStarRatings = reader.GetInt32(6),
+                    OneStarRatings = reader.GetInt32(7),
+                    NormalizedRating = (avgRating - 1) / 4.0 // Normaliseer 1-5 naar 0-1
+                };
+            }
+
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "UserRatingRepository.cs:GetAggregatedRatingForCarAsync",
+                    message = "GetAggregatedRatingForCarAsync no ratings found",
+                    data = new { carId },
+                    sessionId = "debug-session",
+                    runId = "runtime",
+                    hypothesisId = "E"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            return null;
+        }
+        catch (Exception ex)
+        {
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "UserRatingRepository.cs:GetAggregatedRatingForCarAsync",
+                    message = "GetAggregatedRatingForCarAsync failed",
+                    data = new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name, carId, dbPath = _dbPath },
+                    sessionId = "debug-session",
+                    runId = "runtime",
+                    hypothesisId = "E"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            throw;
+        }
     }
 
     public async Task<Dictionary<int, AggregatedRating>> GetAllAggregatedRatingsAsync()
