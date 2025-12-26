@@ -186,3 +186,4 @@ Na 10 gelijkaardige gebruikers:
 4. **Advanced Matching**: Machine learning voor preference matching
 5. **Cold Start Problem**: Aanbevelingen voor nieuwe auto's zonder ratings
 
+

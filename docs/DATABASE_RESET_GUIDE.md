@@ -208,3 +208,4 @@ curl http://localhost:5283/api/ratings/database/stats
 3. **Logging:** Alle reset acties worden gelogd (Warning level)
 4. **Automatisch:** Database wordt automatisch aangemaakt bij eerste gebruik
 
+

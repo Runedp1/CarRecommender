@@ -9,45 +9,11 @@ namespace CarRecommender;
 /// </summary>
 public class UserRatingRepository : IUserRatingRepository
 {
-    private string _connectionString;
+    private readonly string _connectionString;
     private readonly string _dbPath;
 
     public UserRatingRepository(string? dbPath = null)
     {
-        // #region agent log
-        var constructorStart = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        try {
-            try {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-                var logDir = Path.GetDirectoryName(logPath);
-                if (logDir != null && !Directory.Exists(logDir)) {
-                    try {
-                        Directory.CreateDirectory(logDir);
-                    } catch {
-                        // If can't create .cursor, try temp directory
-                        logPath = Path.Combine(Path.GetTempPath(), "car_recommender_debug.log");
-                    }
-                }
-                var logEntry = new {
-                    location = "UserRatingRepository.cs:Constructor",
-                    message = "Constructor entry",
-                    data = new {
-                        providedDbPath = dbPath ?? "(null)",
-                        baseDirectory = AppDomain.CurrentDomain.BaseDirectory,
-                        currentDirectory = Directory.GetCurrentDirectory()
-                    },
-                    timestamp = constructorStart,
-                    sessionId = "debug-session",
-                    runId = "startup",
-                    hypothesisId = "F"
-                };
-                System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-            } catch {
-                // Silently fail - logging should never break startup
-            }
-        } catch {}
-        // #endregion
-
         // Standaard: gebruik database in data directory
         if (string.IsNullOrEmpty(dbPath))
         {
@@ -63,112 +29,27 @@ public class UserRatingRepository : IUserRatingRepository
 
             foreach (var path in possiblePaths)
             {
-                try
+                var fullPath = Path.GetFullPath(path);
+                var dir = Path.GetDirectoryName(fullPath);
+                if (dir != null)
                 {
-                    var fullPath = Path.GetFullPath(path);
-                    var dir = Path.GetDirectoryName(fullPath);
-                    if (dir != null)
+                    if (!Directory.Exists(dir))
                     {
-                        // Probeer directory aan te maken, maar faal niet als het niet lukt
-                        try
-                        {
-                            if (!Directory.Exists(dir))
-                            {
-                                Directory.CreateDirectory(dir);
-                            }
-                        }
-                        catch (Exception dirEx)
-                        {
-                            // #region agent log
-                            try {
-                                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-                                var logDir = Path.GetDirectoryName(logPath);
-                                if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
-                                var logEntry = new {
-                                    location = "UserRatingRepository.cs:Constructor",
-                                    message = "Directory creation failed, trying next path",
-                                    data = new {
-                                        attemptedPath = dir,
-                                        error = dirEx.Message
-                                    },
-                                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                                    sessionId = "debug-session",
-                                    runId = "startup",
-                                    hypothesisId = "F"
-                                };
-                                System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-                            } catch {}
-                            // #endregion
-                            // Probeer volgende pad
-                            continue;
-                        }
-                        _dbPath = fullPath;
-                        break;
+                        Directory.CreateDirectory(dir);
                     }
-                }
-                catch (Exception pathEx)
-                {
-                    // #region agent log
-                    try {
-                        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-                        var logDir = Path.GetDirectoryName(logPath);
-                        if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
-                        var logEntry = new {
-                            location = "UserRatingRepository.cs:Constructor",
-                            message = "Path resolution failed, trying next path",
-                            data = new {
-                                attemptedPath = path,
-                                error = pathEx.Message
-                            },
-                            timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                            sessionId = "debug-session",
-                            runId = "startup",
-                            hypothesisId = "F"
-                        };
-                        System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-                    } catch {}
-                    // #endregion
-                    // Probeer volgende pad
-                    continue;
+                    _dbPath = fullPath;
+                    break;
                 }
             }
 
-            // Fallback - gebruik temp directory als laatste redmiddel
+            // Fallback
             if (string.IsNullOrEmpty(_dbPath))
             {
-                try
+                _dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "user_ratings.db");
+                var directory = Path.GetDirectoryName(_dbPath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
-                    // Probeer eerst standaard data directory
-                    _dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "user_ratings.db");
-                    var directory = Path.GetDirectoryName(_dbPath);
-                    if (!string.IsNullOrEmpty(directory))
-                    {
-                        try
-                        {
-                            if (!Directory.Exists(directory))
-                            {
-                                Directory.CreateDirectory(directory);
-                            }
-                        }
-                        catch
-                        {
-                            // Als dat faalt, gebruik temp directory
-                            _dbPath = Path.Combine(Path.GetTempPath(), "car_recommender_ratings.db");
-                        }
-                    }
-                }
-                catch
-                {
-                    // Laatste fallback: temp directory (dit MOET altijd werken)
-                    try
-                    {
-                        _dbPath = Path.Combine(Path.GetTempPath(), "car_recommender_ratings.db");
-                    }
-                    catch
-                    {
-                        // Absolute laatste fallback: in-memory database
-                        _dbPath = ":memory:";
-                    }
+                    Directory.CreateDirectory(directory);
                 }
             }
         }
@@ -176,114 +57,16 @@ public class UserRatingRepository : IUserRatingRepository
         {
             _dbPath = dbPath;
             var directory = Path.GetDirectoryName(_dbPath);
-            if (!string.IsNullOrEmpty(directory))
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
-                try
-                {
-                    if (!Directory.Exists(directory))
-                    {
-                        Directory.CreateDirectory(directory);
-                    }
-                }
-                catch (Exception dirEx)
-                {
-                    // #region agent log
-                    try {
-                        try {
-                            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-                            var logDir = Path.GetDirectoryName(logPath);
-                            if (logDir != null && !Directory.Exists(logDir)) {
-                                try {
-                                    Directory.CreateDirectory(logDir);
-                                } catch {
-                                    logPath = Path.Combine(Path.GetTempPath(), "car_recommender_debug.log");
-                                }
-                            }
-                            var logEntry = new {
-                                location = "UserRatingRepository.cs:Constructor",
-                                message = "Directory creation failed for provided path, using temp",
-                                data = new {
-                                    providedPath = directory,
-                                    error = dirEx.Message,
-                                    fallbackPath = Path.Combine(Path.GetTempPath(), "car_recommender_ratings.db")
-                                },
-                                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                                sessionId = "debug-session",
-                                runId = "startup",
-                                hypothesisId = "F"
-                            };
-                            System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-                        } catch {}
-                    } catch {}
-                    // #endregion
-                    // Gebruik temp directory als fallback, of in-memory als laatste redmiddel
-                    try
-                    {
-                        _dbPath = Path.Combine(Path.GetTempPath(), "car_recommender_ratings.db");
-                    }
-                    catch
-                    {
-                        // Absolute laatste fallback: in-memory database
-                        _dbPath = ":memory:";
-                    }
-                }
+                Directory.CreateDirectory(directory);
             }
-            else if (string.IsNullOrEmpty(_dbPath))
-            {
-                // Als dbPath leeg is na processing, gebruik in-memory
-                _dbPath = ":memory:";
-            }
-        }
-
-        // Zorg dat _dbPath altijd een waarde heeft (kritiek voor startup)
-        if (string.IsNullOrEmpty(_dbPath))
-        {
-            // Absolute laatste fallback: in-memory database (werkt altijd)
-            _dbPath = ":memory:";
         }
 
         _connectionString = $"Data Source={_dbPath}";
         
-        // Log database locatie voor debugging (maar faal niet als dit niet lukt)
-        try
-        {
-            Console.WriteLine($"User Ratings Database: {_dbPath}");
-        }
-        catch
-        {
-            // Negeer - console output mag startup niet blokkeren
-        }
-        
-        // #region agent log
-        try {
-            try {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-                var logDir = Path.GetDirectoryName(logPath);
-                if (logDir != null && !Directory.Exists(logDir)) {
-                    try {
-                        Directory.CreateDirectory(logDir);
-                    } catch {
-                        logPath = Path.Combine(Path.GetTempPath(), "car_recommender_debug.log");
-                    }
-                }
-                var logEntry = new {
-                    location = "UserRatingRepository.cs:Constructor",
-                    message = "Constructor exit",
-                    data = new {
-                        finalDbPath = _dbPath,
-                        connectionString = _connectionString
-                    },
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    sessionId = "debug-session",
-                    runId = "startup",
-                    hypothesisId = "F"
-                };
-                System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-            } catch {
-                // Silently fail - logging should never break startup
-            }
-        } catch {}
-        // #endregion
+        // Log database locatie voor debugging
+        Console.WriteLine($"User Ratings Database: {_dbPath}");
     }
     
     /// <summary>
@@ -295,64 +78,11 @@ public class UserRatingRepository : IUserRatingRepository
     {
         try
         {
-            // Voor in-memory database, skip directory creation
-            if (_dbPath == ":memory:")
+            // Zorg dat directory bestaat
+            var directory = Path.GetDirectoryName(_dbPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
-                // In-memory database werkt direct, geen directory nodig
-            }
-            else
-            {
-                // Zorg dat directory bestaat (alleen voor file-based databases)
-                var directory = Path.GetDirectoryName(_dbPath);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    try
-                    {
-                        if (!Directory.Exists(directory))
-                        {
-                            Directory.CreateDirectory(directory);
-                        }
-                    }
-                    catch (Exception dirEx)
-                    {
-                        // Als directory creation faalt (bijv. geen rechten op Azure), probeer alternatief pad
-                        try
-                        {
-                            Console.WriteLine($"Waarschuwing: Kan directory niet aanmaken: {directory}. Error: {dirEx.Message}");
-                        }
-                        catch { }
-                        
-                        // Gebruik temp directory als fallback, of in-memory als laatste redmiddel
-                        try
-                        {
-                            var tempPath = Path.Combine(Path.GetTempPath(), "car_recommender_ratings.db");
-                            if (File.Exists(_dbPath))
-                            {
-                                // Als database al bestaat, gebruik die
-                                try
-                                {
-                                    Console.WriteLine($"Database bestaat al op: {_dbPath}");
-                                }
-                                catch { }
-                            }
-                            else
-                            {
-                                try
-                                {
-                                    Console.WriteLine($"Probeer alternatief pad: {tempPath}");
-                                }
-                                catch { }
-                                // Update connection string voor deze sessie
-                                _connectionString = $"Data Source={tempPath}";
-                            }
-                        }
-                        catch
-                        {
-                            // Laatste fallback: in-memory database
-                            _connectionString = "Data Source=:memory:";
-                        }
-                    }
-                }
+                Directory.CreateDirectory(directory);
             }
 
             using var connection = new SqliteConnection(_connectionString);
@@ -580,43 +310,10 @@ public class UserRatingRepository : IUserRatingRepository
 
     public async Task<List<UserRating>> FindSimilarUserRatingsAsync(UserPreferenceSnapshot preferences, int limit = 50)
     {
-        // #region agent log
-        var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        try {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-            var logEntry = new {
-                location = "UserRatingRepository.cs:FindSimilarUserRatingsAsync",
-                message = "Method entry",
-                data = new { limit = limit },
-                timestamp = startTime,
-                sessionId = "debug-session",
-                runId = "run1",
-                hypothesisId = "B"
-            };
-            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-        } catch {}
-        // #endregion
-        using var connection = new SqliteConnection(_connectionString);
-        // #region agent log
-        var beforeOpen = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        // #endregion
-        await connection.OpenAsync();
-        // #region agent log
-        var afterOpen = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        try {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-            var logEntry = new {
-                location = "UserRatingRepository.cs:FindSimilarUserRatingsAsync",
-                message = "Database connection opened",
-                data = new { openDurationMs = afterOpen - beforeOpen },
-                timestamp = afterOpen,
-                sessionId = "debug-session",
-                runId = "run1",
-                hypothesisId = "B"
-            };
-            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-        } catch {}
-        // #endregion
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync();
 
         // Haal alle ratings op met preferences
         var selectCommand = @"
@@ -681,23 +378,14 @@ public class UserRatingRepository : IUserRatingRepository
             .Take(limit)
             .Select(x => x.rating)
             .ToList();
-        // #region agent log
-        var endTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        try {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-            var logEntry = new {
-                location = "UserRatingRepository.cs:FindSimilarUserRatingsAsync",
-                message = "Method exit",
-                data = new { resultCount = result.Count, totalDurationMs = endTime - startTime },
-                timestamp = endTime,
-                sessionId = "debug-session",
-                runId = "run1",
-                hypothesisId = "B"
-            };
-            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-        } catch {}
-        // #endregion
-        return result;
+
+            return result;
+        }
+        catch (Exception)
+        {
+            // Als database niet beschikbaar is, retourneer lege lijst (collaborative filtering is optioneel)
+            return new List<UserRating>();
+        }
     }
 
     public async Task<List<(int CarId, double AverageRating, int Count)>> GetTopRatedCarsForPreferencesAsync(

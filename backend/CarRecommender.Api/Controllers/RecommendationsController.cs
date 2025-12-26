@@ -135,37 +135,7 @@ public class RecommendationsController : ControllerBase
             // Genereer recommendations op basis van tekst via business logica service
             // Deze service gebruikt TextParserService voor NLP parsing en RecommendationEngine voor similarity berekening
             // Gebruik async versie voor collaborative filtering support
-            // #region agent log
-            try {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-                var logEntry = new {
-                    location = "RecommendationsController.cs:GetRecommendationsFromText",
-                    message = "Starting recommendation request",
-                    data = new { text = request.Text?.Substring(0, Math.Min(50, request.Text?.Length ?? 0)), top = top },
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    sessionId = "debug-session",
-                    runId = "run1",
-                    hypothesisId = "A"
-                };
-                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-            } catch {}
-            // #endregion
             var recommendations = await ((RecommendationService)_recommendationService).RecommendFromTextAsync(request.Text, top);
-            // #region agent log
-            try {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-                var logEntry = new {
-                    location = "RecommendationsController.cs:GetRecommendationsFromText",
-                    message = "Recommendations received",
-                    data = new { count = recommendations?.Count ?? 0 },
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    sessionId = "debug-session",
-                    runId = "run1",
-                    hypothesisId = "A"
-                };
-                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-            } catch {}
-            // #endregion
 
             // Track recommendations voor feedback
             TrackRecommendations(recommendations, "text-based");

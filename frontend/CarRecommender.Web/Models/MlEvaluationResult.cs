@@ -68,3 +68,4 @@ public class GeneralTrends
     public string FuelTrend { get; set; } = string.Empty;
 }
 
+

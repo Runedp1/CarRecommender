@@ -15,8 +15,7 @@ public class CollaborativeFilteringService
         IUserRatingRepository ratingRepository,
         ICarRepository carRepository)
     {
-        // Maak ratingRepository optioneel - als null, werkt collaborative filtering gewoon niet
-        _ratingRepository = ratingRepository; // Kan null zijn - service zal dan gewoon geen collaborative filtering doen
+        _ratingRepository = ratingRepository ?? throw new ArgumentNullException(nameof(ratingRepository));
         _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
     }
 
@@ -27,55 +26,12 @@ public class CollaborativeFilteringService
         int carId, 
         UserPreferenceSnapshot currentUserPreferences)
     {
-        // #region agent log
-        var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        try {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-            var logEntry = new {
-                location = "CollaborativeFilteringService.cs:CalculateCollaborativeScoreAsync",
-                message = "Method entry",
-                data = new { carId = carId },
-                timestamp = startTime,
-                sessionId = "debug-session",
-                runId = "run1",
-                hypothesisId = "A"
-            };
-            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-        } catch {}
-        // #endregion
-        
-        // Als rating repository niet beschikbaar is, retourneer neutrale score
-        if (_ratingRepository == null)
-        {
-            return new CollaborativeScore
-            {
-                Score = 0.0,
-                Explanation = "Collaborative filtering niet beschikbaar (rating repository niet geïnitialiseerd)"
-            };
-        }
-        
         try
         {
             // Vind ratings van gebruikers met gelijkaardige preferences
             var similarRatings = await _ratingRepository.FindSimilarUserRatingsAsync(
                 currentUserPreferences, 
-                limit: 100);
-            // #region agent log
-            var queryEndTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            try {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
-                var logEntry = new {
-                    location = "CollaborativeFilteringService.cs:CalculateCollaborativeScoreAsync",
-                    message = "Database query completed",
-                    data = new { carId = carId, ratingCount = similarRatings?.Count ?? 0, queryDurationMs = queryEndTime - startTime },
-                    timestamp = queryEndTime,
-                    sessionId = "debug-session",
-                    runId = "run1",
-                    hypothesisId = "A"
-                };
-                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-            } catch {}
-            // #endregion
+                limit: 100).ConfigureAwait(false);
 
         // Filter op deze specifieke auto
         var carRatings = similarRatings
@@ -109,11 +65,23 @@ public class CollaborativeFilteringService
             UserCount = carRatings.Count,
             AverageRating = averageRating,
             HasCollaborativeData = true,
-            TopRatings = carRatings
+                TopRatings = carRatings
                 .Where(r => r.Rating >= 4)
                 .Take(5)
                 .ToList()
         };
+        }
+        catch (Exception)
+        {
+            // Als collaborative filtering faalt, retourneer lege score (optioneel)
+            return new CollaborativeScore
+            {
+                Score = 0.0,
+                UserCount = 0,
+                AverageRating = 0.0,
+                HasCollaborativeData = false
+            };
+        }
     }
 
     /// <summary>

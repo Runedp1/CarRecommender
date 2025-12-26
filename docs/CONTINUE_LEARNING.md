@@ -183,3 +183,4 @@ Gebruik `/api/feedback/performance` om te monitoren:
 - **Performance**: Retraining gebeurt asynchroon, blokkeert geen requests
 - **Fallback**: Als retraining faalt, blijft oude model werken
 
+
