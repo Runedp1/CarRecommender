@@ -191,7 +191,18 @@ public class CarApiClient
     {
         try
         {
-            var response = await _httpClient.GetAsync($"/api/ratings/car/{carId}");
+            // Voeg cache-busting parameter toe om altijd verse data te krijgen
+            var url = $"/api/ratings/car/{carId}?t={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            // Voorkom caching
+            request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
+            {
+                NoCache = true,
+                NoStore = true,
+                MustRevalidate = true
+            };
+            
+            var response = await _httpClient.SendAsync(request);
             
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {

@@ -154,6 +154,11 @@ public class RatingsController : ControllerBase
         {
             var aggregated = await _ratingRepository.GetAggregatedRatingForCarAsync(carId);
             
+            // Voorkom caching - altijd verse data
+            Response.Headers.Add("Cache-Control", "no-cache, no-store, must-revalidate");
+            Response.Headers.Add("Pragma", "no-cache");
+            Response.Headers.Add("Expires", "0");
+            
             if (aggregated == null)
             {
                 return NotFound(new { error = $"Geen ratings gevonden voor auto met ID {carId}." });

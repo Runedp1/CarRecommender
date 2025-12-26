@@ -88,6 +88,11 @@ public class CarDetailModel : PageModel
             ErrorMessage = "Er is een fout opgetreden bij het ophalen van de auto details.";
         }
 
+        // Voorkom browser caching - force altijd verse data
+        Response.Headers.Add("Cache-Control", "no-cache, no-store, must-revalidate");
+        Response.Headers.Add("Pragma", "no-cache");
+        Response.Headers.Add("Expires", "0");
+
         return Page();
     }
 }
