@@ -220,6 +220,31 @@ public class CarApiClient
     }
 
     /// <summary>
+    /// Haalt de rating op van de huidige gebruiker voor een specifieke auto via GET /api/ratings/user/{userId}/car/{carId}
+    /// </summary>
+    public async Task<int?> GetUserRatingForCarAsync(string userId, int carId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/ratings/user/{userId}/car/{carId}");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            var rating = await response.Content.ReadFromJsonAsync<UserRating>(_jsonOptions);
+            return rating?.Rating;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Fout bij het ophalen van user rating voor auto {CarId}", carId);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Voegt een rating toe via POST /api/ratings
     /// </summary>
     public async Task<bool> AddRatingAsync(RatingRequest request)

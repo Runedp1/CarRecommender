@@ -195,6 +195,33 @@ public class RatingsController : ControllerBase
     }
 
     /// <summary>
+    /// GET /api/ratings/user/{userId}/car/{carId}
+    /// Haalt de rating op van een specifieke gebruiker voor een specifieke auto.
+    /// </summary>
+    [HttpGet("user/{userId}/car/{carId}")]
+    [ProducesResponseType(typeof(UserRating), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetRatingForUserAndCar(string userId, int carId)
+    {
+        try
+        {
+            var rating = await _ratingRepository.GetRatingForUserAndCarAsync(userId, carId);
+            
+            if (rating == null)
+            {
+                return NotFound(new { error = $"Geen rating gevonden voor gebruiker {userId} en auto {carId}." });
+            }
+
+            return Ok(rating);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fout bij ophalen van rating voor gebruiker {UserId} en auto {CarId}", userId, carId);
+            return StatusCode(500, new { error = "Interne serverfout." });
+        }
+    }
+
+    /// <summary>
     /// GET /api/ratings/database/stats
     /// Haalt database statistieken op (voor testing/monitoring).
     /// </summary>

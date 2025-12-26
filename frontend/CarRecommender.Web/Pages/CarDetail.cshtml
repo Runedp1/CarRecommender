@@ -282,9 +282,16 @@
     }
 
     // Rating functionaliteit
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
         const carId = @(Model.Car?.Id ?? 0);
         if (carId === 0) return; // Geen auto, skip rating functionaliteit
+        
+        // Haal of maak user ID op (gebruik localStorage voor persistentie)
+        let userId = localStorage.getItem('carRecommenderUserId');
+        if (!userId) {
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('carRecommenderUserId', userId);
+        }
         
         let selectedRating = 0;
         const stars = document.querySelectorAll('.rating-star');
@@ -297,6 +304,27 @@
         if (!stars.length || !submitButton || !ratingText || !ratingStarsContainer) {
             console.error('Rating elements not found');
             return;
+        }
+
+        // Haal bestaande rating op van deze gebruiker voor deze auto
+        try {
+            const userRatingUrl = apiBaseUrl && apiBaseUrl.trim() !== '' 
+                ? `${apiBaseUrl}/api/ratings/user/${encodeURIComponent(userId)}/car/${carId}` 
+                : `/api/ratings/user/${encodeURIComponent(userId)}/car/${carId}`;
+            
+            const ratingResponse = await fetch(userRatingUrl);
+            if (ratingResponse.ok) {
+                const userRating = await ratingResponse.json();
+                if (userRating && userRating.rating) {
+                    selectedRating = userRating.rating;
+                    highlightStars(selectedRating);
+                    submitButton.disabled = false;
+                    ratingText.textContent = `Je huidige beoordeling: ${selectedRating} ster${selectedRating !== 1 ? 'ren' : ''}. Klik op een ster om te wijzigen.`;
+                    submitButton.textContent = 'Beoordeling bijwerken';
+                }
+            }
+        } catch (error) {
+            console.log('Geen bestaande rating gevonden of fout bij ophalen:', error);
         }
 
         function highlightStars(count) {
@@ -355,12 +383,14 @@
                     },
                     body: JSON.stringify({
                         carId: carId,
-                        rating: selectedRating
+                        rating: selectedRating,
+                        userId: userId  // Stuur user ID mee zodat backend kan checken of er al een rating is
                     })
                 });
 
                 if (response.ok) {
-                    ratingMessage.innerHTML = '<div class="alert alert-success">Bedankt voor je beoordeling! De pagina wordt vernieuwd...</div>';
+                    const isUpdate = selectedRating > 0 && submitButton.textContent.includes('bijwerken');
+                    ratingMessage.innerHTML = `<div class="alert alert-success">${isUpdate ? 'Beoordeling bijgewerkt' : 'Bedankt voor je beoordeling'}! De pagina wordt vernieuwd...</div>`;
                     setTimeout(() => {
                         window.location.reload();
                     }, 1500);

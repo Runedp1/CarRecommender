@@ -28,3 +28,17 @@ public class RatingRequest
     public string? RecommendationContext { get; set; }
 }
 
+/// <summary>
+/// User rating model - komt overeen met de API response.
+/// </summary>
+public class UserRating
+{
+    public int Id { get; set; }
+    public int CarId { get; set; }
+    public int Rating { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public string? OriginalPrompt { get; set; }
+    public string? RecommendationContext { get; set; }
+    public DateTime Timestamp { get; set; }
+}
+
