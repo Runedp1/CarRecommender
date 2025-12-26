@@ -7,9 +7,14 @@ namespace CarRecommender;
 public interface IUserRatingRepository
 {
     /// <summary>
-    /// Voegt een nieuwe rating toe.
+    /// Voegt een nieuwe rating toe of update een bestaande rating als de gebruiker al een rating heeft voor deze auto.
     /// </summary>
-    Task AddRatingAsync(UserRating rating);
+    Task AddOrUpdateRatingAsync(UserRating rating);
+
+    /// <summary>
+    /// Haalt de rating op van een specifieke gebruiker voor een specifieke auto.
+    /// </summary>
+    Task<UserRating?> GetRatingForUserAndCarAsync(string userId, int carId);
 
     /// <summary>
     /// Haalt alle ratings op voor een specifieke auto.

@@ -124,7 +124,8 @@ public class RatingsController : ControllerBase
                 Timestamp = DateTime.UtcNow
             };
 
-            await _ratingRepository.AddRatingAsync(rating);
+            // Gebruik AddOrUpdateRatingAsync om te voorkomen dat een gebruiker meerdere ratings kan geven voor dezelfde auto
+            await _ratingRepository.AddOrUpdateRatingAsync(rating);
 
             _logger.LogInformation("Rating toegevoegd: CarId={CarId}, Rating={Rating}, UserId={UserId}",
                 request.CarId, request.Rating, rating.UserId);

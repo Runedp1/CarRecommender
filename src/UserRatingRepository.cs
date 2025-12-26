@@ -314,6 +314,83 @@ public class UserRatingRepository : IUserRatingRepository
         }
     }
 
+    public async Task<UserRating?> GetRatingForUserAndCarAsync(string userId, int carId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var selectCommand = @"
+            SELECT Id, CarId, Rating, UserId, OriginalPrompt, UserPreferencesJson, RecommendationContext, Timestamp
+            FROM UserRatings
+            WHERE UserId = @UserId AND CarId = @CarId
+            LIMIT 1";
+
+        using var command = new SqliteCommand(selectCommand, connection);
+        command.Parameters.AddWithValue("@UserId", userId);
+        command.Parameters.AddWithValue("@CarId", carId);
+
+        using var reader = await command.ExecuteReaderAsync();
+        
+        if (await reader.ReadAsync())
+        {
+            return new UserRating
+            {
+                Id = reader.GetInt32(0),
+                CarId = reader.GetInt32(1),
+                Rating = reader.GetInt32(2),
+                UserId = reader.GetString(3),
+                OriginalPrompt = reader.IsDBNull(4) ? null : reader.GetString(4),
+                UserPreferencesJson = reader.IsDBNull(5) ? null : reader.GetString(5),
+                RecommendationContext = reader.IsDBNull(6) ? null : reader.GetString(6),
+                Timestamp = reader.GetDateTime(7)
+            };
+        }
+
+        return null;
+    }
+
+    public async Task AddOrUpdateRatingAsync(UserRating rating)
+    {
+        // Check of er al een rating is voor deze gebruiker en auto
+        var existingRating = await GetRatingForUserAndCarAsync(rating.UserId, rating.CarId);
+        
+        if (existingRating != null)
+        {
+            // Update bestaande rating
+            await UpdateRatingAsync(existingRating.Id, rating);
+        }
+        else
+        {
+            // Voeg nieuwe rating toe
+            await AddRatingAsync(rating);
+        }
+    }
+
+    private async Task UpdateRatingAsync(int ratingId, UserRating rating)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var updateCommand = @"
+            UPDATE UserRatings 
+            SET Rating = @Rating,
+                OriginalPrompt = @OriginalPrompt,
+                UserPreferencesJson = @UserPreferencesJson,
+                RecommendationContext = @RecommendationContext,
+                Timestamp = @Timestamp
+            WHERE Id = @Id";
+
+        using var command = new SqliteCommand(updateCommand, connection);
+        command.Parameters.AddWithValue("@Id", ratingId);
+        command.Parameters.AddWithValue("@Rating", rating.Rating);
+        command.Parameters.AddWithValue("@OriginalPrompt", (object?)rating.OriginalPrompt ?? DBNull.Value);
+        command.Parameters.AddWithValue("@UserPreferencesJson", (object?)rating.UserPreferencesJson ?? DBNull.Value);
+        command.Parameters.AddWithValue("@RecommendationContext", (object?)rating.RecommendationContext ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Timestamp", DateTime.UtcNow); // Update timestamp bij wijziging
+
+        await command.ExecuteNonQueryAsync();
+    }
+
     public async Task AddRatingAsync(UserRating rating)
     {
         // #region agent log
