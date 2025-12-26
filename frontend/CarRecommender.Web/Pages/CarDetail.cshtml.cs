@@ -13,6 +13,7 @@ public class CarDetailModel : PageModel
 
     public Car? Car { get; set; }
     public List<string> Images { get; set; } = new();
+    public AggregatedRating? Rating { get; set; }
     public string? ErrorMessage { get; set; }
     public string ApiBaseUrl { get; set; } = string.Empty;
 
@@ -77,6 +78,9 @@ public class CarDetailModel : PageModel
             // Haal alle images op voor deze auto (gebruikt dezelfde id parameter)
             // De id wordt opnieuw gebruikt om GET /api/cars/{id}/images aan te roepen
             Images = await _apiClient.GetCarImagesAsync(id);
+            
+            // Haal ratings op voor deze auto
+            Rating = await _apiClient.GetRatingsForCarAsync(id);
         }
         catch (Exception ex)
         {

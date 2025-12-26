@@ -161,6 +161,71 @@
                         </dl>
                     </div>
                 </div>
+                
+                @* Ratings Sectie *@
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h4 class="card-title mb-3">Beoordelingen</h4>
+                        @if (Model.Rating != null && Model.Rating.TotalRatings > 0)
+                        {
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="me-3">
+                                        <span class="display-6 fw-bold">@Model.Rating.AverageRating.ToString("F1")</span>
+                                        <span class="text-muted">/ 5.0</span>
+                                    </div>
+                                    <div>
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            <i class="bi @(i <= Math.Round(Model.Rating.AverageRating) ? "bi-star-fill text-warning" : "bi-star text-muted")"></i>
+                                        }
+                                    </div>
+                                </div>
+                                <p class="text-muted mb-0">Gebaseerd op @Model.Rating.TotalRatings beoordeling@(Model.Rating.TotalRatings != 1 ? "en" : "")</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                @for (int stars = 5; stars >= 1; stars--)
+                                {
+                                    var count = stars == 5 ? Model.Rating.FiveStarRatings :
+                                                stars == 4 ? Model.Rating.FourStarRatings :
+                                                stars == 3 ? Model.Rating.ThreeStarRatings :
+                                                stars == 2 ? Model.Rating.TwoStarRatings :
+                                                Model.Rating.OneStarRatings;
+                                    var percentage = Model.Rating.TotalRatings > 0 ? (count * 100.0 / Model.Rating.TotalRatings) : 0;
+                                    
+                                    <div class="d-flex align-items-center mb-1">
+                                        <span class="me-2" style="width: 60px;">@stars <i class="bi bi-star-fill text-warning"></i></span>
+                                        <div class="progress flex-grow-1 me-2" style="height: 20px;">
+                                            <div class="progress-bar bg-warning" role="progressbar" style="width: @percentage.ToString("F0")%"></div>
+                                        </div>
+                                        <span class="text-muted" style="width: 50px; text-align: right;">@count</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted">Nog geen beoordelingen voor deze auto.</p>
+                        }
+                        
+                        @* Rating Formulier *@
+                        <div class="mt-4">
+                            <h5>Geef je beoordeling</h5>
+                            <div class="mb-3">
+                                <div class="rating-stars" data-car-id="@Model.Car.Id">
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        <i class="bi bi-star rating-star" data-rating="@i" style="font-size: 2rem; cursor: pointer; color: #ccc; margin-right: 5px;"></i>
+                                    }
+                                </div>
+                                <p class="text-muted mt-2" id="rating-text">Klik op een ster om te beoordelen</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" id="submit-rating" disabled>Beoordeling verzenden</button>
+                            <div id="rating-message" class="mt-2"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -215,5 +280,87 @@
         var modal = new bootstrap.Modal(document.getElementById('imageModal'));
         modal.show();
     }
+
+    // Rating functionaliteit
+    (function() {
+        const carId = @Model.Car?.Id ?? 0;
+        let selectedRating = 0;
+        const stars = document.querySelectorAll('.rating-star');
+        const submitButton = document.getElementById('submit-rating');
+        const ratingText = document.getElementById('rating-text');
+        const ratingMessage = document.getElementById('rating-message');
+        const apiBaseUrl = '@Model.ApiBaseUrl';
+
+        // Star hover en click events
+        stars.forEach((star, index) => {
+            star.addEventListener('mouseenter', function() {
+                highlightStars(index + 1);
+            });
+
+            star.addEventListener('click', function() {
+                selectedRating = index + 1;
+                highlightStars(selectedRating);
+                submitButton.disabled = false;
+                ratingText.textContent = `Je hebt ${selectedRating} ster${selectedRating !== 1 ? 'ren' : ''} geselecteerd`;
+            });
+        });
+
+        // Reset stars op mouseleave (behoud geselecteerde rating)
+        document.querySelector('.rating-stars').addEventListener('mouseleave', function() {
+            highlightStars(selectedRating);
+        });
+
+        function highlightStars(count) {
+            stars.forEach((star, index) => {
+                if (index < count) {
+                    star.classList.remove('bi-star');
+                    star.classList.add('bi-star-fill');
+                    star.style.color = '#ffc107';
+                } else {
+                    star.classList.remove('bi-star-fill');
+                    star.classList.add('bi-star');
+                    star.style.color = '#ccc';
+                }
+            });
+        }
+
+        // Submit rating
+        submitButton.addEventListener('click', async function() {
+            if (selectedRating === 0) return;
+
+            submitButton.disabled = true;
+            submitButton.textContent = 'Verzenden...';
+            ratingMessage.innerHTML = '';
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/ratings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        carId: carId,
+                        rating: selectedRating
+                    })
+                });
+
+                if (response.ok) {
+                    ratingMessage.innerHTML = '<div class="alert alert-success">Bedankt voor je beoordeling! De pagina wordt vernieuwd...</div>';
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    const error = await response.json();
+                    ratingMessage.innerHTML = `<div class="alert alert-danger">Fout: ${error.error || 'Onbekende fout'}</div>`;
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Beoordeling verzenden';
+                }
+            } catch (error) {
+                ratingMessage.innerHTML = `<div class="alert alert-danger">Fout bij het verzenden: ${error.message}</div>`;
+                submitButton.disabled = false;
+                submitButton.textContent = 'Beoordeling verzenden';
+            }
+        });
+    })();
 </script>
 

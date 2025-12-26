@@ -183,6 +183,48 @@ public class CarApiClient
             throw;
         }
     }
+
+    /// <summary>
+    /// Haalt aggregated ratings op voor een auto via GET /api/ratings/car/{carId}
+    /// </summary>
+    public async Task<AggregatedRating?> GetRatingsForCarAsync(int carId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/ratings/car/{carId}");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<AggregatedRating>(_jsonOptions);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Fout bij het ophalen van ratings voor auto {CarId}", carId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Voegt een rating toe via POST /api/ratings
+    /// </summary>
+    public async Task<bool> AddRatingAsync(RatingRequest request)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/ratings", request, _jsonOptions);
+            response.EnsureSuccessStatusCode();
+            return true;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Fout bij het toevoegen van rating voor auto {CarId}", request.CarId);
+            return false;
+        }
+    }
 }
 
 
