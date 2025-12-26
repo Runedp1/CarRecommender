@@ -4,7 +4,7 @@ ASP.NET Core Razor Pages frontend voor de CarRecommender Web API.
 
 ## Vereisten
 
-- .NET 9.0 SDK
+- .NET 8.0 SDK
 - Werkende CarRecommender API (standaard: `https://app-carrecommender-dev-h0agdkbfbcb3fxg7.westeurope-01.azurewebsites.net`)
 
 ## Configuratie
@@ -110,7 +110,7 @@ CarRecommender.Web/
 - Controleer de browser console voor JavaScript errors
 
 ### Build errors
-- Zorg dat .NET 9.0 SDK geïnstalleerd is
+- Zorg dat .NET 8.0 SDK geïnstalleerd is
 - Run `dotnet restore` om packages te herstellen
 - Check of alle bestanden correct zijn aangemaakt
 

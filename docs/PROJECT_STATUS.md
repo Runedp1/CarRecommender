@@ -111,7 +111,7 @@ Recommendation System/
 ## 🔧 TECHNISCHE STACK
 
 ### Backend (C#)
-- **.NET 9.0**
+- **.NET 8.0**
 - **Console Applicatie**
 - **Clean Architecture** (3-laags: Data Model, Data, Business, Presentatie)
 

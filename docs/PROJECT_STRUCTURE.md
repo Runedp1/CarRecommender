@@ -59,7 +59,7 @@ Recommendation_System_New/
 │       ├── appsettings.json                     # API URL configuratie
 │       └── CarRecommender.Web.csproj           # Project file
 │
-├── src/                                        # Core Business Logic Library (.NET 9.0)
+├── src/                                        # Core Business Logic Library (.NET 8.0)
 │   ├── Car.cs                                  # Domain models:
 │   │                                           #   - Car
 │   │                                           #   - RecommendationResult
@@ -109,7 +109,7 @@ Recommendation_System_New/
 
 ### Backend API (`backend/CarRecommender.Api/`)
 
-**Type**: ASP.NET Core Web API (.NET 9.0)  
+**Type**: ASP.NET Core Web API (.NET 8.0)  
 **Functie**: RESTful API voor auto recommendations
 
 #### Endpoints:
@@ -148,7 +148,7 @@ Recommendation_System_New/
 
 ### Frontend Web App (`frontend/CarRecommender.Web/`)
 
-**Type**: ASP.NET Core Razor Pages (.NET 9.0)  
+**Type**: ASP.NET Core Razor Pages (.NET 8.0)  
 **Functie**: Web interface voor gebruikers
 
 #### Pagina's:
@@ -187,7 +187,7 @@ Recommendation_System_New/
 
 ### Core Library (`src/`)
 
-**Type**: .NET 9.0 Class Library  
+**Type**: .NET 8.0 Class Library  
 **Functie**: Business logic, algoritmes, data modellen
 
 #### Belangrijkste Classes:
@@ -400,18 +400,18 @@ public class ManualFilterRequest
 ## 📦 Dependencies
 
 ### Backend:
-- .NET 9.0
+- .NET 8.0
 - ASP.NET Core Web API
 - CarRecommender library (src/)
 
 ### Frontend:
-- .NET 9.0
+- .NET 8.0
 - ASP.NET Core Razor Pages
 - Bootstrap 5
 - jQuery
 
 ### Core Library:
-- .NET 9.0
+- .NET 8.0
 - System.Text.Json
 
 ---
@@ -420,12 +420,12 @@ public class ManualFilterRequest
 
 ### Backend:
 - **Platform**: Azure App Service
-- **Runtime**: .NET 9.0
+- **Runtime**: .NET 8.0
 - **Status**: ✅ Gedeployed
 
 ### Frontend:
 - **Platform**: Azure App Service (of lokaal)
-- **Runtime**: .NET 9.0
+- **Runtime**: .NET 8.0
 - **Status**: ⚠️ Configuratie aanwezig
 
 ---

@@ -4,7 +4,7 @@
 
 Dit project is een **hybride AI-aanbevelingssysteem** voor auto's met de volgende componenten:
 
-### Backend (C#/.NET 9.0 API)
+### Backend (C#/.NET 8.0 API)
 - **Locatie**: `backend/CarRecommender.Api/`
 - **Type**: ASP.NET Core Web API
 - **Functie**: RESTful API die recommendation endpoints aanbiedt
@@ -20,7 +20,7 @@ Dit project is een **hybride AI-aanbevelingssysteem** voor auto's met de volgend
 
 ### Core Library (Business Logic)
 - **Locatie**: `src/`
-- **Type**: .NET 9.0 class library
+- **Type**: .NET 8.0 class library
 - **Functie**: Bevat alle recommendation algoritmes, data modellen en business logica
 - **Gedeeld door**: Backend API en (potentieel) andere clients
 

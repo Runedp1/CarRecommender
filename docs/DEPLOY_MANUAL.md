@@ -13,7 +13,7 @@ Dit maakt een `publish` folder met alle benodigde bestanden.
 
 ## Stap 2: Maak een ZIP bestand
 
-1. Ga naar `CarRecommender.Api/bin/Release/net9.0/publish`
+1. Ga naar `CarRecommender.Api/bin/Release/net8.0/publish`
 2. Selecteer alle bestanden en folders
 3. Maak een ZIP bestand (bijv. `CarRecommender.Api.zip`)
 

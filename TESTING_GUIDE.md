@@ -6,7 +6,7 @@ Deze gids helpt je om de nieuwe functionaliteit te testen:
 
 ## Vereisten
 
-- .NET 9.0 SDK geïnstalleerd
+- .NET 8.0 SDK geïnstalleerd
 - Visual Studio of VS Code (of terminal)
 - CSV data bestand beschikbaar in `backend/CarRecommender.Api/data/`
 

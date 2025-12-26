@@ -194,7 +194,7 @@ public class UserRatingRepository : IUserRatingRepository
             {
                 id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
                 timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                location = "UserRatingRepository.cs:126",
+                location = "UserRatingRepository.cs:187",
                 message = "InitializeDatabaseAsync start",
                 data = new { dbPath = _dbPath },
                 sessionId = "debug-session",
@@ -205,28 +205,52 @@ public class UserRatingRepository : IUserRatingRepository
         }
         catch { }
         // #endregion
+        
+        // Zorg dat directory bestaat - probeer meerdere keren met fallbacks
+        string? finalDbPath = _dbPath;
         try
         {
-            // Zorg dat directory bestaat
-            try
+            var directory = Path.GetDirectoryName(_dbPath);
+            if (!string.IsNullOrEmpty(directory))
             {
-                var directory = Path.GetDirectoryName(_dbPath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                if (!Directory.Exists(directory))
                 {
                     Directory.CreateDirectory(directory);
                 }
-            }
-            catch (Exception dirEx)
-            {
-                // Als directory creation faalt, probeer temp path
-                _dbPath = Path.Combine(Path.GetTempPath(), $"user_ratings_{Guid.NewGuid()}.db");
-                _connectionString = $"Data Source={_dbPath}";
+                // Test of we kunnen schrijven
+                var testFile = Path.Combine(directory, ".test_write");
                 try
                 {
-                    Console.WriteLine($"Database directory creation gefaald, gebruik temp path: {_dbPath} (Error: {dirEx.Message})");
+                    File.WriteAllText(testFile, "test");
+                    File.Delete(testFile);
                 }
-                catch { }
+                catch
+                {
+                    // Kan niet schrijven - gebruik temp
+                    finalDbPath = Path.Combine(Path.GetTempPath(), $"user_ratings_{Guid.NewGuid()}.db");
+                }
             }
+        }
+        catch (Exception dirEx)
+        {
+            // Als directory creation faalt, gebruik temp path
+            finalDbPath = Path.Combine(Path.GetTempPath(), $"user_ratings_{Guid.NewGuid()}.db");
+            try
+            {
+                Console.WriteLine($"Database directory creation gefaald, gebruik temp path: {finalDbPath} (Error: {dirEx.Message})");
+            }
+            catch { }
+        }
+        
+        // Update connection string als pad is veranderd
+        if (finalDbPath != _dbPath)
+        {
+            _dbPath = finalDbPath;
+            _connectionString = $"Data Source={_dbPath}";
+        }
+        
+        try
+        {
 
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync();

@@ -6,7 +6,7 @@ Deze handleiding legt uit hoe je de CarRecommender.Api naar Azure App Service ku
 
 - Azure for Students subscription (gratis)
 - Visual Studio Code met Azure extensie geïnstalleerd
-- .NET 9.0 SDK geïnstalleerd
+- .NET 8.0 SDK geïnstalleerd
 - Azure CLI (optioneel, voor alternatieve deployment methoden)
 
 ## Stap 1: Lokaal Builden en Testen
@@ -96,7 +96,7 @@ Voor Azure deployment moet je de CSV data bestanden meenemen. Zorg ervoor dat:
 3. Kies of maak een Resource Group
 4. Geef je App Service een naam (bijv. `carrecommender-api`)
 5. Kies "Linux" als OS (gratis plan werkt alleen op Linux)
-6. Kies ".NET 9" als runtime stack
+6. Kies ".NET 8" als runtime stack
 7. Kies "F1 Free" als App Service Plan
 8. Wacht tot de App Service is aangemaakt
 
@@ -208,7 +208,7 @@ curl -X POST "https://<jouw-app-name>.azurewebsites.net/api/recommendations/text
 ### Probleem: Deployment faalt
 
 **Oplossing:**
-1. Controleer of je .NET 9.0 SDK hebt geïnstalleerd
+1. Controleer of je .NET 8.0 SDK hebt geïnstalleerd
 2. Controleer of alle packages correct zijn gerestored
 3. Probeer eerst lokaal te builden: `dotnet build -c Release`
 

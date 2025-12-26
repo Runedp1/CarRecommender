@@ -69,7 +69,7 @@ Het project volgt een **clean architecture** met duidelijke scheiding van verant
 ## Hoe te Gebruiken
 
 ### Vereisten
-- .NET 9.0 SDK
+- .NET 8.0 SDK
 - Python 3.x (voor data processing scripts)
 
 ### C# Applicatie Uitvoeren

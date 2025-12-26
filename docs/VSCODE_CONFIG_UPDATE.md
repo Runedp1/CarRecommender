@@ -9,7 +9,7 @@ Na de project herstructurering zijn de VS Code configuratiebestanden bijgewerkt:
 - ✅ `publish-release` task: Pad bijgewerkt naar `backend/CarRecommender.Api/CarRecommender.Api.csproj`
 
 ### `.vscode/settings.json`
-- ✅ `appService.deploySubpath`: Bijgewerkt naar `backend/CarRecommender.Api/bin/Release/net9.0/publish`
+- ✅ `appService.deploySubpath`: Bijgewerkt naar `backend/CarRecommender.Api/bin/Release/net8.0/publish`
 
 ---
 
@@ -17,11 +17,11 @@ Na de project herstructurering zijn de VS Code configuratiebestanden bijgewerkt:
 
 ### Oude Paden (Werken niet meer):
 - ❌ `CarRecommender.Api/CarRecommender.Api.csproj`
-- ❌ `CarRecommender.Api/bin/Release/net9.0/publish`
+- ❌ `CarRecommender.Api/bin/Release/net8.0/publish`
 
 ### Nieuwe Paden (Correct):
 - ✅ `backend/CarRecommender.Api/CarRecommender.Api.csproj`
-- ✅ `backend/CarRecommender.Api/bin/Release/net9.0/publish`
+- ✅ `backend/CarRecommender.Api/bin/Release/net8.0/publish`
 
 ---
 

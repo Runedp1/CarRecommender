@@ -80,7 +80,7 @@ Deze guide helpt je om het **CarRecommender.Web** frontend project te deployen n
 1. In het Publish profiel venster, klik op **"Edit"** of **"Bewerken"**
 2. Controleer de volgende instellingen:
    - **Configuration:** `Release` (voor productie)
-   - **Target Framework:** `net9.0`
+   - **Target Framework:** `net8.0`
    - **Deployment Mode:** `Framework-Dependent` (aanbevolen) of `Self-Contained`
 3. Klik op **"Save"** of **"Opslaan"**
 
@@ -202,7 +202,7 @@ Open `https://localhost:7001` en test of de API calls werken.
 
 **Laatste update:** $(date)
 **Project:** CarRecommender.Web
-**Target Framework:** .NET 9.0
+**Target Framework:** .NET 8.0
 
 
 

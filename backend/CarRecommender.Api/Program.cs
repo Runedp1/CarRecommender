@@ -150,6 +150,7 @@ builder.Services.AddSingleton<IUserRatingRepository>(sp =>
     
     // Initialiseer database asynchroon bij startup (met error handling om crashes te voorkomen)
     // Gebruik ConfigureAwait(false) om deadlocks te voorkomen
+    // BELANGRIJK: Als database init faalt, laat app gewoon doorgaan zonder user ratings
     _ = Task.Run(async () =>
     {
         try
@@ -158,13 +159,13 @@ builder.Services.AddSingleton<IUserRatingRepository>(sp =>
             DebugLog("Program.cs:85", "Database init task started", null, "A");
             // #endregion
             // Wacht even zodat app kan starten
-            await Task.Delay(2000).ConfigureAwait(false);
+            await Task.Delay(3000).ConfigureAwait(false);
             
             // #region agent log
             DebugLog("Program.cs:90", "Starting database initialization", null, "A");
             // #endregion
             // Probeer database te initialiseren met retry logic
-            int retries = 3;
+            int retries = 2; // Minder retries om sneller te falen
             for (int i = 0; i < retries; i++)
             {
                 try
@@ -176,16 +177,27 @@ builder.Services.AddSingleton<IUserRatingRepository>(sp =>
                     // #region agent log
                     DebugLog("Program.cs:98", "Database init success", new { attempt = i + 1 }, "A");
                     // #endregion
+                    var logger = sp.GetService<ILogger<Program>>();
                     logger?.LogInformation("User Ratings Database succesvol geïnitialiseerd");
-                    break;
+                    return; // Success - exit
                 }
                 catch (Exception retryEx) when (i < retries - 1)
                 {
                     // #region agent log
                     DebugLog("Program.cs:102", "Database init retry", new { attempt = i + 1, error = retryEx.Message }, "A");
                     // #endregion
+                    var logger = sp.GetService<ILogger<Program>>();
                     logger?.LogWarning(retryEx, "Database initialisatie poging {Attempt} gefaald, retry...", i + 1);
-                    await Task.Delay(1000 * (i + 1)).ConfigureAwait(false);
+                    await Task.Delay(2000).ConfigureAwait(false); // Kortere delay
+                }
+                catch (Exception finalEx)
+                {
+                    // #region agent log
+                    DebugLog("Program.cs:102", "Database init final failure", new { attempt = i + 1, error = finalEx.Message }, "A");
+                    // #endregion
+                    var logger = sp.GetService<ILogger<Program>>();
+                    logger?.LogWarning(finalEx, "User Ratings Database initialisatie gefaald na alle retries. App blijft werken zonder user ratings.");
+                    return; // Fail gracefully - app blijft werken
                 }
             }
         }
@@ -194,8 +206,9 @@ builder.Services.AddSingleton<IUserRatingRepository>(sp =>
             // #region agent log
             DebugLog("Program.cs:109", "Database init task failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "A");
             // #endregion
-            // Log error maar laat app niet crashen
-            logger?.LogError(ex, "Fout bij initialiseren van User Ratings Database na alle retries. Collaborative filtering wordt uitgeschakeld.");
+            // Log error maar laat app niet crashen - app blijft werken zonder user ratings
+            var logger = sp.GetService<ILogger<Program>>();
+            logger?.LogWarning(ex, "User Ratings Database initialisatie gefaald. App blijft werken zonder user ratings.");
         }
     });
     
@@ -465,7 +478,7 @@ DebugLog("Program.cs:322", "Controllers mapped, app ready to run", null, "A");
 //
 // 2. Publiceer via Azure CLI:
 //    dotnet publish -c Release
-//    az webapp deploy --name <app-name> --resource-group <resource-group> --src-path bin/Release/net9.0/publish
+//    az webapp deploy --name <app-name> --resource-group <resource-group> --src-path bin/Release/net8.0/publish
 //
 // 3. Voor productie:
 //    - Zet app.Environment.IsDevelopment() op false of gebruik appsettings.Production.json

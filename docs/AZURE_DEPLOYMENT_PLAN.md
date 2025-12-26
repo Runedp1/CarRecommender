@@ -10,7 +10,7 @@
 ```
 ┌─────────────────────────────────────────────────┐
 │         Azure App Service (Web API)             │  ← REST API voor recommendations
-│         .NET 9.0 ASP.NET Core                   │
+│         .NET 8.0 ASP.NET Core                   │
 └─────────────────────────────────────────────────┘
                       │
          ┌────────────┴────────────┐
@@ -191,7 +191,7 @@ df.to_sql('Cars', engine, if_exists='replace', index=False)
 #### 2.1 Nieuw ASP.NET Core Project
 ```bash
 cd "Recommendation System"
-dotnet new webapi -n CarRecommender.Api -f net9.0
+dotnet new webapi -n CarRecommender.Api -f net8.0
 ```
 
 #### 2.2 Entity Framework Core Setup

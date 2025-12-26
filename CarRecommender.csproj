@@ -4,7 +4,7 @@
     <!-- Conditionally set OutputType: Library when referenced by API, Exe when standalone -->
     <OutputType Condition="'$(IsReferencedByApi)' != 'true'">Exe</OutputType>
     <OutputType Condition="'$(IsReferencedByApi)' == 'true'">Library</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>CarRecommender</RootNamespace>
