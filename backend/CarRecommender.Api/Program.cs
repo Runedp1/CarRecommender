@@ -77,7 +77,30 @@ builder.Services.AddSingleton<ICarRepository>(sp =>
 // Registreer feedback services voor continue learning
 builder.Services.AddSingleton<IFeedbackRepository, FeedbackRepository>();
 builder.Services.AddSingleton<FeedbackTrackingService>();
-builder.Services.AddSingleton<MlRecommendationService>();
+// #region agent log
+DebugLog("Program.cs:77", "MlRecommendationService registration start", null, "C");
+// #endregion
+builder.Services.AddSingleton<MlRecommendationService>(sp =>
+{
+    // #region agent log
+    DebugLog("Program.cs:80", "MlRecommendationService factory start", null, "C");
+    // #endregion
+    try
+    {
+        var service = new MlRecommendationService();
+        // #region agent log
+        DebugLog("Program.cs:80", "MlRecommendationService factory success", null, "C");
+        // #endregion
+        return service;
+    }
+    catch (Exception ex)
+    {
+        // #region agent log
+        DebugLog("Program.cs:80", "MlRecommendationService factory failed", new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name }, "C");
+        // #endregion
+        throw;
+    }
+});
 
 // Registreer session service voor user ID management (GEEN echte authentication)
 builder.Services.AddSingleton<SessionUserService>();
@@ -352,122 +375,124 @@ builder.Services.AddControllers()
 // #region agent log
 DebugLog("Program.cs:218", "Building application", null, "A");
 // #endregion
-var app = builder.Build();
-// #region agent log
-DebugLog("Program.cs:218", "Application built successfully", null, "A");
-// #endregion
-
-// ============================================================================
-// HTTP REQUEST PIPELINE CONFIGURATIE
-// ============================================================================
-// Deze sectie configureert hoe HTTP requests worden verwerkt.
-
-// In development mode: toon Swagger UI voor API testing
-if (app.Environment.IsDevelopment())
+try
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    var app = builder.Build();
+    // #region agent log
+    DebugLog("Program.cs:218", "Application built successfully", null, "A");
+    // #endregion
 
-// HTTPS redirect (veiligheid) - alleen lokaal, Azure handelt dit zelf af
-if (app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
+    // ============================================================================
+    // HTTP REQUEST PIPELINE CONFIGURATIE
+    // ============================================================================
+    // Deze sectie configureert hoe HTTP requests worden verwerkt.
 
-// Session middleware (voor session-based user IDs)
-app.UseSession();
-
-// CORS middleware - moet vóór UseRouting/MapControllers komen
-app.UseCors();
-
-// Serve static files (voor lokale auto-afbeeldingen uit images/ directory)
-// Dit maakt afbeeldingen beschikbaar via /images/{filename}.jpg
-app.UseStaticFiles();
-
-// Serve images from backend/images directory
-// Probeer verschillende locaties (lokaal en Azure)
-string[] possibleImagePaths = new[]
-{
-    Path.Combine(builder.Environment.ContentRootPath, "..", "backend", "images"), // Lokaal development
-    Path.Combine(builder.Environment.ContentRootPath, "images"), // Azure deployment
-    Path.Combine(builder.Environment.ContentRootPath, "backend", "images"), // Alternatief lokaal
-    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "images"), // Azure runtime
-    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backend", "images") // Alternatief Azure
-};
-
-string? imagesPath = null;
-foreach (var path in possibleImagePaths)
-{
-    if (Directory.Exists(path))
+    // In development mode: toon Swagger UI voor API testing
+    if (app.Environment.IsDevelopment())
     {
-        imagesPath = path;
-        break;
+        app.UseSwagger();
+        app.UseSwaggerUI();
     }
-}
 
-if (!string.IsNullOrEmpty(imagesPath))
-{
-    app.UseStaticFiles(new StaticFileOptions
+    // HTTPS redirect (veiligheid) - alleen lokaal, Azure handelt dit zelf af
+    if (app.Environment.IsDevelopment())
     {
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(imagesPath),
-        RequestPath = "/images"
-    });
-    Console.WriteLine($"Images directory geconfigureerd: {imagesPath}");
-}
-else
-{
-    Console.WriteLine($"Waarschuwing: Images directory niet gevonden. Gezocht in:");
+        app.UseHttpsRedirection();
+    }
+
+    // Session middleware (voor session-based user IDs)
+    app.UseSession();
+
+    // CORS middleware - moet vóór UseRouting/MapControllers komen
+    app.UseCors();
+
+    // Serve static files (voor lokale auto-afbeeldingen uit images/ directory)
+    // Dit maakt afbeeldingen beschikbaar via /images/{filename}.jpg
+    app.UseStaticFiles();
+
+    // Serve images from backend/images directory
+    // Probeer verschillende locaties (lokaal en Azure)
+    string[] possibleImagePaths = new[]
+    {
+        Path.Combine(builder.Environment.ContentRootPath, "..", "backend", "images"), // Lokaal development
+        Path.Combine(builder.Environment.ContentRootPath, "images"), // Azure deployment
+        Path.Combine(builder.Environment.ContentRootPath, "backend", "images"), // Alternatief lokaal
+        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "images"), // Azure runtime
+        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backend", "images") // Alternatief Azure
+    };
+
+    string? imagesPath = null;
     foreach (var path in possibleImagePaths)
     {
-        Console.WriteLine($"  - {path}");
-    }
-}
-
-// ============================================================================
-// GLOBALE FOUTAFHANDELING VOOR AZURE PRODUCTION
-// ============================================================================
-// Deze middleware vangt onverwachte exceptions op en geeft een nette 500 response
-// In Production loggen we de echte exception maar geven we geen details aan de client
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.StatusCode = 500;
-        context.Response.ContentType = "application/json";
-
-        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-        var exceptionHandlerFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
-        
-        if (exceptionHandlerFeature?.Error != null)
+        if (Directory.Exists(path))
         {
-            var exception = exceptionHandlerFeature.Error;
-            
-            // Log de echte exception voor debugging (alleen in Azure logs, niet naar client)
-            logger.LogError(exception, "Onverwachte fout opgetreden tijdens verwerking van request: {Path}", 
-                context.Request.Path);
-            
-            // Geef generieke foutmelding aan client (veiligheid)
-            var response = new { error = "Er is een interne serverfout opgetreden. Probeer het later opnieuw." };
-            await context.Response.WriteAsJsonAsync(response);
+            imagesPath = path;
+            break;
         }
+    }
+
+    if (!string.IsNullOrEmpty(imagesPath))
+    {
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(imagesPath),
+            RequestPath = "/images"
+        });
+        Console.WriteLine($"Images directory geconfigureerd: {imagesPath}");
+    }
+    else
+    {
+        Console.WriteLine($"Waarschuwing: Images directory niet gevonden. Gezocht in:");
+        foreach (var path in possibleImagePaths)
+        {
+            Console.WriteLine($"  - {path}");
+        }
+    }
+
+    // ============================================================================
+    // GLOBALE FOUTAFHANDELING VOOR AZURE PRODUCTION
+    // ============================================================================
+    // Deze middleware vangt onverwachte exceptions op en geeft een nette 500 response
+    // In Production loggen we de echte exception maar geven we geen details aan de client
+    app.UseExceptionHandler(errorApp =>
+    {
+        errorApp.Run(async context =>
+        {
+            context.Response.StatusCode = 500;
+            context.Response.ContentType = "application/json";
+
+            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+            var exceptionHandlerFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+            
+            if (exceptionHandlerFeature?.Error != null)
+            {
+                var exception = exceptionHandlerFeature.Error;
+                
+                // Log de echte exception voor debugging (alleen in Azure logs, niet naar client)
+                logger.LogError(exception, "Onverwachte fout opgetreden tijdens verwerking van request: {Path}", 
+                    context.Request.Path);
+                
+                // Geef generieke foutmelding aan client (veiligheid)
+                var response = new { error = "Er is een interne serverfout opgetreden. Probeer het later opnieuw." };
+                await context.Response.WriteAsJsonAsync(response);
+            }
+        });
     });
-});
 
 // ============================================================================
 // ROUTING CONFIGURATIE
 // ============================================================================
-// Map controllers naar routes (bijv. /api/cars, /api/recommendations)
-// Deze routes werken zowel in Development als Production
-app.MapControllers();
+    // Map controllers naar routes (bijv. /api/cars, /api/recommendations)
+    // Deze routes werken zowel in Development als Production
+    app.MapControllers();
 
-// #region agent log
-DebugLog("Program.cs:322", "Controllers mapped, app ready to run", null, "A");
-// #endregion
+    // #region agent log
+    DebugLog("Program.cs:322", "Controllers mapped, app ready to run", null, "A");
+    // #endregion
 
-// ============================================================================
-// AZURE DEPLOYMENT NOTES
-// ============================================================================
+    // ============================================================================
+    // AZURE DEPLOYMENT NOTES
+    // ============================================================================
 // Om deze API naar Azure App Service te publiceren:
 // 
 // 1. Publiceer via Visual Studio:
@@ -491,4 +516,15 @@ DebugLog("Program.cs:322", "Controllers mapped, app ready to run", null, "A");
 //    - Registreer SqlCarRepository in plaats van CarRepository hierboven
 //    - De rest van de code blijft hetzelfde werken!
 
-app.Run();
+    // #region agent log
+    DebugLog("Program.cs:519", "Starting application", null, "A");
+    // #endregion
+    app.Run();
+}
+catch (Exception ex)
+{
+    // #region agent log
+    DebugLog("Program.cs:523", "Application startup failed", new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name }, "A");
+    // #endregion
+    throw;
+}

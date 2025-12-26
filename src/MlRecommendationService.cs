@@ -64,7 +64,112 @@ public class MlRecommendationService
 
     public MlRecommendationService()
     {
-        _mlContext = new MLContext(seed: 0);
+        // #region agent log
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logDir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                Directory.CreateDirectory(logDir);
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "MlRecommendationService.cs:65",
+                message = "MlRecommendationService constructor start",
+                data = new { },
+                sessionId = "debug-session",
+                runId = "startup",
+                hypothesisId = "A"
+            });
+            File.AppendAllText(logPath, logEntry + Environment.NewLine);
+        }
+        catch { }
+        // #endregion
+        try
+        {
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "MlRecommendationService.cs:67",
+                    message = "MLContext creation start",
+                    data = new { },
+                    sessionId = "debug-session",
+                    runId = "startup",
+                    hypothesisId = "B"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            _mlContext = new MLContext(seed: 0);
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "MlRecommendationService.cs:69",
+                    message = "MLContext creation success",
+                    data = new { },
+                    sessionId = "debug-session",
+                    runId = "startup",
+                    hypothesisId = "B"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+        }
+        catch (Exception ex)
+        {
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "MlRecommendationService.cs:71",
+                    message = "MLContext creation failed",
+                    data = new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name },
+                    sessionId = "debug-session",
+                    runId = "startup",
+                    hypothesisId = "B"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            throw;
+        }
+        // #region agent log
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "MlRecommendationService.cs:73",
+                message = "MlRecommendationService constructor success",
+                data = new { },
+                sessionId = "debug-session",
+                runId = "startup",
+                hypothesisId = "A"
+            });
+            File.AppendAllText(logPath, logEntry + Environment.NewLine);
+        }
+        catch { }
+        // #endregion
     }
 
     /// <summary>
