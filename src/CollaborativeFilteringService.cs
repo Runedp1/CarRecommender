@@ -26,10 +26,42 @@ public class CollaborativeFilteringService
         int carId, 
         UserPreferenceSnapshot currentUserPreferences)
     {
+        // #region agent log
+        var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        try {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+            var logEntry = new {
+                location = "CollaborativeFilteringService.cs:CalculateCollaborativeScoreAsync",
+                message = "Method entry",
+                data = new { carId = carId },
+                timestamp = startTime,
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "A"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch {}
+        // #endregion
         // Vind ratings van gebruikers met gelijkaardige preferences
         var similarRatings = await _ratingRepository.FindSimilarUserRatingsAsync(
             currentUserPreferences, 
             limit: 100);
+        // #region agent log
+        var queryEndTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        try {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+            var logEntry = new {
+                location = "CollaborativeFilteringService.cs:CalculateCollaborativeScoreAsync",
+                message = "Database query completed",
+                data = new { carId = carId, ratingCount = similarRatings?.Count ?? 0, queryDurationMs = queryEndTime - startTime },
+                timestamp = queryEndTime,
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "A"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch {}
+        // #endregion
 
         // Filter op deze specifieke auto
         var carRatings = similarRatings

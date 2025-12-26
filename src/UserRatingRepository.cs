@@ -281,8 +281,43 @@ public class UserRatingRepository : IUserRatingRepository
 
     public async Task<List<UserRating>> FindSimilarUserRatingsAsync(UserPreferenceSnapshot preferences, int limit = 50)
     {
+        // #region agent log
+        var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        try {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+            var logEntry = new {
+                location = "UserRatingRepository.cs:FindSimilarUserRatingsAsync",
+                message = "Method entry",
+                data = new { limit = limit },
+                timestamp = startTime,
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "B"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch {}
+        // #endregion
         using var connection = new SqliteConnection(_connectionString);
+        // #region agent log
+        var beforeOpen = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        // #endregion
         await connection.OpenAsync();
+        // #region agent log
+        var afterOpen = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        try {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+            var logEntry = new {
+                location = "UserRatingRepository.cs:FindSimilarUserRatingsAsync",
+                message = "Database connection opened",
+                data = new { openDurationMs = afterOpen - beforeOpen },
+                timestamp = afterOpen,
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "B"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch {}
+        // #endregion
 
         // Haal alle ratings op met preferences
         var selectCommand = @"
@@ -341,12 +376,29 @@ public class UserRatingRepository : IUserRatingRepository
         }
 
         // Sorteer op similarity en rating, pak top N
-        return similarRatings
+        var result = similarRatings
             .OrderByDescending(x => x.similarity)
             .ThenByDescending(x => x.rating.Rating)
             .Take(limit)
             .Select(x => x.rating)
             .ToList();
+        // #region agent log
+        var endTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        try {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+            var logEntry = new {
+                location = "UserRatingRepository.cs:FindSimilarUserRatingsAsync",
+                message = "Method exit",
+                data = new { resultCount = result.Count, totalDurationMs = endTime - startTime },
+                timestamp = endTime,
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "B"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch {}
+        // #endregion
+        return result;
     }
 
     public async Task<List<(int CarId, double AverageRating, int Count)>> GetTopRatedCarsForPreferencesAsync(

@@ -212,9 +212,39 @@ public class RecommendationService : IRecommendationService
     /// </summary>
     public async Task<List<RecommendationResult>> RecommendFromTextAsync(string inputText, int n = 5)
     {
+        // #region agent log
+        try {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+            var logEntry = new {
+                location = "RecommendationService.cs:RecommendFromTextAsync",
+                message = "Method entry",
+                data = new { inputText = inputText?.Substring(0, Math.Min(50, inputText?.Length ?? 0)), n = n },
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "A"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch {}
+        // #endregion
         EnsureInitialized();
         
         List<Car> allCars = _carRepository.GetAllCars();
+        // #region agent log
+        try {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+            var logEntry = new {
+                location = "RecommendationService.cs:RecommendFromTextAsync",
+                message = "Cars loaded",
+                data = new { totalCars = allCars.Count },
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "A"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch {}
+        // #endregion
         
         // Parse tekst naar preferences
         UserPreferences prefs = _textParser.ParsePreferencesFromText(inputText);
@@ -228,6 +258,21 @@ public class RecommendationService : IRecommendationService
         {
             candidateCars = allCars;
         }
+        // #region agent log
+        try {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+            var logEntry = new {
+                location = "RecommendationService.cs:RecommendFromTextAsync",
+                message = "Starting candidate processing",
+                data = new { candidateCount = candidateCars.Count, hasCollaborativeService = _collaborativeService != null },
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "A"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch {}
+        // #endregion
 
         // NEW AI: Content-based similarity + Advanced scoring
         // Maak ideale feature vector op basis van preferences
@@ -236,6 +281,7 @@ public class RecommendationService : IRecommendationService
         // Bereken similarity en ranking scores voor alle candidate auto's met geavanceerde scoring
         List<RecommendationResult> results = new List<RecommendationResult>();
 
+        int carIndex = 0;
         foreach (Car car in candidateCars)
         {
             // Skip auto's zonder geldige data
@@ -262,6 +308,22 @@ public class RecommendationService : IRecommendationService
             CollaborativeScore? collaborativeScore = null;
             if (_collaborativeService != null)
             {
+                // #region agent log
+                var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                try {
+                    var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+                    var logEntry = new {
+                        location = "RecommendationService.cs:RecommendFromTextAsync",
+                        message = "Starting collaborative filtering",
+                        data = new { carId = car.Id, carIndex = carIndex, totalCandidates = candidateCars.Count },
+                        timestamp = startTime,
+                        sessionId = "debug-session",
+                        runId = "run1",
+                        hypothesisId = "A"
+                    };
+                    await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+                } catch {}
+                // #endregion
                 try
                 {
                     var prefsSnapshot = new UserPreferenceSnapshot
@@ -277,6 +339,23 @@ public class RecommendationService : IRecommendationService
                     };
 
                     collaborativeScore = await _collaborativeService.CalculateCollaborativeScoreAsync(car.Id, prefsSnapshot);
+                    // #region agent log
+                    var endTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    var duration = endTime - startTime;
+                    try {
+                        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+                        var logEntry = new {
+                            location = "RecommendationService.cs:RecommendFromTextAsync",
+                            message = "Collaborative filtering completed",
+                            data = new { carId = car.Id, durationMs = duration, hasData = collaborativeScore?.HasCollaborativeData ?? false },
+                            timestamp = endTime,
+                            sessionId = "debug-session",
+                            runId = "run1",
+                            hypothesisId = "A"
+                        };
+                        await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+                    } catch {}
+                    // #endregion
                     
                     // Collaborative score heeft 15% gewicht
                     if (collaborativeScore.HasCollaborativeData)
@@ -284,11 +363,27 @@ public class RecommendationService : IRecommendationService
                         finalScore = (finalScore * 0.85) + (collaborativeScore.Score * 0.15);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    // #region agent log
+                    try {
+                        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+                        var logEntry = new {
+                            location = "RecommendationService.cs:RecommendFromTextAsync",
+                            message = "Collaborative filtering exception",
+                            data = new { carId = car.Id, error = ex.Message, stackTrace = ex.StackTrace?.Substring(0, Math.Min(200, ex.StackTrace?.Length ?? 0)) },
+                            timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                            sessionId = "debug-session",
+                            runId = "run1",
+                            hypothesisId = "C"
+                        };
+                        await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+                    } catch {}
+                    // #endregion
                     // Fail silently - collaborative filtering is optioneel
                 }
             }
+            carIndex++;
 
             string explanation = _explanationBuilder.BuildExplanation(car, prefs, finalScore, collaborativeScore);
 

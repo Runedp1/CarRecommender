@@ -443,7 +443,9 @@ public class AdvancedScoringService
         string preferredBodyType = preferences.BodyTypePreference.ToLower().Trim();
 
         // Exacte match
-        if (carBodyType == preferredBodyType)
+        if (carBodyType == preferredBodyType)  
+
+    
             return 1.0;
 
         // Gedeeltelijke match

@@ -196,6 +196,22 @@ public class CarApiClient
     /// </summary>
     public async Task<List<RecommendationResult>?> GetRecommendationsFromTextAsync(string text, int top = 5)
     {
+        // #region agent log
+        var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        try {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+            var logEntry = new {
+                location = "CarApiClient.cs:GetRecommendationsFromTextAsync",
+                message = "Method entry",
+                data = new { text = text?.Substring(0, Math.Min(50, text?.Length ?? 0)), top = top },
+                timestamp = startTime,
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId = "D"
+            };
+            await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+        } catch {}
+        // #endregion
         try
         {
             var request = new RecommendationTextRequest
@@ -204,14 +220,68 @@ public class CarApiClient
                 Top = top
             };
 
+            // #region agent log
+            var beforeRequest = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            // #endregion
             var response = await _httpClient.PostAsJsonAsync("/api/recommendations/text", request, _jsonOptions);
+            // #region agent log
+            var afterRequest = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            try {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+                var logEntry = new {
+                    location = "CarApiClient.cs:GetRecommendationsFromTextAsync",
+                    message = "API response received",
+                    data = new { statusCode = (int)response.StatusCode, requestDurationMs = afterRequest - beforeRequest },
+                    timestamp = afterRequest,
+                    sessionId = "debug-session",
+                    runId = "run1",
+                    hypothesisId = "D"
+                };
+                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+            } catch {}
+            // #endregion
             response.EnsureSuccessStatusCode();
             
             return await response.Content.ReadFromJsonAsync<List<RecommendationResult>>(_jsonOptions);
         }
         catch (HttpRequestException ex)
         {
+            // #region agent log
+            try {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+                var logEntry = new {
+                    location = "CarApiClient.cs:GetRecommendationsFromTextAsync",
+                    message = "HttpRequestException",
+                    data = new { error = ex.Message, innerException = ex.InnerException?.Message },
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    sessionId = "debug-session",
+                    runId = "run1",
+                    hypothesisId = "D"
+                };
+                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+            } catch {}
+            // #endregion
             _logger.LogError(ex, "Fout bij het ophalen van recommendations op basis van tekst: {Text}", text);
+            throw;
+        }
+        catch (TaskCanceledException ex)
+        {
+            // #region agent log
+            try {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log");
+                var logEntry = new {
+                    location = "CarApiClient.cs:GetRecommendationsFromTextAsync",
+                    message = "TaskCanceledException (timeout)",
+                    data = new { error = ex.Message },
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    sessionId = "debug-session",
+                    runId = "run1",
+                    hypothesisId = "D"
+                };
+                await System.IO.File.AppendAllTextAsync(logPath, System.Text.Json.JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+            } catch {}
+            // #endregion
+            _logger.LogError(ex, "Timeout bij het ophalen van recommendations op basis van tekst: {Text}", text);
             throw;
         }
     }
