@@ -324,30 +324,28 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         // CORS: Allow frontend origins
-        // Note: Wildcards don't work with AllowCredentials, so we list specific origins
-        var allowedOrigins = new[]
+        // Use SetIsOriginAllowed to allow Azure App Service URLs dynamically
+        policy.SetIsOriginAllowed(origin =>
         {
-            "http://localhost:7000",
-            "https://localhost:7001",
-            "https://pp-carrecommender-web-dev.azurewebsites.net",
-            "https://pp-carrecommender-web-dev-gaaehxe3hahvejah.scm.francecentral-01.azurewebsites.net",
-            "https://pp-carrecommender-web-dev-gaaehxe3hahvejah.francecentral-01.azurewebsites.net"
-        };
-        
-        // In Development, allow any origin for easier testing
-        if (builder.Environment.IsDevelopment())
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        }
-        else
-        {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();
-        }
+            // Allow localhost for development
+            if (origin.StartsWith("http://localhost:") || origin.StartsWith("https://localhost:"))
+                return true;
+            
+            // Allow any Azure App Service URL (ends with .azurewebsites.net or .scm.azurewebsites.net)
+            if (origin.EndsWith(".azurewebsites.net") || origin.EndsWith(".scm.azurewebsites.net"))
+                return true;
+            
+            // Allow specific known origins
+            var allowedOrigins = new[]
+            {
+                "https://pp-carrecommender-web-dev.azurewebsites.net"
+            };
+            
+            return allowedOrigins.Contains(origin);
+        })
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials();
     });
 });
 
