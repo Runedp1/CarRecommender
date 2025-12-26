@@ -326,11 +326,15 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 "http://localhost:7000", 
                 "https://localhost:7001",
-                "https://pp-carrecommender-web-dev.azurewebsites.net"
+                "https://pp-carrecommender-web-dev.azurewebsites.net",
+                "https://pp-carrecommender-web-dev-gaaehxe3hahvejah.scm.francecentral-01.azurewebsites.net",
+                "https://pp-carrecommender-web-dev-gaaehxe3hahvejah.francecentral-01.azurewebsites.net",
+                "https://*.azurewebsites.net"  // Allow all Azure App Service subdomains
               )
               .AllowAnyMethod()
               .AllowAnyHeader()
-              .AllowCredentials();
+              .AllowCredentials()
+              .SetIsOriginAllowedToAllowWildcardSubdomains();
     });
 });
 

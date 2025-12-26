@@ -341,7 +341,14 @@
             ratingMessage.innerHTML = '';
 
             try {
-                const response = await fetch(`${apiBaseUrl}/api/ratings`, {
+                // Gebruik relatieve URL als apiBaseUrl leeg is (same-origin)
+                const apiUrl = apiBaseUrl && apiBaseUrl.trim() !== '' 
+                    ? `${apiBaseUrl}/api/ratings` 
+                    : '/api/ratings';
+                
+                console.log('Sending rating to:', apiUrl, 'with data:', { carId, rating: selectedRating });
+                
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
