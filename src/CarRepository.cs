@@ -30,9 +30,76 @@ public class CarRepository : ICarRepository
     /// </summary>
     public CarRepository(string csvFileName = "Cleaned_Car_Data_For_App_Fully_Enriched.csv", string dataDirectory = "data")
     {
+        // #region agent log
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logDir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                Directory.CreateDirectory(logDir);
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "CarRepository.cs:31",
+                message = "CarRepository constructor start",
+                data = new { csvFileName, dataDirectory },
+                sessionId = "debug-session",
+                runId = "startup",
+                hypothesisId = "B"
+            });
+            File.AppendAllText(logPath, logEntry + Environment.NewLine);
+        }
+        catch { }
+        // #endregion
         _csvFileName = csvFileName;
         _dataDirectory = dataDirectory;
-        LoadCarsFromCsv();
+        try
+        {
+            LoadCarsFromCsv();
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "CarRepository.cs:35",
+                    message = "CarRepository LoadCarsFromCsv success",
+                    data = new { carCount = _cars.Count },
+                    sessionId = "debug-session",
+                    runId = "startup",
+                    hypothesisId = "B"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+        }
+        catch (Exception ex)
+        {
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "CarRepository.cs:35",
+                    message = "CarRepository LoadCarsFromCsv failed",
+                    data = new { error = ex.Message, stackTrace = ex.StackTrace },
+                    sessionId = "debug-session",
+                    runId = "startup",
+                    hypothesisId = "B"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            throw;
+        }
     }
 
     /// <summary>

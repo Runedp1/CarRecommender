@@ -16,12 +16,53 @@ public class RetrainingBackgroundService : BackgroundService
         IServiceProvider serviceProvider,
         ILogger<RetrainingBackgroundService> logger)
     {
+        // #region agent log
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logDir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                Directory.CreateDirectory(logDir);
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "RetrainingBackgroundService.cs:18",
+                message = "RetrainingBackgroundService constructor",
+                data = new { },
+                sessionId = "debug-session",
+                runId = "startup",
+                hypothesisId = "D"
+            });
+            File.AppendAllText(logPath, logEntry + Environment.NewLine);
+        }
+        catch { }
+        // #endregion
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // #region agent log
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "RetrainingBackgroundService.cs:23",
+                message = "RetrainingBackgroundService ExecuteAsync start",
+                data = new { },
+                sessionId = "debug-session",
+                runId = "startup",
+                hypothesisId = "D"
+            });
+            File.AppendAllText(logPath, logEntry + Environment.NewLine);
+        }
+        catch { }
+        // #endregion
         _logger.LogInformation("Retraining background service gestart. Check interval: {Interval} minuten", 
             _checkInterval.TotalMinutes);
 

@@ -1,7 +1,38 @@
 using CarRecommender;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+
+// #region agent log
+static void DebugLog(string location, string message, object? data = null, string hypothesisId = "")
+{
+    try
+    {
+        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+        var logDir = Path.GetDirectoryName(logPath);
+        if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+            Directory.CreateDirectory(logDir);
+        var logEntry = new
+        {
+            id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+            timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            location = location,
+            message = message,
+            data = data ?? new { },
+            sessionId = "debug-session",
+            runId = "startup",
+            hypothesisId = hypothesisId
+        };
+        File.AppendAllText(logPath, JsonSerializer.Serialize(logEntry) + Environment.NewLine);
+    }
+    catch { }
+}
+// #endregion
 
 var builder = WebApplication.CreateBuilder(args);
+
+// #region agent log
+DebugLog("Program.cs:4", "Application startup begin", new { environment = builder.Environment.EnvironmentName }, "A");
+// #endregion
 
 // ============================================================================
 // CONFIGURATIE LEZEN
@@ -21,7 +52,27 @@ var dataDirectory = builder.Configuration["DataSettings:DataDirectory"] ?? "data
 // Singleton betekent dat er één instantie is voor de hele applicatie levensduur.
 // Dit is efficiënt omdat we de CSV één keer inlezen en dan hergebruiken.
 // Geef configuratie door aan CarRepository via factory pattern
-builder.Services.AddSingleton<ICarRepository>(sp => new CarRepository(csvFileName, dataDirectory));
+builder.Services.AddSingleton<ICarRepository>(sp =>
+{
+    // #region agent log
+    DebugLog("Program.cs:24", "CarRepository creation start", new { csvFileName, dataDirectory }, "B");
+    // #endregion
+    try
+    {
+        var repo = new CarRepository(csvFileName, dataDirectory);
+        // #region agent log
+        DebugLog("Program.cs:24", "CarRepository creation success", new { carCount = repo.GetAllCars().Count }, "B");
+        // #endregion
+        return repo;
+    }
+    catch (Exception ex)
+    {
+        // #region agent log
+        DebugLog("Program.cs:24", "CarRepository creation failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "B");
+        // #endregion
+        throw;
+    }
+});
 
 // Registreer feedback services voor continue learning
 builder.Services.AddSingleton<IFeedbackRepository, FeedbackRepository>();
@@ -43,6 +94,9 @@ builder.Services.AddSession(options =>
 // Registreer user rating services voor collaborative filtering
 builder.Services.AddSingleton<IUserRatingRepository>(sp =>
 {
+    // #region agent log
+    DebugLog("Program.cs:44", "UserRatingRepository registration start", null, "A");
+    // #endregion
     // Haal database pad op uit configuratie
     // In Azure: gebruik HOME environment variable voor persistent storage
     var dbPath = builder.Configuration["DatabaseSettings:RatingsDatabasePath"];
@@ -63,11 +117,36 @@ builder.Services.AddSingleton<IUserRatingRepository>(sp =>
         }
     }
     
-    var ratingRepo = new UserRatingRepository(dbPath);
+    // #region agent log
+    DebugLog("Program.cs:44", "Database path determined", new { dbPath, homeEnv = Environment.GetEnvironmentVariable("HOME") }, "A");
+    // #endregion
     
-    // Log database locatie
-    var logger = sp.GetService<ILogger<Program>>();
-    logger?.LogInformation("User Ratings Database locatie: {DbPath}", ((UserRatingRepository)ratingRepo).DatabasePath);
+    UserRatingRepository ratingRepo;
+    try
+    {
+        // #region agent log
+        DebugLog("Program.cs:69", "UserRatingRepository constructor call start", new { dbPath }, "A");
+        // #endregion
+        ratingRepo = new UserRatingRepository(dbPath);
+        
+        // #region agent log
+        DebugLog("Program.cs:69", "UserRatingRepository constructor success", new { databasePath = ratingRepo.DatabasePath }, "A");
+        // #endregion
+        
+        // Log database locatie
+        var logger = sp.GetService<ILogger<Program>>();
+        logger?.LogInformation("User Ratings Database locatie: {DbPath}", ratingRepo.DatabasePath);
+    }
+    catch (Exception ex)
+    {
+        // #region agent log
+        DebugLog("Program.cs:75", "UserRatingRepository constructor failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "A");
+        // #endregion
+        // Als repository creation faalt, gebruik fallback met temp path
+        var logger = sp.GetService<ILogger<Program>>();
+        logger?.LogWarning(ex, "UserRatingRepository creation gefaald, gebruik fallback");
+        ratingRepo = new UserRatingRepository(Path.Combine(Path.GetTempPath(), "user_ratings.db"));
+    }
     
     // Initialiseer database asynchroon bij startup (met error handling om crashes te voorkomen)
     // Gebruik ConfigureAwait(false) om deadlocks te voorkomen
@@ -75,21 +154,36 @@ builder.Services.AddSingleton<IUserRatingRepository>(sp =>
     {
         try
         {
+            // #region agent log
+            DebugLog("Program.cs:85", "Database init task started", null, "A");
+            // #endregion
             // Wacht even zodat app kan starten
             await Task.Delay(2000).ConfigureAwait(false);
             
+            // #region agent log
+            DebugLog("Program.cs:90", "Starting database initialization", null, "A");
+            // #endregion
             // Probeer database te initialiseren met retry logic
             int retries = 3;
             for (int i = 0; i < retries; i++)
             {
                 try
                 {
+                    // #region agent log
+                    DebugLog("Program.cs:98", "Database init attempt", new { attempt = i + 1, maxRetries = retries }, "A");
+                    // #endregion
                     await ratingRepo.InitializeDatabaseAsync().ConfigureAwait(false);
+                    // #region agent log
+                    DebugLog("Program.cs:98", "Database init success", new { attempt = i + 1 }, "A");
+                    // #endregion
                     logger?.LogInformation("User Ratings Database succesvol geïnitialiseerd");
                     break;
                 }
                 catch (Exception retryEx) when (i < retries - 1)
                 {
+                    // #region agent log
+                    DebugLog("Program.cs:102", "Database init retry", new { attempt = i + 1, error = retryEx.Message }, "A");
+                    // #endregion
                     logger?.LogWarning(retryEx, "Database initialisatie poging {Attempt} gefaald, retry...", i + 1);
                     await Task.Delay(1000 * (i + 1)).ConfigureAwait(false);
                 }
@@ -97,6 +191,9 @@ builder.Services.AddSingleton<IUserRatingRepository>(sp =>
         }
         catch (Exception ex)
         {
+            // #region agent log
+            DebugLog("Program.cs:109", "Database init task failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "A");
+            // #endregion
             // Log error maar laat app niet crashen
             logger?.LogError(ex, "Fout bij initialiseren van User Ratings Database na alle retries. Collaborative filtering wordt uitgeschakeld.");
         }
@@ -112,11 +209,27 @@ builder.Services.AddSingleton<CollaborativeFilteringService>(sp =>
 });
 builder.Services.AddScoped<ModelRetrainingService>(sp =>
 {
-    var mlService = sp.GetRequiredService<MlRecommendationService>();
-    var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
-    var carRepo = sp.GetRequiredService<ICarRepository>();
-    var recService = sp.GetRequiredService<IRecommendationService>();
-    return new ModelRetrainingService(mlService, feedbackService, carRepo, recService);
+    // #region agent log
+    DebugLog("Program.cs:124", "ModelRetrainingService registration start", null, "D");
+    // #endregion
+    try
+    {
+        var mlService = sp.GetRequiredService<MlRecommendationService>();
+        var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
+        var carRepo = sp.GetRequiredService<ICarRepository>();
+        var recService = sp.GetRequiredService<IRecommendationService>();
+        // #region agent log
+        DebugLog("Program.cs:124", "ModelRetrainingService dependencies resolved", null, "D");
+        // #endregion
+        return new ModelRetrainingService(mlService, feedbackService, carRepo, recService);
+    }
+    catch (Exception ex)
+    {
+        // #region agent log
+        DebugLog("Program.cs:124", "ModelRetrainingService registration failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "D");
+        // #endregion
+        throw;
+    }
 });
 builder.Services.AddSingleton<ModelPerformanceMonitor>(sp =>
 {
@@ -131,12 +244,28 @@ builder.Services.AddSingleton<ModelPerformanceMonitor>(sp =>
 // Dit is geschikt voor services die per request gebruikt worden.
 builder.Services.AddScoped<IRecommendationService>(sp =>
 {
-    var carRepo = sp.GetRequiredService<ICarRepository>();
-    var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
-    var retrainingService = sp.GetRequiredService<ModelRetrainingService>();
-    var collaborativeService = sp.GetService<CollaborativeFilteringService>();
-    var ratingRepo = sp.GetService<IUserRatingRepository>();
-    return new RecommendationService(carRepo, feedbackService, retrainingService, collaborativeService, ratingRepo);
+    // #region agent log
+    DebugLog("Program.cs:143", "RecommendationService registration start", null, "C");
+    // #endregion
+    try
+    {
+        var carRepo = sp.GetRequiredService<ICarRepository>();
+        var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
+        var retrainingService = sp.GetRequiredService<ModelRetrainingService>();
+        var collaborativeService = sp.GetService<CollaborativeFilteringService>();
+        var ratingRepo = sp.GetService<IUserRatingRepository>();
+        // #region agent log
+        DebugLog("Program.cs:143", "RecommendationService dependencies resolved", null, "C");
+        // #endregion
+        return new RecommendationService(carRepo, feedbackService, retrainingService, collaborativeService, ratingRepo);
+    }
+    catch (Exception ex)
+    {
+        // #region agent log
+        DebugLog("Program.cs:143", "RecommendationService registration failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "C");
+        // #endregion
+        throw;
+    }
 });
 
 // ML Pipeline services - registreer voor ML evaluatie, hyperparameter tuning en forecasting
@@ -148,6 +277,9 @@ builder.Services.AddSingleton<ForecastingService>();
 builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
 
 // Background service voor automatische retraining
+// #region agent log
+DebugLog("Program.cs:162", "RetrainingBackgroundService registration", null, "D");
+// #endregion
 builder.Services.AddHostedService<CarRecommender.Api.Services.RetrainingBackgroundService>();
 
 // ============================================================================
@@ -204,7 +336,13 @@ builder.Services.AddControllers()
 // Dit voorkomt te veel log output in Azure App Service logs
 // Development mode logt meer details voor debugging
 
+// #region agent log
+DebugLog("Program.cs:218", "Building application", null, "A");
+// #endregion
 var app = builder.Build();
+// #region agent log
+DebugLog("Program.cs:218", "Application built successfully", null, "A");
+// #endregion
 
 // ============================================================================
 // HTTP REQUEST PIPELINE CONFIGURATIE
@@ -309,6 +447,10 @@ app.UseExceptionHandler(errorApp =>
 // Map controllers naar routes (bijv. /api/cars, /api/recommendations)
 // Deze routes werken zowel in Development als Production
 app.MapControllers();
+
+// #region agent log
+DebugLog("Program.cs:322", "Controllers mapped, app ready to run", null, "A");
+// #endregion
 
 // ============================================================================
 // AZURE DEPLOYMENT NOTES

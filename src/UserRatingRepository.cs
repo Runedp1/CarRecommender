@@ -14,59 +14,169 @@ public class UserRatingRepository : IUserRatingRepository
 
     public UserRatingRepository(string? dbPath = null)
     {
-        // Standaard: gebruik database in data directory
-        if (string.IsNullOrEmpty(dbPath))
+        // #region agent log
+        try
         {
-            // Probeer verschillende locaties
-            var possiblePaths = new[]
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logDir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                Directory.CreateDirectory(logDir);
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
             {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "user_ratings.db"),
-                Path.Combine(Directory.GetCurrentDirectory(), "data", "user_ratings.db"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backend", "data", "user_ratings.db"),
-                Path.Combine(Directory.GetCurrentDirectory(), "backend", "data", "user_ratings.db"),
-                "data/user_ratings.db"
-            };
-
-            foreach (var path in possiblePaths)
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "UserRatingRepository.cs:15",
+                message = "UserRatingRepository constructor start",
+                data = new { dbPath },
+                sessionId = "debug-session",
+                runId = "startup",
+                hypothesisId = "A"
+            });
+            File.AppendAllText(logPath, logEntry + Environment.NewLine);
+        }
+        catch { }
+        // #endregion
+        try
+        {
+            // Standaard: gebruik database in data directory
+            if (string.IsNullOrEmpty(dbPath))
             {
-                var fullPath = Path.GetFullPath(path);
-                var dir = Path.GetDirectoryName(fullPath);
-                if (dir != null)
+                // Probeer verschillende locaties
+                var possiblePaths = new[]
                 {
-                    if (!Directory.Exists(dir))
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "user_ratings.db"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "data", "user_ratings.db"),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backend", "data", "user_ratings.db"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "backend", "data", "user_ratings.db"),
+                    "data/user_ratings.db"
+                };
+
+                foreach (var path in possiblePaths)
+                {
+                    try
                     {
-                        Directory.CreateDirectory(dir);
+                        var fullPath = Path.GetFullPath(path);
+                        var dir = Path.GetDirectoryName(fullPath);
+                        if (dir != null)
+                        {
+                            if (!Directory.Exists(dir))
+                            {
+                                Directory.CreateDirectory(dir);
+                            }
+                            _dbPath = fullPath;
+                            break;
+                        }
                     }
-                    _dbPath = fullPath;
-                    break;
+                    catch
+                    {
+                        // Skip deze path en probeer volgende
+                        continue;
+                    }
                 }
-            }
 
-            // Fallback
-            if (string.IsNullOrEmpty(_dbPath))
-            {
-                _dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "user_ratings.db");
-                var directory = Path.GetDirectoryName(_dbPath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                // Fallback
+                if (string.IsNullOrEmpty(_dbPath))
                 {
-                    Directory.CreateDirectory(directory);
+                    try
+                    {
+                        _dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "user_ratings.db");
+                        var directory = Path.GetDirectoryName(_dbPath);
+                        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                        {
+                            Directory.CreateDirectory(directory);
+                        }
+                    }
+                    catch
+                    {
+                        // Als alles faalt, gebruik een tijdelijke locatie
+                        _dbPath = Path.Combine(Path.GetTempPath(), "user_ratings.db");
+                    }
                 }
             }
-        }
-        else
-        {
-            _dbPath = dbPath;
-            var directory = Path.GetDirectoryName(_dbPath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            else
             {
-                Directory.CreateDirectory(directory);
+                _dbPath = dbPath;
+                try
+                {
+                    var directory = Path.GetDirectoryName(_dbPath);
+                    if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+                }
+                catch
+                {
+                    // Als directory creation faalt, gebruik temp path
+                    _dbPath = Path.Combine(Path.GetTempPath(), "user_ratings.db");
+                }
+            }
+
+            _connectionString = $"Data Source={_dbPath}";
+            
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "UserRatingRepository.cs:92",
+                    message = "UserRatingRepository constructor success",
+                    data = new { dbPath = _dbPath, connectionString = _connectionString },
+                    sessionId = "debug-session",
+                    runId = "startup",
+                    hypothesisId = "A"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            
+            // Log database locatie voor debugging (alleen als Console beschikbaar is)
+            try
+            {
+                Console.WriteLine($"User Ratings Database: {_dbPath}");
+            }
+            catch
+            {
+                // Console niet beschikbaar, negeer
             }
         }
-
-        _connectionString = $"Data Source={_dbPath}";
-        
-        // Log database locatie voor debugging
-        Console.WriteLine($"User Ratings Database: {_dbPath}");
+        catch (Exception ex)
+        {
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "UserRatingRepository.cs:104",
+                    message = "UserRatingRepository constructor exception",
+                    data = new { error = ex.Message, stackTrace = ex.StackTrace },
+                    sessionId = "debug-session",
+                    runId = "startup",
+                    hypothesisId = "A"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
+            // Als alles faalt, gebruik temp path als laatste redmiddel
+            _dbPath = Path.Combine(Path.GetTempPath(), $"user_ratings_{Guid.NewGuid()}.db");
+            _connectionString = $"Data Source={_dbPath}";
+            
+            try
+            {
+                Console.WriteLine($"User Ratings Database fallback naar temp: {_dbPath} (Error: {ex.Message})");
+            }
+            catch
+            {
+                // Negeer
+            }
+        }
     }
     
     /// <summary>
@@ -76,13 +186,46 @@ public class UserRatingRepository : IUserRatingRepository
 
     public async Task InitializeDatabaseAsync()
     {
+        // #region agent log
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                location = "UserRatingRepository.cs:126",
+                message = "InitializeDatabaseAsync start",
+                data = new { dbPath = _dbPath },
+                sessionId = "debug-session",
+                runId = "startup",
+                hypothesisId = "A"
+            });
+            File.AppendAllText(logPath, logEntry + Environment.NewLine);
+        }
+        catch { }
+        // #endregion
         try
         {
             // Zorg dat directory bestaat
-            var directory = Path.GetDirectoryName(_dbPath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            try
             {
-                Directory.CreateDirectory(directory);
+                var directory = Path.GetDirectoryName(_dbPath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+            }
+            catch (Exception dirEx)
+            {
+                // Als directory creation faalt, probeer temp path
+                _dbPath = Path.Combine(Path.GetTempPath(), $"user_ratings_{Guid.NewGuid()}.db");
+                _connectionString = $"Data Source={_dbPath}";
+                try
+                {
+                    Console.WriteLine($"Database directory creation gefaald, gebruik temp path: {_dbPath} (Error: {dirEx.Message})");
+                }
+                catch { }
             }
 
             using var connection = new SqliteConnection(_connectionString);
@@ -122,6 +265,25 @@ public class UserRatingRepository : IUserRatingRepository
         }
         catch (Exception ex)
         {
+            // #region agent log
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
+                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    location = "UserRatingRepository.cs:186",
+                    message = "InitializeDatabaseAsync failed",
+                    data = new { error = ex.Message, stackTrace = ex.StackTrace },
+                    sessionId = "debug-session",
+                    runId = "startup",
+                    hypothesisId = "A"
+                });
+                File.AppendAllText(logPath, logEntry + Environment.NewLine);
+            }
+            catch { }
+            // #endregion
             // Log maar gooi niet - laat app niet crashen
             Console.WriteLine($"Waarschuwing: Database initialisatie gefaald: {ex.Message}");
             throw; // Re-throw zodat caller weet dat het gefaald is
