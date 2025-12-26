@@ -16,12 +16,14 @@ namespace CarRecommender;
 /// </summary>
 public class MlRecommendationService
 {
-    private readonly MLContext _mlContext;
+    private MLContext? _mlContext;
     private ITransformer? _trainedModel;
     private PredictionEngine<CarFeatureData, ScorePrediction>? _predictionEngine;
     private bool _isModelTrained = false;
     private DateTime _lastTrainingTime = DateTime.MinValue;
     private int _trainingDataCount = 0;
+    private bool _isInitialized = false;
+    private Exception? _initializationError = null;
 
     /// <summary>
     /// Input data voor ML model - features van een auto.
@@ -64,6 +66,19 @@ public class MlRecommendationService
 
     public MlRecommendationService()
     {
+        // Lazy initialization - MLContext wordt alleen geïnitialiseerd wanneer nodig
+        // Dit voorkomt crashes tijdens startup als ML.NET native dependencies ontbreken
+    }
+
+    /// <summary>
+    /// Initialiseert MLContext lazy - alleen wanneer nodig.
+    /// Retourneert false als initialisatie faalt (bijv. native dependencies ontbreken).
+    /// </summary>
+    private bool EnsureInitialized()
+    {
+        if (_isInitialized)
+            return _initializationError == null;
+
         // #region agent log
         try
         {
@@ -75,39 +90,23 @@ public class MlRecommendationService
             {
                 id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
                 timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                location = "MlRecommendationService.cs:65",
-                message = "MlRecommendationService constructor start",
+                location = "MlRecommendationService.cs:EnsureInitialized",
+                message = "MLContext lazy initialization start",
                 data = new { },
                 sessionId = "debug-session",
                 runId = "startup",
-                hypothesisId = "A"
+                hypothesisId = "B"
             });
             File.AppendAllText(logPath, logEntry + Environment.NewLine);
         }
         catch { }
         // #endregion
+
         try
         {
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "MlRecommendationService.cs:67",
-                    message = "MLContext creation start",
-                    data = new { },
-                    sessionId = "debug-session",
-                    runId = "startup",
-                    hypothesisId = "B"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             _mlContext = new MLContext(seed: 0);
+            _isInitialized = true;
+            _initializationError = null;
             // #region agent log
             try
             {
@@ -116,8 +115,8 @@ public class MlRecommendationService
                 {
                     id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
                     timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "MlRecommendationService.cs:69",
-                    message = "MLContext creation success",
+                    location = "MlRecommendationService.cs:EnsureInitialized",
+                    message = "MLContext lazy initialization success",
                     data = new { },
                     sessionId = "debug-session",
                     runId = "startup",
@@ -127,9 +126,12 @@ public class MlRecommendationService
             }
             catch { }
             // #endregion
+            return true;
         }
         catch (Exception ex)
         {
+            _isInitialized = true;
+            _initializationError = ex;
             // #region agent log
             try
             {
@@ -138,8 +140,8 @@ public class MlRecommendationService
                 {
                     id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
                     timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "MlRecommendationService.cs:71",
-                    message = "MLContext creation failed",
+                    location = "MlRecommendationService.cs:EnsureInitialized",
+                    message = "MLContext lazy initialization failed - ML.NET disabled",
                     data = new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name },
                     sessionId = "debug-session",
                     runId = "startup",
@@ -149,27 +151,8 @@ public class MlRecommendationService
             }
             catch { }
             // #endregion
-            throw;
+            return false; // ML.NET niet beschikbaar, maar app kan doorgaan
         }
-        // #region agent log
-        try
-        {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                location = "MlRecommendationService.cs:73",
-                message = "MlRecommendationService constructor success",
-                data = new { },
-                sessionId = "debug-session",
-                runId = "startup",
-                hypothesisId = "A"
-            });
-            File.AppendAllText(logPath, logEntry + Environment.NewLine);
-        }
-        catch { }
-        // #endregion
     }
 
     /// <summary>
@@ -182,6 +165,13 @@ public class MlRecommendationService
     /// </summary>
     public void TrainModel(List<Car> cars, List<RecommendationResult> recommendationResults, Dictionary<int, AggregatedFeedback>? userFeedback = null)
     {
+        // Lazy initialize ML.NET - als het faalt, skip training maar crash niet
+        if (!EnsureInitialized())
+        {
+            _isModelTrained = false;
+            return; // ML.NET niet beschikbaar, maar app kan doorgaan
+        }
+
         if (cars == null || cars.Count == 0 || recommendationResults == null || recommendationResults.Count == 0)
         {
             // Geen training data beschikbaar - gebruik fallback
@@ -256,6 +246,11 @@ public class MlRecommendationService
             }
 
             // Converteer naar IDataView
+            if (_mlContext == null)
+            {
+                _isModelTrained = false;
+                return; // ML.NET niet beschikbaar
+            }
             var dataView = _mlContext.Data.LoadFromEnumerable(trainingData);
 
             // Feature engineering: combineer numerieke en categorische features
@@ -318,9 +313,10 @@ public class MlRecommendationService
     /// </summary>
     public double PredictScore(Car car, List<Car> allCars)
     {
-        if (!_isModelTrained || _predictionEngine == null)
+        // Lazy initialize ML.NET - als het faalt, retourneer neutrale score
+        if (!EnsureInitialized() || !_isModelTrained || _predictionEngine == null)
         {
-            // Geen getraind model - retourneer neutrale score
+            // ML.NET niet beschikbaar of geen getraind model - retourneer neutrale score
             return 0.5;
         }
 
