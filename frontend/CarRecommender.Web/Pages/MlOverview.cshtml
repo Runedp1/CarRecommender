@@ -1,0 +1,345 @@
+@page
+@model MlOverviewModel
+@{
+    ViewData["Title"] = "ML Evaluatie Overzicht";
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        // Prijs trend grafiek
+        document.addEventListener('DOMContentLoaded', function() {
+            @if (Model.EvaluationResult?.ForecastingResults?.PeriodTrends != null && Model.EvaluationResult.ForecastingResults.PeriodTrends.Any())
+            {
+                <text>
+                const ctx = document.getElementById('priceTrendChart');
+                if (ctx) {
+                    const periods = @Html.Raw(Json.Serialize(Model.EvaluationResult.ForecastingResults.PeriodTrends.Select(t => t.PeriodName)));
+                    const prices = @Html.Raw(Json.Serialize(Model.EvaluationResult.ForecastingResults.PeriodTrends.Select(t => t.AveragePrice)));
+                    
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: periods,
+                            datasets: [{
+                                label: 'Gemiddelde prijs (€)',
+                                data: prices,
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    display: true
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Prijs trend over de jaren'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return '€' + value.toLocaleString('nl-NL', {maximumFractionDigits: 0});
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                </text>
+            }
+        });
+    </script>
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4 mb-4">ML Evaluatie Overzicht</h1>
+            <p class="lead">Machine Learning evaluatie metrics, hyperparameter optimalisatie en trend analyse</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Fout:</strong> @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (Model.EvaluationResult != null && Model.EvaluationResult.IsValid)
+    {
+        <!-- Evaluatie Metrics Sectie -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="card-title mb-0">Evaluatie Metrics</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Train/Test Split</h5>
+                                <p>
+                                    <strong>Training set:</strong> @Model.EvaluationResult.TrainingSetSize auto's (80%)<br>
+                                    <strong>Test set:</strong> @Model.EvaluationResult.TestSetSize auto's (20%)
+                                </p>
+                                <p class="text-muted">
+                                    <small>De dataset is gesplitst in een training set (om het model te trainen) en een test set (om te evalueren). 
+                                    Dit is een standaard ML techniek om te voorkomen dat het model overfitted op de training data.</small>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Recommendation Metrics</h5>
+                                <table class="table table-striped">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Precision@K</strong></td>
+                                            <td>@(Model.EvaluationResult.PrecisionAtK.ToString("F3"))</td>
+                                            <td>
+                                                <span class="badge bg-info" data-bs-toggle="tooltip" title="Precision@K meet hoeveel van de top K recommendations relevant zijn. Hoger is beter (max 1.0).">
+                                                    Info
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Recall@K</strong></td>
+                                            <td>@(Model.EvaluationResult.RecallAtK.ToString("F3"))</td>
+                                            <td>
+                                                <span class="badge bg-info" data-bs-toggle="tooltip" title="Recall@K meet hoeveel relevante items gevonden worden in de top K. Hoger is beter (max 1.0).">
+                                                    Info
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <p class="text-muted">
+                                    <small><strong>Precision@K:</strong> Meet de accuraatheid van de top K recommendations (hoeveel zijn relevant?).<br>
+                                    <strong>Recall@K:</strong> Meet de volledigheid (hoeveel relevante items worden gevonden?).</small>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prijsvoorspelling Metrics -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h3 class="card-title mb-0">Prijsvoorspelling Metrics</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Mean Absolute Error (MAE)</h5>
+                                <p class="display-6">€@(Model.EvaluationResult.MeanAbsoluteError.ToString("N2"))</p>
+                                <p class="text-muted">
+                                    <small>MAE meet de gemiddelde absolute fout tussen voorspelde en werkelijke prijzen. 
+                                    Lager is beter. Deze metric geeft een gemiddelde afwijking in euro's.</small>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Root Mean Squared Error (RMSE)</h5>
+                                <p class="display-6">€@(Model.EvaluationResult.RootMeanSquaredError.ToString("N2"))</p>
+                                <p class="text-muted">
+                                    <small>RMSE is gevoeliger voor grote fouten dan MAE. Grote fouten worden zwaarder bestraft. 
+                                    Lager is beter. Deze metric wordt gebruikt wanneer grote fouten problematischer zijn.</small>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hyperparameter Tuning Sectie -->
+        @if (Model.EvaluationResult.BestHyperparameters != null)
+        {
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h3 class="card-title mb-0">Hyperparameter Optimalisatie</h3>
+                        </div>
+                        <div class="card-body">
+                            <h5>Beste Configuratie</h5>
+                            <p>De volgende similarity gewichten zijn geoptimaliseerd voor de beste resultaten:</p>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Feature</th>
+                                        <th>Gewicht</th>
+                                        <th>Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Vermogen (Power)</td>
+                                        <td>@(Model.EvaluationResult.BestHyperparameters.PowerWeight.ToString("F3"))</td>
+                                        <td>@((Model.EvaluationResult.BestHyperparameters.PowerWeight * 100).ToString("F1"))%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Budget/Prijs</td>
+                                        <td>@(Model.EvaluationResult.BestHyperparameters.BudgetWeight.ToString("F3"))</td>
+                                        <td>@((Model.EvaluationResult.BestHyperparameters.BudgetWeight * 100).ToString("F1"))%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Bouwjaar (Year)</td>
+                                        <td>@(Model.EvaluationResult.BestHyperparameters.YearWeight.ToString("F3"))</td>
+                                        <td>@((Model.EvaluationResult.BestHyperparameters.YearWeight * 100).ToString("F1"))%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Brandstof (Fuel)</td>
+                                        <td>@(Model.EvaluationResult.BestHyperparameters.FuelWeight.ToString("F3"))</td>
+                                        <td>@((Model.EvaluationResult.BestHyperparameters.FuelWeight * 100).ToString("F1"))%</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p class="text-muted">
+                                <small>Hyperparameter tuning test verschillende combinaties van similarity gewichten om de beste configuratie te vinden. 
+                                Dit is een belangrijk onderdeel van ML model optimalisatie.</small>
+                            </p>
+                            
+                            @if (Model.EvaluationResult.HyperparameterResults != null && Model.EvaluationResult.HyperparameterResults.Any())
+                            {
+                                <h5 class="mt-4">Alle Geteste Configuraties</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Power</th>
+                                                <th>Budget</th>
+                                                <th>Year</th>
+                                                <th>Fuel</th>
+                                                <th>Score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var result in Model.EvaluationResult.HyperparameterResults.OrderByDescending(r => r.Score).Take(10))
+                                            {
+                                                <tr>
+                                                    <td>@(result.Configuration.PowerWeight.ToString("F2"))</td>
+                                                    <td>@(result.Configuration.BudgetWeight.ToString("F2"))</td>
+                                                    <td>@(result.Configuration.YearWeight.ToString("F2"))</td>
+                                                    <td>@(result.Configuration.FuelWeight.ToString("F2"))</td>
+                                                    <td>@(result.Score.ToString("F3"))</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Forecasting/Trend Analyse Sectie -->
+        @if (Model.EvaluationResult.ForecastingResults != null && Model.EvaluationResult.ForecastingResults.IsValid)
+        {
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h3 class="card-title mb-0">Trend Analyse & Forecasting</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">
+                                <small>Deze analyse toont trends in de auto dataset op basis van bouwjaar. 
+                                Dit kan geïnterpreteerd worden als seizoensanalyse (verschillende periodes) of trendanalyse (algemene ontwikkelingen).</small>
+                            </p>
+
+                            @if (Model.EvaluationResult.ForecastingResults.GeneralTrends != null)
+                            {
+                                <h5>Algemene Trends</h5>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6>Prijs Trend</h6>
+                                                <p>@Model.EvaluationResult.ForecastingResults.GeneralTrends.PriceTrend</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6>Vermogen Trend</h6>
+                                                <p>@Model.EvaluationResult.ForecastingResults.GeneralTrends.PowerTrend</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6>Brandstof Trend</h6>
+                                                <p>@Model.EvaluationResult.ForecastingResults.GeneralTrends.FuelTrend</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (Model.EvaluationResult.ForecastingResults.PeriodTrends != null && Model.EvaluationResult.ForecastingResults.PeriodTrends.Any())
+                            {
+                                <h5 class="mt-4">Prijs Trend per Periode</h5>
+                                <canvas id="priceTrendChart" style="max-height: 300px;"></canvas>
+
+                                <h5 class="mt-4">Gedetailleerde Periode Analyse</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Periode</th>
+                                                <th>Auto's</th>
+                                                <th>Gem. Prijs</th>
+                                                <th>Gem. Vermogen</th>
+                                                <th>Top Brandstof Types</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var trend in Model.EvaluationResult.ForecastingResults.PeriodTrends)
+                                            {
+                                                <tr>
+                                                    <td><strong>@trend.PeriodName</strong></td>
+                                                    <td>@trend.CarCount</td>
+                                                    <td>€@(trend.AveragePrice.ToString("N0"))</td>
+                                                    <td>@(trend.AveragePower.ToString("F0")) KW</td>
+                                                    <td>
+                                                        @string.Join(", ", trend.FuelDistribution.Take(3).Select(f => $"{f.FuelType} ({f.Percentage:F1}%)"))
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Evaluatie Timestamp -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <p class="text-muted text-end">
+                    <small>Evaluatie uitgevoerd op: @Model.EvaluationResult.EvaluationTimestamp.ToString("dd-MM-yyyy HH:mm:ss") UTC</small>
+                </p>
+            </div>
+        </div>
+    }
+</div>
+

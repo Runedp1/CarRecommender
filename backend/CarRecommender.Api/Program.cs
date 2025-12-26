@@ -28,6 +28,14 @@ builder.Services.AddSingleton<ICarRepository>(sp => new CarRepository(csvFileNam
 // Dit is geschikt voor services die per request gebruikt worden.
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 
+// ML Pipeline services - registreer voor ML evaluatie, hyperparameter tuning en forecasting
+// HyperparameterTuningService en ForecastingService zijn stateless en kunnen als singleton
+builder.Services.AddSingleton<HyperparameterTuningService>();
+builder.Services.AddSingleton<ForecastingService>();
+
+// MlEvaluationService is scoped omdat het IRecommendationService gebruikt (ook scoped)
+builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
+
 // ============================================================================
 // CORS CONFIGURATIE
 // ============================================================================

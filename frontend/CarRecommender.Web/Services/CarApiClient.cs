@@ -260,6 +260,25 @@ public class CarApiClient
             throw;
         }
     }
+
+    /// <summary>
+    /// Haalt ML evaluatie resultaten op via GET /api/ml/evaluation
+    /// </summary>
+    public async Task<MlEvaluationResult?> GetMlEvaluationAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("/api/ml/evaluation");
+            response.EnsureSuccessStatusCode();
+            
+            return await response.Content.ReadFromJsonAsync<MlEvaluationResult>(_jsonOptions);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Fout bij het ophalen van ML evaluatie resultaten");
+            throw;
+        }
+    }
 }
 
 
