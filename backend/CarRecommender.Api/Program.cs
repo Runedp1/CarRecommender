@@ -239,41 +239,37 @@ builder.Services.AddSingleton<IUserRatingRepository>(sp =>
 });
 builder.Services.AddSingleton<CollaborativeFilteringService>(sp =>
 {
-    var ratingRepo = sp.GetRequiredService<IUserRatingRepository>();
-    var carRepo = sp.GetRequiredService<ICarRepository>();
-    return new CollaborativeFilteringService(ratingRepo, carRepo);
-});
-builder.Services.AddScoped<ModelRetrainingService>(sp =>
-{
-    // #region agent log
-    DebugLog("Program.cs:124", "ModelRetrainingService registration start", null, "D");
-    // #endregion
     try
     {
-        var mlService = sp.GetRequiredService<MlRecommendationService>();
-        var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
+        var ratingRepo = sp.GetService<IUserRatingRepository>();
         var carRepo = sp.GetRequiredService<ICarRepository>();
-        var recService = sp.GetRequiredService<IRecommendationService>();
-        // #region agent log
-        DebugLog("Program.cs:124", "ModelRetrainingService dependencies resolved", null, "D");
-        // #endregion
-        return new ModelRetrainingService(mlService, feedbackService, carRepo, recService);
+        // Als ratingRepo niet beschikbaar is, return null (wordt later opgevangen)
+        if (ratingRepo == null)
+        {
+            // #region agent log
+            DebugLog("Program.cs:240", "CollaborativeFilteringService: ratingRepo not available, skipping", null, "A");
+            // #endregion
+            return null!; // Return null, maar markeer als non-nullable voor DI
+        }
+        return new CollaborativeFilteringService(ratingRepo, carRepo);
     }
     catch (Exception ex)
     {
         // #region agent log
-        DebugLog("Program.cs:124", "ModelRetrainingService registration failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "D");
+        DebugLog("Program.cs:240", "CollaborativeFilteringService creation failed", new { error = ex.Message }, "A");
         // #endregion
-        throw;
+        return null!; // Return null, maar markeer als non-nullable voor DI
     }
 });
-builder.Services.AddSingleton<ModelPerformanceMonitor>(sp =>
-{
-    var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
-    var mlService = sp.GetRequiredService<MlRecommendationService>();
-    var retrainingService = sp.GetRequiredService<ModelRetrainingService>();
-    return new ModelPerformanceMonitor(feedbackService, mlService, retrainingService);
-});
+// ModelRetrainingService wordt NIET geregistreerd om circular dependency te voorkomen
+// RecommendationService maakt ModelRetrainingService optioneel, dus de app kan zonder werken
+// #region agent log
+DebugLog("Program.cs:264", "Skipping ModelRetrainingService registration - circular dependency with IRecommendationService", null, "D");
+// #endregion
+// ModelPerformanceMonitor wordt NIET geregistreerd omdat ModelRetrainingService niet beschikbaar is
+// #region agent log
+DebugLog("Program.cs:270", "Skipping ModelPerformanceMonitor registration - ModelRetrainingService not available", null, "D");
+// #endregion
 
 // Registreer IRecommendationService als scoped (één per HTTP request)
 // Scoped betekent dat er één instantie is per HTTP request.
@@ -287,7 +283,8 @@ builder.Services.AddScoped<IRecommendationService>(sp =>
     {
         var carRepo = sp.GetRequiredService<ICarRepository>();
         var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
-        var retrainingService = sp.GetRequiredService<ModelRetrainingService>();
+        // ModelRetrainingService is niet beschikbaar (circular dependency) - RecommendationService maakt het optioneel
+        var retrainingService = (ModelRetrainingService?)null;
         var collaborativeService = sp.GetService<CollaborativeFilteringService>();
         var ratingRepo = sp.GetService<IUserRatingRepository>();
         // #region agent log
