@@ -28,7 +28,7 @@ public class CarRepository : ICarRepository
     /// Constructor - laadt auto's uit CSV bij initialisatie.
     /// Gebruikt configuratie voor CSV bestandsnaam en data directory.
     /// </summary>
-    public CarRepository(string csvFileName = "Cleaned_Car_Data_For_App_Fully_Enriched.csv", string dataDirectory = "data")
+    public CarRepository(string csvFileName = "df_master_v8_def.csv", string dataDirectory = "data")
     {
         // #region agent log
         try
