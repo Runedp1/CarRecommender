@@ -188,7 +188,7 @@ public class CarRepository : ICarRepository
             }
 
             // Zoek welke kolom waar staat (flexibel, werkt met verschillende CSV formaten)
-            string header = lines[0].ToLower();
+            string header = lines[0].ToLower();          
             string[] headerColumns = ParseCsvLine(header);
             
             int idIndex = FindColumnIndex(headerColumns, new[] { "id" });
@@ -258,13 +258,18 @@ public class CarRepository : ICarRepository
                     // Parse Vermogen (Power)
                     if (vermogenIndex >= 0 && vermogenIndex < columns.Length)
                     {
-                        string vermogenStr = columns[vermogenIndex]?.Trim() ?? string.Empty;
-                        // Haal alleen cijfers eruit (bijv. "963 hp" -> 963)
-                        vermogenStr = System.Text.RegularExpressions.Regex.Replace(vermogenStr, @"[^\d]", "");
-                        if (int.TryParse(vermogenStr, out int power))
+                        if (vermogenIndex >= 0 && vermogenIndex < columns.Length)
                         {
-                            car.Power = power;
+                            if (double.TryParse(
+                                columns[vermogenIndex],
+                                NumberStyles.Any,
+                                CultureInfo.InvariantCulture,
+                                out double powerDouble))
+                            {
+                                car.Power = (int)powerDouble;
+                            }
                         }
+
                     }
 
                     // Parse Brandstof (Fuel)
@@ -291,10 +296,16 @@ public class CarRepository : ICarRepository
                     {
                         string jaarStr = columns[bouwjaarIndex]?.Trim() ?? string.Empty;
                         // Pak alleen het jaar eruit (4 cijfers)
-                        var yearMatch = System.Text.RegularExpressions.Regex.Match(jaarStr, @"\b(19|20)\d{2}\b");
-                        if (yearMatch.Success && int.TryParse(yearMatch.Value, out int year) && year >= 1900 && year <= DateTime.Now.Year + 1)
+                        if (bouwjaarIndex >= 0 && bouwjaarIndex < columns.Length)
                         {
-                            car.Year = year;
+                            if (double.TryParse(
+                                columns[bouwjaarIndex],
+                                NumberStyles.Any,
+                                CultureInfo.InvariantCulture,
+                                out double yearDouble))
+                            {
+                                car.Year = (int)yearDouble;
+                            }
                         }
                     }
 
