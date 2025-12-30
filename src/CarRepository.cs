@@ -112,7 +112,7 @@ public class CarRepository : ICarRepository
         
         if (string.IsNullOrEmpty(csvPath) || !File.Exists(csvPath))
         {
-            Console.WriteLine($"Waarschuwing: Cleaned_Car_Data_For_App_Fully_Enriched.csv niet gevonden in data directory.");
+            Console.WriteLine($"Waarschuwing: {_csvFileName} niet gevonden in data directory.");
             Console.WriteLine($"Gezocht in: {Path.Combine(Directory.GetCurrentDirectory(), "data")}");
             _cars = new List<Car>();
             return;
@@ -123,6 +123,15 @@ public class CarRepository : ICarRepository
 
         // Parse CSV naar Car objecten
         _cars = LoadCarsFromCsv(csvPath);
+
+        // Verwijder duplicaten (auto's met dezelfde combinatie van merk en model)
+        int originalCount = _cars.Count;
+        _cars = RemoveDuplicates(_cars);
+        int duplicateCount = originalCount - _cars.Count;
+        if (duplicateCount > 0)
+        {
+            Console.WriteLine($"Duplicaten verwijderd: {duplicateCount} auto's (oorspronkelijk {originalCount}, na verwijdering {_cars.Count})");
+        }
 
         // PERFORMANCE FIX: Laad permanente image mapping (als die bestaat)
         // Dit voorkomt dat we bij elke start opnieuw moeten matchen
@@ -389,6 +398,58 @@ public class CarRepository : ICarRepository
         }
 
         return cars;
+    }
+
+    /// <summary>
+    /// Verwijdert duplicaten uit de lijst van auto's.
+    /// Twee auto's worden als duplicaat beschouwd als ze dezelfde combinatie hebben van:
+    /// Brand en Model.
+    /// Behoudt de auto met de HOOGSTE prijs voor elke unieke combinatie.
+    /// Dit voorkomt dat auto's met onrealistisch lage prijzen worden behouden.
+    /// </summary>
+    private List<Car> RemoveDuplicates(List<Car> cars)
+    {
+        if (cars == null || cars.Count == 0)
+            return cars;
+
+        // Groepeer auto's per Brand|Model combinatie
+        Dictionary<string, List<Car>> carsByKey = new Dictionary<string, List<Car>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (Car car in cars)
+        {
+            // Maak een unieke key op basis van Brand en Model
+            // Normaliseer strings voor case-insensitive vergelijking
+            string brand = (car.Brand ?? string.Empty).Trim();
+            string model = (car.Model ?? string.Empty).Trim();
+            
+            // Maak een samengestelde key: Brand|Model
+            string uniqueKey = $"{brand}|{model}";
+
+            if (!carsByKey.ContainsKey(uniqueKey))
+            {
+                carsByKey[uniqueKey] = new List<Car>();
+            }
+
+            carsByKey[uniqueKey].Add(car);
+        }
+
+        // Voor elke unieke combinatie, behoud alleen de auto met de hoogste prijs
+        List<Car> uniqueCars = new List<Car>();
+
+        foreach (var kvp in carsByKey)
+        {
+            List<Car> carsInGroup = kvp.Value;
+
+            // Vind de auto met de hoogste prijs (Budget property)
+            // Als meerdere auto's dezelfde hoogste prijs hebben, behoud de eerste
+            Car carWithHighestPrice = carsInGroup
+                .OrderByDescending(c => c.Budget)
+                .First();
+
+            uniqueCars.Add(carWithHighestPrice);
+        }
+
+        return uniqueCars;
     }
 
     /// <summary>

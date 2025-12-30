@@ -39,7 +39,7 @@ DebugLog("Program.cs:4", "Application startup begin", new { environment = builde
 // ============================================================================
 // Lees configuratie uit appsettings.json (lokaal) of appsettings.Production.json (Azure)
 // Dit zorgt ervoor dat de applicatie werkt zonder harde paden
-var csvFileName = builder.Configuration["DataSettings:CsvFileName"] ?? "Cleaned_Car_Data_For_App_Fully_Enriched.csv";
+var csvFileName = builder.Configuration["DataSettings:CsvFileName"] ?? "df_master_v8_def.csv";
 var dataDirectory = builder.Configuration["DataSettings:DataDirectory"] ?? "data";
 
 // ============================================================================
