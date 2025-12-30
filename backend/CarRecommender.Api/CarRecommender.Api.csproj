@@ -27,8 +27,8 @@
 
   <!-- Zorg dat data bestanden worden meegenomen tijdens deployment -->
   <ItemGroup>
-    <Content Include="..\data\Cleaned_Car_Data_For_App_Fully_Enriched.csv">
-      <Link>data\Cleaned_Car_Data_For_App_Fully_Enriched.csv</Link>
+    <Content Include="..\data\df_master_v8_def.csv">
+      <Link>data\df_master_v8_def.csv</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
