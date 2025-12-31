@@ -36,21 +36,26 @@ public class CarRepository : ICarRepository
     /// </summary>
     private void LoadCarsFromCsv()
     {
+        Console.WriteLine($"[DEBUG] LoadCarsFromCsv gestart - Zoeken naar: {_csvFileName} in {_dataDirectory}");
         string csvPath = FindCsvFile(_csvFileName, _dataDirectory);
+        Console.WriteLine($"[DEBUG] FindCsvFile resultaat: {csvPath ?? "NULL"}");
         
         if (string.IsNullOrEmpty(csvPath) || !File.Exists(csvPath))
         {
-            Console.WriteLine($"Waarschuwing: Cleaned_Car_Data_For_App_Fully_Enriched.csv niet gevonden in data directory.");
-            Console.WriteLine($"Gezocht in: {Path.Combine(Directory.GetCurrentDirectory(), "data")}");
+            Console.WriteLine($"[DEBUG] FOUT: CSV bestand niet gevonden!");
+            Console.WriteLine($"Waarschuwing: {_csvFileName} niet gevonden in data directory.");
+            Console.WriteLine($"Gezocht in: {Path.Combine(Directory.GetCurrentDirectory(), _dataDirectory)}");
             _cars = new List<Car>();
             return;
         }
 
-        Console.WriteLine($"CSV-bestand gevonden: {csvPath}");
-        Console.WriteLine("Laden van auto's...");
+        Console.WriteLine($"[DEBUG] CSV-bestand gevonden: {csvPath}");
+        Console.WriteLine("[DEBUG] Laden van auto's...");
 
         // Parse CSV naar Car objecten
+        Console.WriteLine("[DEBUG] Aanroepen LoadCarsFromCsv(string csvPath)...");
         var allCars = LoadCarsFromCsv(csvPath);
+        Console.WriteLine($"[DEBUG] LoadCarsFromCsv voltooid - {allCars.Count} auto's geladen");
         
         // #region agent log
         try
@@ -142,6 +147,7 @@ public class CarRepository : ICarRepository
     /// </summary>
     private List<Car> LoadCarsFromCsv(string csvPath)
     {
+        Console.WriteLine($"[DEBUG] LoadCarsFromCsv(string) gestart met pad: {csvPath}");
         List<Car> cars = new List<Car>();
         int rowNumber = 0;
 
@@ -149,12 +155,19 @@ public class CarRepository : ICarRepository
         {
             // Lees alle regels uit het CSV-bestand
             string[] lines = File.ReadAllLines(csvPath);
+            Console.WriteLine($"[DEBUG] CSV gelezen: {lines.Length} regels totaal (inclusief header)");
 
             if (lines.Length == 0)
             {
-                Console.WriteLine("Waarschuwing: Het CSV-bestand is leeg.");
+                Console.WriteLine("[DEBUG] FOUT: Het CSV-bestand is leeg.");
                 return cars;
             }
+            if (lines.Length == 1)
+            {
+                Console.WriteLine("[DEBUG] FOUT: CSV bevat alleen header, geen data regels.");
+                return cars;
+            }
+            Console.WriteLine($"[DEBUG] Verwacht {lines.Length - 1} data regels (na header)");
 
             // Zoek welke kolom waar staat (flexibel, werkt met verschillende CSV formaten)
             string header = lines[0].ToLower();
@@ -359,13 +372,16 @@ public class CarRepository : ICarRepository
         }
         catch (FileNotFoundException)
         {
-            Console.WriteLine($"Fout: Bestand niet gevonden: {csvPath}");
+            Console.WriteLine($"[DEBUG] FOUT: Bestand niet gevonden: {csvPath}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Fout bij het lezen van het CSV-bestand: {ex.Message}");
+            Console.WriteLine($"[DEBUG] FOUT bij het lezen van het CSV-bestand: {ex.Message}");
+            Console.WriteLine($"[DEBUG] Exception type: {ex.GetType().Name}");
+            Console.WriteLine($"[DEBUG] Stack trace: {ex.StackTrace}");
         }
 
+        Console.WriteLine($"[DEBUG] LoadCarsFromCsv(string) voltooid: {cars.Count} auto's toegevoegd");
         return cars;
     }
 
