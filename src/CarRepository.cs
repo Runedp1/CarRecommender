@@ -70,9 +70,11 @@ public class CarRepository : ICarRepository
         // #endregion
         
         // Verwijder duplicaten (Brand+Model combinatie, behoud hoogste prijs)
+        // TIJDELIJK UITGESCHAKELD VOOR DEBUGGING
         int originalCount = allCars.Count;
-        _cars = RemoveDuplicates(allCars);
-        int duplicateCount = originalCount - _cars.Count;
+        // _cars = RemoveDuplicates(allCars);
+        _cars = allCars; // TIJDELIJK: geen deduplicatie
+        int duplicateCount = 0; // originalCount - _cars.Count;
         
         // #region agent log
         try
