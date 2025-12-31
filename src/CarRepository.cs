@@ -52,10 +52,25 @@ public class CarRepository : ICarRepository
         // Parse CSV naar Car objecten
         var allCars = LoadCarsFromCsv(csvPath);
         
+        // #region agent log
+        var audiCountBeforeDedup = allCars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
+        var audiModelsBeforeDedup = allCars.Where(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true).Select(c => c.Model).Distinct().ToList();
+        File.AppendAllText(@"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log", 
+            $"{{\"location\":\"CarRepository.cs:53\",\"message\":\"Audi count VOOR deduplicatie\",\"data\":{{\"count\":{audiCountBeforeDedup},\"models\":{JsonSerializer.Serialize(audiModelsBeforeDedup)},\"totalCars\":{allCars.Count}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
+        // #endregion
+        
         // Verwijder duplicaten (Brand+Model combinatie, behoud hoogste prijs)
         int originalCount = allCars.Count;
         _cars = RemoveDuplicates(allCars);
         int duplicateCount = originalCount - _cars.Count;
+        
+        // #region agent log
+        var audiCountAfterDedup = _cars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
+        var audiModelsAfterDedup = _cars.Where(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true).Select(c => c.Model).Distinct().ToList();
+        File.AppendAllText(@"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log", 
+            $"{{\"location\":\"CarRepository.cs:57\",\"message\":\"Audi count NA deduplicatie\",\"data\":{{\"count\":{audiCountAfterDedup},\"models\":{JsonSerializer.Serialize(audiModelsAfterDedup)},\"totalCars\":{_cars.Count}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
+        // #endregion
+        
         if (duplicateCount > 0)
         {
             Console.WriteLine($"Duplicaten verwijderd: {duplicateCount} auto's (oorspronkelijk {originalCount}, na verwijdering {_cars.Count})");
@@ -75,6 +90,11 @@ public class CarRepository : ICarRepository
     /// </summary>
     public List<Car> GetAllCars()
     {
+        // #region agent log
+        var audiCount = _cars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
+        File.AppendAllText(@"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log", 
+            $"{{\"location\":\"CarRepository.cs:78\",\"message\":\"GetAllCars aangeroepen\",\"data\":{{\"totalCars\":{_cars.Count},\"audiCount\":{audiCount}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\"}}\n");
+        // #endregion
         return _cars;
     }
 
@@ -234,15 +254,39 @@ public class CarRepository : ICarRepository
                     // Voeg alleen toe als merk en model bestaan EN waarden realistisch zijn
                     if (!string.IsNullOrWhiteSpace(car.Brand) && !string.IsNullOrWhiteSpace(car.Model))
                     {
+                        // #region agent log
+                        if (car.Brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var logData = new { brand = car.Brand, model = car.Model, budget = car.Budget, power = car.Power, year = car.Year, rowNumber };
+                            File.AppendAllText(@"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log", 
+                                $"{{\"location\":\"CarRepository.cs:258\",\"message\":\"Audi gevonden in CSV (voor IsCarRealistic)\",\"data\":{JsonSerializer.Serialize(logData)},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}}\n");
+                        }
+                        // #endregion
                         // Filter onrealistische waarden
                         if (IsCarRealistic(car))
                         {
+                            // #region agent log
+                            if (car.Brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var logData = new { brand = car.Brand, model = car.Model, budget = car.Budget };
+                                File.AppendAllText(@"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log", 
+                                    $"{{\"location\":\"CarRepository.cs:268\",\"message\":\"Audi passeert IsCarRealistic\",\"data\":{JsonSerializer.Serialize(logData)},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}}\n");
+                            }
+                            // #endregion
                             // Genereer ImageUrl voor belangrijke modellen
                             car.ImageUrl = GenerateImageUrl(car);
                             cars.Add(car);
                         }
                         else
                         {
+                            // #region agent log
+                            if (car.Brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var logData = new { brand = car.Brand, model = car.Model, budget = car.Budget, power = car.Power, year = car.Year };
+                                File.AppendAllText(@"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log", 
+                                    $"{{\"location\":\"CarRepository.cs:287\",\"message\":\"Audi GEFAALD IsCarRealistic check\",\"data\":{JsonSerializer.Serialize(logData)},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}}\n");
+                            }
+                            // #endregion
                             // Stil overgeslagen - te veel log output anders
                         }
                     }
@@ -292,6 +336,14 @@ public class CarRepository : ICarRepository
             if (uniqueCarsMap.TryGetValue(uniqueKey, out Car? existingCar))
             {
                 // Als er al een auto is, behoud degene met de hoogste prijs
+                // #region agent log
+                if (brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
+                {
+                    var logData = new { uniqueKey, existingBudget = existingCar.Budget, newBudget = car.Budget, kept = car.Budget > existingCar.Budget };
+                    File.AppendAllText(@"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log", 
+                        $"{{\"location\":\"CarRepository.cs:292\",\"message\":\"Audi duplicaat gevonden in RemoveDuplicates\",\"data\":{JsonSerializer.Serialize(logData)},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
+                }
+                // #endregion
                 if (car.Budget > existingCar.Budget)
                 {
                     uniqueCarsMap[uniqueKey] = car;
@@ -300,6 +352,14 @@ public class CarRepository : ICarRepository
             else
             {
                 // Nieuwe unieke combinatie, voeg toe
+                // #region agent log
+                if (brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
+                {
+                    var logData = new { uniqueKey, budget = car.Budget };
+                    File.AppendAllText(@"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log", 
+                        $"{{\"location\":\"CarRepository.cs:302\",\"message\":\"Nieuwe Audi unieke combinatie toegevoegd\",\"data\":{JsonSerializer.Serialize(logData)},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
+                }
+                // #endregion
                 uniqueCarsMap.Add(uniqueKey, car);
             }
         }
