@@ -50,7 +50,16 @@ public class CarRepository : ICarRepository
         Console.WriteLine("Laden van auto's...");
 
         // Parse CSV naar Car objecten
-        _cars = LoadCarsFromCsv(csvPath);
+        var allCars = LoadCarsFromCsv(csvPath);
+        
+        // Verwijder duplicaten (Brand+Model combinatie, behoud hoogste prijs)
+        int originalCount = allCars.Count;
+        _cars = RemoveDuplicates(allCars);
+        int duplicateCount = originalCount - _cars.Count;
+        if (duplicateCount > 0)
+        {
+            Console.WriteLine($"Duplicaten verwijderd: {duplicateCount} auto's (oorspronkelijk {originalCount}, na verwijdering {_cars.Count})");
+        }
 
         // Laad image mapping
         LoadImageMapping();
@@ -259,6 +268,43 @@ public class CarRepository : ICarRepository
         }
 
         return cars;
+    }
+
+    /// <summary>
+    /// Verwijdert duplicaten op basis van Brand+Model combinatie.
+    /// Behoudt de auto met de hoogste prijs per unieke combinatie.
+    /// </summary>
+    private List<Car> RemoveDuplicates(List<Car> cars)
+    {
+        if (cars == null || cars.Count == 0)
+            return cars;
+
+        // Gebruik een dictionary om de beste auto per unieke combinatie bij te houden
+        // Key: Brand|Model (case-insensitive), Value: Car object
+        Dictionary<string, Car> uniqueCarsMap = new Dictionary<string, Car>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (Car car in cars)
+        {
+            string brand = (car.Brand ?? string.Empty).Trim();
+            string model = (car.Model ?? string.Empty).Trim();
+            string uniqueKey = $"{brand}|{model}";
+
+            if (uniqueCarsMap.TryGetValue(uniqueKey, out Car? existingCar))
+            {
+                // Als er al een auto is, behoud degene met de hoogste prijs
+                if (car.Budget > existingCar.Budget)
+                {
+                    uniqueCarsMap[uniqueKey] = car;
+                }
+            }
+            else
+            {
+                // Nieuwe unieke combinatie, voeg toe
+                uniqueCarsMap.Add(uniqueKey, car);
+            }
+        }
+
+        return uniqueCarsMap.Values.ToList();
     }
 
     /// <summary>

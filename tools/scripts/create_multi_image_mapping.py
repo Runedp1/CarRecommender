@@ -270,8 +270,8 @@ for car in unique_cars:
                             break
     
     if matched_images:
-        # Converteer naar image URLs
-        image_urls = [f"/images/{img}" for img in matched_images]
+        # Converteer naar image URLs en beperk tot maximaal 15 per auto
+        image_urls = [f"/images/{img}" for img in matched_images[:15]]  # Max 15 images per auto
         mapping[str(car_id)] = image_urls
         matched_count += 1
         total_images_matched += len(image_urls)
@@ -285,6 +285,7 @@ print(f"    - Gedeeltelijke match (geen exact jaar): {matched_no_year}")
 print(f"  Auto's zonder images: {unmatched_count}")
 print(f"  Totaal aantal images toegewezen: {total_images_matched}")
 print(f"  Gemiddeld aantal images per auto: {(total_images_matched/matched_count):.1f}" if matched_count > 0 else "  Gemiddeld aantal images per auto: 0")
+print(f"  (Maximaal 15 images per auto)")
 print()
 
 # STAP 4: Opslaan van mapping
