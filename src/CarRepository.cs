@@ -57,6 +57,8 @@ public class CarRepository : ICarRepository
         {
             var audiCountBeforeDedup = allCars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
             var audiModelsBeforeDedup = allCars.Where(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true).Select(c => c.Model).Distinct().ToList();
+            Console.WriteLine($"[DEBUG] Audi count VOOR deduplicatie: {audiCountBeforeDedup} (totaal auto's: {allCars.Count})");
+            Console.WriteLine($"[DEBUG] Audi modellen VOOR deduplicatie: {string.Join(", ", audiModelsBeforeDedup)}");
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
             var logDir = Path.GetDirectoryName(logPath);
             if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
@@ -77,6 +79,8 @@ public class CarRepository : ICarRepository
         {
             var audiCountAfterDedup = _cars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
             var audiModelsAfterDedup = _cars.Where(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true).Select(c => c.Model).Distinct().ToList();
+            Console.WriteLine($"[DEBUG] Audi count NA deduplicatie: {audiCountAfterDedup} (totaal auto's: {_cars.Count})");
+            Console.WriteLine($"[DEBUG] Audi modellen NA deduplicatie: {string.Join(", ", audiModelsAfterDedup)}");
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
             var logDir = Path.GetDirectoryName(logPath);
             if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
@@ -110,6 +114,7 @@ public class CarRepository : ICarRepository
         try
         {
             var audiCount = _cars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
+            Console.WriteLine($"[DEBUG] GetAllCars aangeroepen - Totaal auto's: {_cars.Count}, Audi count: {audiCount}");
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
             var logDir = Path.GetDirectoryName(logPath);
             if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
