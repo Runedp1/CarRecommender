@@ -26,16 +26,19 @@ public class CarApiClient
 
     /// <summary>
     /// Haalt alle auto's op via GET /api/cars
+    /// Backend retourneert een PagedResult, maar we willen alle auto's, dus gebruiken we een grote pageSize
     /// </summary>
     public async Task<List<Car>?> GetAllCarsAsync()
     {
         try
         {
-            var response = await _httpClient.GetAsync("/api/cars");
+            // Gebruik een grote pageSize om alle auto's in één keer op te halen
+            var response = await _httpClient.GetAsync("/api/cars?page=1&pageSize=10000");
             response.EnsureSuccessStatusCode();
             
-            var cars = await response.Content.ReadFromJsonAsync<List<Car>>(_jsonOptions);
-            return cars;
+            // Backend retourneert PagedResult<Car>, niet List<Car>
+            var pagedResult = await response.Content.ReadFromJsonAsync<PagedResult<Car>>(_jsonOptions);
+            return pagedResult?.Items;
         }
         catch (HttpRequestException ex)
         {
