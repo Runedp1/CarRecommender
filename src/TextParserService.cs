@@ -281,88 +281,76 @@ public class TextParserService
 
     /// <summary>
     /// Extraheert vermogen voorkeur met gewicht.
-    /// Herkent informele omschrijvingen: "veel vermogen" (0.8), "sterke motor" (0.8), 
-    /// "voldoende voor snelweg" (0.5), of exacte waarden "200 KW", "minstens 150 KW"
+    /// Herkent informele omschrijvingen en mapt ze naar realistische PK-drempels, 
+    /// "voldoende voor snelweg" (0.5), of exacte waarden "200 KW", "minstens 150 pk"
     /// </summary>
+    
     private void ExtractPowerPreference(string text, UserPreferences prefs)
     {
         double? powerValue = null;
         double weight = 1.0;
 
-        // Eerst checken op expliciete vermogen eisen (exacte getallen)
+        // 1️⃣ Eerst: expliciete PK (bv "200 pk", "minstens 180 pk")
         powerValue = ExtractExplicitPower(text);
-
-        // Als geen expliciet vermogen, check op informele omschrijvingen
-        if (!powerValue.HasValue)
-        {
-            // "Veel vermogen" / "veel pk" / "sterke motor" / "krachtig" → 0.8 (hoog)
-            if (ContainsKeywords(text, new[] { "veel vermogen", "veel pk", "sterke motor", "krachtig", "sterk", "veel power" }))
-            {
-                powerValue = 0.8;
-                weight = DetectImportanceWeight(text, "vermogen");
-            }
-            // "Voldoende voor snelweg" / "genoeg vermogen" → 0.5 (medium)
-            else if (ContainsKeywords(text, new[] { "voldoende", "genoeg", "voor snelweg", "snelweg" }))
-            {
-                powerValue = 0.5;
-                weight = DetectImportanceWeight(text, "vermogen");
-            }
-            // Sportieve keywords → 0.8
-            else if (ContainsKeywords(text, new[] { "sportief", "sporty", "snel", "prestaties", "performance", "sportwagen" }))
-            {
-                powerValue = 0.8;
-                weight = DetectImportanceWeight(text, "sportief");
-            }
-        }
-        else
-        {
-            // Expliciet vermogen heeft standaard hoog gewicht
-            weight = 1.0;
-        }
 
         if (powerValue.HasValue)
         {
+            // Expliciet vermogen = exact PK
             prefs.MinPower = powerValue.Value;
-            prefs.PreferenceWeights["power"] = weight;
+            prefs.PreferenceWeights["power"] = 1.0;
+            return;
+        }
+
+        // 2️⃣ Informele omschrijvingen → map naar REALISTISCHE PK
+        if (ContainsKeywords(text, new[] { "veel vermogen", "veel pk", "sterke motor", "krachtig", "veel power" }))
+        {
+            prefs.MinPower = 180; // sportief maar realistisch
+            prefs.PreferenceWeights["power"] = DetectImportanceWeight(text, "vermogen");
+        }
+        else if (ContainsKeywords(text, new[] { "sportief", "sporty", "performance", "prestaties", "sportwagen" }))
+        {
+            prefs.MinPower = 200;
+            prefs.PreferenceWeights["power"] = DetectImportanceWeight(text, "sportief");
+        }
+        else if (ContainsKeywords(text, new[] { "voldoende", "genoeg", "voor snelweg", "snelweg" }))
+        {
+            prefs.MinPower = 120;
+            prefs.PreferenceWeights["power"] = DetectImportanceWeight(text, "vermogen");
         }
     }
+
 
     /// <summary>
     /// Extraheert expliciet vermogen uit tekst (exacte getallen).
     /// </summary>
-    private double? ExtractExplicitPower(string text)
+    private int? ExtractExplicitPower(string text)
+{
+    var patterns = new[]
     {
-        var patterns = new[]
-        {
-            @"(?:minstens|min|min\.|tenminste)\s*(\d+)\s*(?:kw|pk|kW)",
-            @"(\d+)\s*(?:kw|pk|kW)\s*(?:minstens|min|of\s*meer)?",
-            @"(\d+)\s*(?:pk)\s*(?:vermogen|power)?"
-        };
+        @"(?:minstens|min|min\.|tenminste)\s*(\d+)\s*(?:pk)",
+        @"(\d+)\s*(?:pk)\s*(?:minstens|min|of\s*meer)?",
+        @"(\d+)\s*(?:pk)\s*(?:vermogen|power)?"
+    };
 
-        foreach (var pattern in patterns)
+    foreach (var pattern in patterns)
+    {
+        var match = Regex.Match(text, pattern, RegexOptions.IgnoreCase);
+        if (match.Success && match.Groups.Count > 1)
         {
-            var match = Regex.Match(text, pattern, RegexOptions.IgnoreCase);
-            if (match.Success && match.Groups.Count > 1)
+            if (int.TryParse(match.Groups[1].Value, out int power))
             {
-                if (int.TryParse(match.Groups[1].Value, out int power))
+                // Veiligheidscheck
+                if (power >= 40 && power <= 500)
                 {
-                    // Als PK (> 200), converteer naar KW
-                    if (power > 200)
-                    {
-                        power = (int)(power * 0.736);
-                    }
-                    // Als > 100, is het waarschijnlijk KW (exacte waarde)
-                    // Anders is het een score (0.0-1.0)
-                    if (power <= 100)
-                    {
-                        return power / 100.0; // Normaliseer naar 0.0-1.0
-                    }
-                    return power; // Exacte KW waarde
+                    return power; // EXPLICIETE PK
                 }
             }
         }
-        return null;
     }
+
+    return null;
+}
+
 
     /// <summary>
     /// Extraheert body type voorkeur met gewicht.
