@@ -20,7 +20,8 @@ public class CarApiClient
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
         {
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
         };
     }
 
@@ -106,19 +107,38 @@ public class CarApiClient
                 Top = top
             };
 
+            // Log de volledige URL die wordt gebruikt
+            var fullUrl = $"{_httpClient.BaseAddress}api/recommendations/text";
+            _logger.LogInformation("[CarApiClient] Aanroepen API: {FullUrl}", fullUrl);
+            _logger.LogInformation("[CarApiClient] Request: Text={Text}, Top={Top}", text, top);
+
             var response = await _httpClient.PostAsJsonAsync("/api/recommendations/text", request, _jsonOptions);
+            
+            _logger.LogInformation("[CarApiClient] Response Status: {StatusCode}", response.StatusCode);
+            
             response.EnsureSuccessStatusCode();
             
-            return await response.Content.ReadFromJsonAsync<List<RecommendationResult>>(_jsonOptions);
+            var result = await response.Content.ReadFromJsonAsync<List<RecommendationResult>>(_jsonOptions);
+            _logger.LogInformation("[CarApiClient] Aantal recommendations ontvangen: {Count}", result?.Count ?? 0);
+            
+            return result;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Fout bij het ophalen van recommendations op basis van tekst: {Text}", text);
+            _logger.LogError(ex, "HTTP fout bij het ophalen van recommendations. BaseAddress: {BaseAddress}, URL: {Url}", 
+                _httpClient.BaseAddress, "/api/recommendations/text");
             throw;
         }
         catch (TaskCanceledException ex)
         {
-            _logger.LogError(ex, "Timeout bij het ophalen van recommendations op basis van tekst: {Text}", text);
+            _logger.LogError(ex, "Timeout bij het ophalen van recommendations. BaseAddress: {BaseAddress}", 
+                _httpClient.BaseAddress);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Onverwachte fout bij het ophalen van recommendations. BaseAddress: {BaseAddress}", 
+                _httpClient.BaseAddress);
             throw;
         }
     }
@@ -265,5 +285,6 @@ public class CarApiClient
         }
     }
 }
+
 
 

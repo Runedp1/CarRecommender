@@ -47,6 +47,18 @@
         // Als het niet herkend wordt, retourneer de originele waarde met hoofdletter
         return char.ToUpper(transmission[0]) + (transmission.Length > 1 ? transmission.Substring(1).ToLower() : "");
     }
+    
+    /// <summary>
+    /// Converteert vermogen van KW naar PK (paardenkracht).
+    /// Dataset bevat vermogen in KW, maar we tonen het in PK voor gebruikers.
+    /// Conversie: 1 KW = 1.35962 PK (afgerond naar 1.36)
+    /// </summary>
+    int ConvertKwToHp(int powerKw)
+    {
+        // 1 KW = 1.35962 PK (metrische paardenkracht)
+        // Afgerond naar 1.36 voor eenvoud
+        return (int)Math.Round(powerKw * 1.35962);
+    }
 }
 
 <div class="container mt-4">
@@ -168,7 +180,7 @@
                                 <strong>Prijs:</strong> €@recommendation.Car.Budget.ToString("N0")<br>
                                 <strong>Brandstof:</strong> @recommendation.Car.Fuel<br>
                                 <strong>Bouwjaar:</strong> @recommendation.Car.Year<br>
-                                <strong>Vermogen:</strong> @recommendation.Car.Power PK<br>
+                                <strong>Vermogen:</strong> @ConvertKwToHp(recommendation.Car.Power) PK<br>
                                 <strong>Transmissie:</strong> @FormatTransmission(recommendation.Car.Transmission)<br>
                                 @if (!string.IsNullOrWhiteSpace(recommendation.Car.BodyType))
                                 {

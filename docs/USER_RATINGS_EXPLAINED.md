@@ -205,3 +205,6 @@ SQLite databases in Azure App Service:
 **Het huidige systeem werkt perfect voor collaborative filtering zonder inlog!** 🎉
 
 
+
+
+

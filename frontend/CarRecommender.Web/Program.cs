@@ -9,10 +9,23 @@ builder.Services.AddRazorPages();
 var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"] 
     ?? throw new InvalidOperationException("ApiSettings:BaseUrl is niet geconfigureerd in appsettings.json");
 
+// Zorg dat BaseAddress eindigt met een slash voor correct gebruik met relatieve URLs
+if (!apiBaseUrl.EndsWith("/"))
+{
+    apiBaseUrl = apiBaseUrl + "/";
+}
+
+// LOG: Toon welke API URL wordt gebruikt
+Console.WriteLine($"[FRONTEND] API Base URL: {apiBaseUrl}");
+Console.WriteLine($"[FRONTEND] Environment: {builder.Environment.EnvironmentName}");
+
 builder.Services.AddHttpClient<CarApiClient>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
+    // LOG: Bevestig configuratie
+    Console.WriteLine($"[FRONTEND] HttpClient geconfigureerd met BaseAddress: {client.BaseAddress}");
+    Console.WriteLine($"[FRONTEND] Test URL zou zijn: {client.BaseAddress}api/health");
 });
 
 

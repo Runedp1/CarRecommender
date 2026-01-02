@@ -1,38 +1,7 @@
 using CarRecommender;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-
-// #region agent log
-static void DebugLog(string location, string message, object? data = null, string hypothesisId = "")
-{
-    try
-    {
-        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-        var logDir = Path.GetDirectoryName(logPath);
-        if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-            Directory.CreateDirectory(logDir);
-        var logEntry = new
-        {
-            id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-            timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-            location = location,
-            message = message,
-            data = data ?? new { },
-            sessionId = "debug-session",
-            runId = "startup",
-            hypothesisId = hypothesisId
-        };
-        File.AppendAllText(logPath, JsonSerializer.Serialize(logEntry) + Environment.NewLine);
-    }
-    catch { }
-}
-// #endregion
 
 var builder = WebApplication.CreateBuilder(args);
-
-// #region agent log
-DebugLog("Program.cs:4", "Application startup begin", new { environment = builder.Environment.EnvironmentName }, "A");
-// #endregion
 
 // ============================================================================
 // CONFIGURATIE LEZEN
@@ -40,7 +9,75 @@ DebugLog("Program.cs:4", "Application startup begin", new { environment = builde
 // Lees configuratie uit appsettings.json (lokaal) of appsettings.Production.json (Azure)
 // Dit zorgt ervoor dat de applicatie werkt zonder harde paden
 var csvFileName = builder.Configuration["DataSettings:CsvFileName"] ?? "df_master_v8_def.csv";
-var dataDirectory = builder.Configuration["DataSettings:DataDirectory"] ?? "data";
+var configuredDataDirectory = builder.Configuration["DataSettings:DataDirectory"] ?? "../data";
+
+// Bepaal absolute pad naar backend/data directory
+// Strategie: zoek vanuit verschillende locaties om backend/data te vinden
+string? dataDirectory = null;
+
+// 1. Probeer vanuit assembly locatie (runtime - deployed)
+var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+if (!string.IsNullOrEmpty(assemblyLocation))
+{
+    var assemblyDir = Path.GetDirectoryName(assemblyLocation);
+    // Van bin/Debug/net8.0/CarRecommender.Api.dll naar backend/data
+    // bin/Debug/net8.0 -> bin -> Debug -> .. -> backend/CarRecommender.Api -> .. -> backend -> data
+    var testPath = Path.Combine(assemblyDir ?? "", "..", "..", "..", "..", "data");
+    testPath = Path.GetFullPath(testPath);
+    if (Directory.Exists(testPath) && File.Exists(Path.Combine(testPath, csvFileName)))
+    {
+        dataDirectory = testPath;
+        Console.WriteLine($"[CONFIG] Found backend/data from assembly location: {dataDirectory}");
+    }
+}
+
+// 2. Probeer vanuit current working directory (development)
+if (dataDirectory == null)
+{
+    var currentWorkingDir = Directory.GetCurrentDirectory();
+    // Zoek omhoog tot we backend/data vinden
+    var searchDir = currentWorkingDir;
+    for (int i = 0; i < 5 && searchDir != null; i++)
+    {
+        var testPath = Path.Combine(searchDir, "backend", "data");
+        testPath = Path.GetFullPath(testPath);
+        if (Directory.Exists(testPath) && File.Exists(Path.Combine(testPath, csvFileName)))
+        {
+            dataDirectory = testPath;
+            Console.WriteLine($"[CONFIG] Found backend/data from current directory: {dataDirectory}");
+            break;
+        }
+        searchDir = Directory.GetParent(searchDir)?.FullName;
+    }
+}
+
+// 3. Gebruik geconfigureerd pad als fallback
+if (dataDirectory == null)
+{
+    dataDirectory = Path.IsPathRooted(configuredDataDirectory) 
+        ? configuredDataDirectory 
+        : Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), configuredDataDirectory));
+    Console.WriteLine($"[CONFIG] Using configured data directory: {dataDirectory}");
+}
+
+// Verifieer dat het bestand bestaat
+var fullPath = Path.Combine(dataDirectory, csvFileName);
+Console.WriteLine($"[CONFIG] CSV File: {csvFileName}");
+Console.WriteLine($"[CONFIG] Data Directory: {dataDirectory}");
+Console.WriteLine($"[CONFIG] Full Path: {fullPath}");
+Console.WriteLine($"[CONFIG] File Exists: {File.Exists(fullPath)}");
+
+if (File.Exists(fullPath))
+{
+    var fileInfo = new FileInfo(fullPath);
+    Console.WriteLine($"[CONFIG] File Size: {fileInfo.Length:N0} bytes");
+    Console.WriteLine($"[CONFIG] File Last Modified: {fileInfo.LastWriteTime}");
+}
+else
+{
+    Console.WriteLine($"[WARNING] CSV file not found at: {fullPath}");
+    Console.WriteLine($"[WARNING] Application may not work correctly!");
+}
 
 // ============================================================================
 // DEPENDENCY INJECTION CONFIGURATIE
@@ -51,303 +88,19 @@ var dataDirectory = builder.Configuration["DataSettings:DataDirectory"] ?? "data
 // Registreer ICarRepository als singleton (data wordt één keer geladen bij opstart)
 // Singleton betekent dat er één instantie is voor de hele applicatie levensduur.
 // Dit is efficiënt omdat we de CSV één keer inlezen en dan hergebruiken.
+// ⚠️ BELANGRIJK: Als CSV bestand wordt vervangen, moet de applicatie worden herstart!
 // Geef configuratie door aan CarRepository via factory pattern
-builder.Services.AddSingleton<ICarRepository>(sp =>
-{
-    // #region agent log
-    DebugLog("Program.cs:24", "CarRepository creation start", new { csvFileName, dataDirectory }, "B");
-    // #endregion
-    try
-    {
-        var repo = new CarRepository(csvFileName, dataDirectory);
-        // #region agent log
-        DebugLog("Program.cs:24", "CarRepository creation success", new { carCount = repo.GetAllCars().Count }, "B");
-        // #endregion
-        return repo;
-    }
-    catch (Exception ex)
-    {
-        // #region agent log
-        DebugLog("Program.cs:24", "CarRepository creation failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "B");
-        // #endregion
-        throw;
-    }
-});
-
-// Registreer feedback services voor continue learning
-builder.Services.AddSingleton<IFeedbackRepository, FeedbackRepository>();
-builder.Services.AddSingleton<FeedbackTrackingService>();
-// #region agent log
-DebugLog("Program.cs:77", "MlRecommendationService registration start", null, "C");
-// #endregion
-builder.Services.AddSingleton<MlRecommendationService>(sp =>
-{
-    // #region agent log
-    DebugLog("Program.cs:80", "MlRecommendationService factory start", null, "C");
-    // #endregion
-    try
-    {
-        var service = new MlRecommendationService();
-        // #region agent log
-        DebugLog("Program.cs:80", "MlRecommendationService factory success", null, "C");
-        // #endregion
-        return service;
-    }
-    catch (Exception ex)
-    {
-        // #region agent log
-        DebugLog("Program.cs:80", "MlRecommendationService factory failed", new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name }, "C");
-        // #endregion
-        throw;
-    }
-});
-
-// Registreer session service voor user ID management (GEEN echte authentication)
-builder.Services.AddSingleton<SessionUserService>();
-
-// Registreer session middleware (voor session-based user IDs)
-builder.Services.AddDistributedMemoryCache();
-builder.Services.AddSession(options =>
-{
-    options.IdleTimeout = TimeSpan.FromHours(24); // Session blijft 24 uur actief
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-});
-
-// Registreer user rating services voor collaborative filtering
-builder.Services.AddSingleton<IUserRatingRepository>(sp =>
-{
-    // #region agent log
-    DebugLog("Program.cs:44", "UserRatingRepository registration start", null, "A");
-    // #endregion
-    // Haal database pad op uit configuratie
-    // In Azure: gebruik HOME environment variable voor persistent storage
-    var dbPath = builder.Configuration["DatabaseSettings:RatingsDatabasePath"];
-    
-    // Als geen pad is opgegeven, gebruik standaard locatie
-    if (string.IsNullOrEmpty(dbPath))
-    {
-        // Probeer Azure HOME directory eerst (persistent storage)
-        var homePath = Environment.GetEnvironmentVariable("HOME");
-        if (!string.IsNullOrEmpty(homePath))
-        {
-            dbPath = Path.Combine(homePath, "data", "user_ratings.db");
-        }
-        else
-        {
-            // Fallback naar lokale data directory
-            dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "user_ratings.db");
-        }
-    }
-    
-    // #region agent log
-    DebugLog("Program.cs:44", "Database path determined", new { dbPath, homeEnv = Environment.GetEnvironmentVariable("HOME") }, "A");
-    // #endregion
-    
-    UserRatingRepository ratingRepo;
-    try
-    {
-        // #region agent log
-        DebugLog("Program.cs:69", "UserRatingRepository constructor call start", new { dbPath }, "A");
-        // #endregion
-        ratingRepo = new UserRatingRepository(dbPath);
-        
-        // #region agent log
-        DebugLog("Program.cs:69", "UserRatingRepository constructor success", new { databasePath = ratingRepo.DatabasePath }, "A");
-        // #endregion
-        
-        // Log database locatie
-        var logger = sp.GetService<ILogger<Program>>();
-        logger?.LogInformation("User Ratings Database locatie: {DbPath}", ratingRepo.DatabasePath);
-    }
-    catch (Exception ex)
-    {
-        // #region agent log
-        DebugLog("Program.cs:75", "UserRatingRepository constructor failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "A");
-        // #endregion
-        // Als repository creation faalt, gebruik fallback met temp path
-        var logger = sp.GetService<ILogger<Program>>();
-        logger?.LogWarning(ex, "UserRatingRepository creation gefaald, gebruik fallback");
-        ratingRepo = new UserRatingRepository(Path.Combine(Path.GetTempPath(), "user_ratings.db"));
-    }
-    
-    // Initialiseer database asynchroon bij startup (met error handling om crashes te voorkomen)
-    // Gebruik ConfigureAwait(false) om deadlocks te voorkomen
-    // BELANGRIJK: Als database init faalt, laat app gewoon doorgaan zonder user ratings
-    _ = Task.Run(async () =>
-    {
-        try
-        {
-            // #region agent log
-            DebugLog("Program.cs:85", "Database init task started", null, "A");
-            // #endregion
-            // Wacht even zodat app kan starten
-            await Task.Delay(3000).ConfigureAwait(false);
-            
-            // #region agent log
-            DebugLog("Program.cs:90", "Starting database initialization", null, "A");
-            // #endregion
-            // Probeer database te initialiseren met retry logic
-            int retries = 2; // Minder retries om sneller te falen
-            for (int i = 0; i < retries; i++)
-            {
-                try
-                {
-                    // #region agent log
-                    DebugLog("Program.cs:98", "Database init attempt", new { attempt = i + 1, maxRetries = retries }, "A");
-                    // #endregion
-                    await ratingRepo.InitializeDatabaseAsync().ConfigureAwait(false);
-                    // #region agent log
-                    DebugLog("Program.cs:98", "Database init success", new { attempt = i + 1 }, "A");
-                    // #endregion
-                    var logger = sp.GetService<ILogger<Program>>();
-                    logger?.LogInformation("User Ratings Database succesvol geïnitialiseerd");
-                    return; // Success - exit
-                }
-                catch (Exception retryEx) when (i < retries - 1)
-                {
-                    // #region agent log
-                    DebugLog("Program.cs:102", "Database init retry", new { attempt = i + 1, error = retryEx.Message }, "A");
-                    // #endregion
-                    var logger = sp.GetService<ILogger<Program>>();
-                    logger?.LogWarning(retryEx, "Database initialisatie poging {Attempt} gefaald, retry...", i + 1);
-                    await Task.Delay(2000).ConfigureAwait(false); // Kortere delay
-                }
-                catch (Exception finalEx)
-                {
-                    // #region agent log
-                    DebugLog("Program.cs:102", "Database init final failure", new { attempt = i + 1, error = finalEx.Message }, "A");
-                    // #endregion
-                    var logger = sp.GetService<ILogger<Program>>();
-                    logger?.LogWarning(finalEx, "User Ratings Database initialisatie gefaald na alle retries. App blijft werken zonder user ratings.");
-                    return; // Fail gracefully - app blijft werken
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            // #region agent log
-            DebugLog("Program.cs:109", "Database init task failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "A");
-            // #endregion
-            // Log error maar laat app niet crashen - app blijft werken zonder user ratings
-            var logger = sp.GetService<ILogger<Program>>();
-            logger?.LogWarning(ex, "User Ratings Database initialisatie gefaald. App blijft werken zonder user ratings.");
-        }
-    });
-    
-    return ratingRepo;
-});
-builder.Services.AddSingleton<CollaborativeFilteringService>(sp =>
-{
-    try
-    {
-        var ratingRepo = sp.GetService<IUserRatingRepository>();
-        var carRepo = sp.GetRequiredService<ICarRepository>();
-        // Als ratingRepo niet beschikbaar is, return null (wordt later opgevangen)
-        if (ratingRepo == null)
-        {
-            // #region agent log
-            DebugLog("Program.cs:240", "CollaborativeFilteringService: ratingRepo not available, skipping", null, "A");
-            // #endregion
-            return null!; // Return null, maar markeer als non-nullable voor DI
-        }
-        return new CollaborativeFilteringService(ratingRepo, carRepo);
-    }
-    catch (Exception ex)
-    {
-        // #region agent log
-        DebugLog("Program.cs:240", "CollaborativeFilteringService creation failed", new { error = ex.Message }, "A");
-        // #endregion
-        return null!; // Return null, maar markeer als non-nullable voor DI
-    }
-});
-// ModelRetrainingService wordt NIET geregistreerd om circular dependency te voorkomen
-// RecommendationService maakt ModelRetrainingService optioneel, dus de app kan zonder werken
-// #region agent log
-DebugLog("Program.cs:264", "Skipping ModelRetrainingService registration - circular dependency with IRecommendationService", null, "D");
-// #endregion
-// ModelPerformanceMonitor wordt NIET geregistreerd omdat ModelRetrainingService niet beschikbaar is
-// #region agent log
-DebugLog("Program.cs:270", "Skipping ModelPerformanceMonitor registration - ModelRetrainingService not available", null, "D");
-// #endregion
+Console.WriteLine($"[DI] Initialiseren CarRepository singleton...");
+Console.WriteLine($"[DI] CSV File: {csvFileName}");
+Console.WriteLine($"[DI] Data Directory: {dataDirectory}");
+var carRepository = new CarRepository(csvFileName, dataDirectory);
+Console.WriteLine($"[DI] ✅ CarRepository singleton geïnitialiseerd met {carRepository.GetAllCars().Count} auto's");
+builder.Services.AddSingleton<ICarRepository>(sp => carRepository);
 
 // Registreer IRecommendationService als scoped (één per HTTP request)
 // Scoped betekent dat er één instantie is per HTTP request.
 // Dit is geschikt voor services die per request gebruikt worden.
-builder.Services.AddScoped<IRecommendationService>(sp =>
-{
-    // #region agent log
-    DebugLog("Program.cs:143", "RecommendationService registration start", null, "C");
-    // #endregion
-    try
-    {
-        var carRepo = sp.GetRequiredService<ICarRepository>();
-        var feedbackService = sp.GetRequiredService<FeedbackTrackingService>();
-        // ModelRetrainingService is niet beschikbaar (circular dependency) - RecommendationService maakt het optioneel
-        var retrainingService = (ModelRetrainingService?)null;
-        var collaborativeService = sp.GetService<CollaborativeFilteringService>();
-        var ratingRepo = sp.GetService<IUserRatingRepository>();
-        // #region agent log
-        DebugLog("Program.cs:143", "RecommendationService dependencies resolved", null, "C");
-        // #endregion
-        return new RecommendationService(carRepo, feedbackService, retrainingService, collaborativeService, ratingRepo);
-    }
-    catch (Exception ex)
-    {
-        // #region agent log
-        DebugLog("Program.cs:143", "RecommendationService registration failed", new { error = ex.Message, stackTrace = ex.StackTrace }, "C");
-        // #endregion
-        throw;
-    }
-});
-
-// ML Pipeline services - registreer voor ML evaluatie, hyperparameter tuning en forecasting
-// HyperparameterTuningService en ForecastingService zijn stateless en kunnen als singleton
-builder.Services.AddSingleton<HyperparameterTuningService>();
-builder.Services.AddSingleton<ForecastingService>();
-
-// MlEvaluationService is scoped omdat het IRecommendationService gebruikt (ook scoped)
-builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
-
-// Background service voor automatische retraining
-// #region agent log
-DebugLog("Program.cs:162", "RetrainingBackgroundService registration", null, "D");
-// #endregion
-builder.Services.AddHostedService<CarRecommender.Api.Services.RetrainingBackgroundService>();
-
-// ============================================================================
-// CORS CONFIGURATIE
-// ============================================================================
-// CORS is nodig zodat de frontend (lokaal en Azure) kan communiceren met de API
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        // CORS: Allow frontend origins
-        // Use SetIsOriginAllowed to allow Azure App Service URLs dynamically
-        policy.SetIsOriginAllowed(origin =>
-        {
-            // Allow localhost for development
-            if (origin.StartsWith("http://localhost:") || origin.StartsWith("https://localhost:"))
-                return true;
-            
-            // Allow any Azure App Service URL (ends with .azurewebsites.net or .scm.azurewebsites.net)
-            if (origin.EndsWith(".azurewebsites.net") || origin.EndsWith(".scm.azurewebsites.net"))
-                return true;
-            
-            // Allow specific known origins
-            var allowedOrigins = new[]
-            {
-                "https://pp-carrecommender-web-dev.azurewebsites.net"
-            };
-            
-            return allowedOrigins.Contains(origin);
-        })
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials();
-    });
-});
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 
 // ============================================================================
 // SWAGGER/OPENAPI CONFIGURATIE
@@ -358,11 +111,33 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // ============================================================================
+// CORS CONFIGURATIE
+// ============================================================================
+// CORS (Cross-Origin Resource Sharing) is nodig zodat de frontend (localhost:7000) 
+// kan verbinden met de backend API (localhost:5283)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:7000", "https://localhost:7001", "http://localhost:5000", "https://localhost:5001")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+// ============================================================================
 // CONTROLLERS CONFIGURATIE
 // ============================================================================
 // Voeg controllers toe zodat ASP.NET Core ze kan vinden en routes kan maken.
 // Configureer JSON serialization voor consistente error responses
+// Zorg dat camelCase wordt gebruikt (text i.p.v. Text) voor compatibiliteit met frontend
 builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    })
     .ConfigureApiBehaviorOptions(options =>
     {
         // Standaard foutafhandeling voor model validation errors
@@ -384,127 +159,118 @@ builder.Services.AddControllers()
 // Dit voorkomt te veel log output in Azure App Service logs
 // Development mode logt meer details voor debugging
 
-// #region agent log
-DebugLog("Program.cs:218", "Building application", null, "A");
-// #endregion
-try
+var app = builder.Build();
+
+// ============================================================================
+// HTTP REQUEST PIPELINE CONFIGURATIE
+// ============================================================================
+// Deze sectie configureert hoe HTTP requests worden verwerkt.
+
+// In development mode: toon Swagger UI voor API testing
+if (app.Environment.IsDevelopment())
 {
-    var app = builder.Build();
-    // #region agent log
-    DebugLog("Program.cs:218", "Application built successfully", null, "A");
-    // #endregion
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
-    // ============================================================================
-    // HTTP REQUEST PIPELINE CONFIGURATIE
-    // ============================================================================
-    // Deze sectie configureert hoe HTTP requests worden verwerkt.
-
-    // In development mode: toon Swagger UI voor API testing
-    if (app.Environment.IsDevelopment())
+// ============================================================================
+// GLOBALE FOUTAFHANDELING VOOR AZURE PRODUCTION
+// ============================================================================
+// Deze middleware vangt onverwachte exceptions op en geeft een nette 500 response
+// MOET vroeg in de pipeline staan om alle exceptions te vangen
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
     {
-        app.UseSwagger();
-        app.UseSwaggerUI();
-    }
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
 
-    // HTTPS redirect (veiligheid) - alleen lokaal, Azure handelt dit zelf af
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseHttpsRedirection();
-    }
-
-    // Session middleware (voor session-based user IDs)
-    app.UseSession();
-
-    // CORS middleware - moet vóór UseRouting/MapControllers komen
-    app.UseCors();
-
-    // Serve static files (voor lokale auto-afbeeldingen uit images/ directory)
-    // Dit maakt afbeeldingen beschikbaar via /images/{filename}.jpg
-    app.UseStaticFiles();
-
-    // Serve images from backend/images directory
-    // Probeer verschillende locaties (lokaal en Azure)
-    string[] possibleImagePaths = new[]
-    {
-        Path.Combine(builder.Environment.ContentRootPath, "..", "backend", "images"), // Lokaal development
-        Path.Combine(builder.Environment.ContentRootPath, "images"), // Azure deployment
-        Path.Combine(builder.Environment.ContentRootPath, "backend", "images"), // Alternatief lokaal
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "images"), // Azure runtime
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backend", "images") // Alternatief Azure
-    };
-
-    string? imagesPath = null;
-    foreach (var path in possibleImagePaths)
-    {
-        if (Directory.Exists(path))
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        var exceptionHandlerFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        
+        if (exceptionHandlerFeature?.Error != null)
         {
-            imagesPath = path;
-            break;
-        }
-    }
-
-    if (!string.IsNullOrEmpty(imagesPath))
-    {
-        app.UseStaticFiles(new StaticFileOptions
-        {
-            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(imagesPath),
-            RequestPath = "/images"
-        });
-        Console.WriteLine($"Images directory geconfigureerd: {imagesPath}");
-    }
-    else
-    {
-        Console.WriteLine($"Waarschuwing: Images directory niet gevonden. Gezocht in:");
-        foreach (var path in possibleImagePaths)
-        {
-            Console.WriteLine($"  - {path}");
-        }
-    }
-
-    // ============================================================================
-    // GLOBALE FOUTAFHANDELING VOOR AZURE PRODUCTION
-    // ============================================================================
-    // Deze middleware vangt onverwachte exceptions op en geeft een nette 500 response
-    // In Production loggen we de echte exception maar geven we geen details aan de client
-    app.UseExceptionHandler(errorApp =>
-    {
-        errorApp.Run(async context =>
-        {
-            context.Response.StatusCode = 500;
-            context.Response.ContentType = "application/json";
-
-            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-            var exceptionHandlerFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+            var exception = exceptionHandlerFeature.Error;
             
-            if (exceptionHandlerFeature?.Error != null)
-            {
-                var exception = exceptionHandlerFeature.Error;
-                
-                // Log de echte exception voor debugging (alleen in Azure logs, niet naar client)
-                logger.LogError(exception, "Onverwachte fout opgetreden tijdens verwerking van request: {Path}", 
-                    context.Request.Path);
-                
-                // Geef generieke foutmelding aan client (veiligheid)
-                var response = new { error = "Er is een interne serverfout opgetreden. Probeer het later opnieuw." };
-                await context.Response.WriteAsJsonAsync(response);
-            }
-        });
+            // Log de echte exception voor debugging (alleen in Azure logs, niet naar client)
+            logger.LogError(exception, "Onverwachte fout opgetreden tijdens verwerking van request: {Path}", 
+                context.Request.Path);
+            
+            // Geef generieke foutmelding aan client (veiligheid)
+            var response = new { error = "Er is een interne serverfout opgetreden. Probeer het later opnieuw." };
+            await context.Response.WriteAsJsonAsync(response);
+        }
     });
+});
+
+// HTTPS redirect (veiligheid) - alleen lokaal, Azure handelt dit zelf af
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+// Serve static files (voor lokale auto-afbeeldingen uit images/ directory)
+// Dit maakt afbeeldingen beschikbaar via /images/{brand}/{model}/{id}.jpg
+// Zoek naar images directory: eerst in output directory, dan in backend/images
+string? imagesPath = null;
+var imagesCurrentDir = Directory.GetCurrentDirectory();
+
+// 1. Probeer images in output directory (deployed)
+var outputImagesPath = Path.Combine(imagesCurrentDir, "images");
+if (Directory.Exists(outputImagesPath))
+{
+    imagesPath = outputImagesPath;
+    Console.WriteLine($"[CONFIG] Static files from output directory: {imagesPath}");
+}
+
+// 2. Probeer backend/images (development)
+if (imagesPath == null)
+{
+    var backendImagesPath = Path.Combine(imagesCurrentDir, "..", "images");
+    backendImagesPath = Path.GetFullPath(backendImagesPath);
+    if (Directory.Exists(backendImagesPath))
+    {
+        imagesPath = backendImagesPath;
+        Console.WriteLine($"[CONFIG] Static files from backend/images: {imagesPath}");
+    }
+}
+
+// Configureer static files
+if (!string.IsNullOrEmpty(imagesPath))
+{
+    var staticFilesOptions = new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(imagesPath),
+        RequestPath = "/images"
+    };
+    app.UseStaticFiles(staticFilesOptions);
+}
+else
+{
+    // Fallback: gebruik default static files (wwwroot)
+    app.UseStaticFiles();
+    Console.WriteLine($"[WARNING] Images directory not found, using default static files");
+}
+
+// CORS middleware - MOET vóór UseRouting() komen
+app.UseCors("AllowFrontend");
+
+// Routing moet vóór authorization komen
+app.UseRouting();
 
 // ============================================================================
-// ROUTING CONFIGURATIE
+// AUTHORIZATION & ENDPOINTS
 // ============================================================================
-    // Map controllers naar routes (bijv. /api/cars, /api/recommendations)
-    // Deze routes werken zowel in Development als Production
-    app.MapControllers();
+// Authorization middleware (na routing, vóór endpoints)
+app.UseAuthorization();
 
-    // #region agent log
-    DebugLog("Program.cs:322", "Controllers mapped, app ready to run", null, "A");
-    // #endregion
+// Map controllers naar routes (bijv. /api/cars, /api/recommendations)
+// Deze routes werken zowel in Development als Production
+app.MapControllers();
 
-    // ============================================================================
-    // AZURE DEPLOYMENT NOTES
-    // ============================================================================
+// ============================================================================
+// AZURE DEPLOYMENT NOTES
+// ============================================================================
 // Om deze API naar Azure App Service te publiceren:
 // 
 // 1. Publiceer via Visual Studio:
@@ -515,7 +281,7 @@ try
 //
 // 2. Publiceer via Azure CLI:
 //    dotnet publish -c Release
-//    az webapp deploy --name <app-name> --resource-group <resource-group> --src-path bin/Release/net8.0/publish
+//    az webapp deploy --name <app-name> --resource-group <resource-group> --src-path bin/Release/net9.0/publish
 //
 // 3. Voor productie:
 //    - Zet app.Environment.IsDevelopment() op false of gebruik appsettings.Production.json
@@ -528,15 +294,4 @@ try
 //    - Registreer SqlCarRepository in plaats van CarRepository hierboven
 //    - De rest van de code blijft hetzelfde werken!
 
-    // #region agent log
-    DebugLog("Program.cs:519", "Starting application", null, "A");
-    // #endregion
-    app.Run();
-}
-catch (Exception ex)
-{
-    // #region agent log
-    DebugLog("Program.cs:523", "Application startup failed", new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name }, "A");
-    // #endregion
-    throw;
-}
+app.Run();

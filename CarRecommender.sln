@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CarRecommender", "CarRecommender.csproj", "{89E1B230-2BAA-4E1E-A027-16B59AA11FCD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CarRecommender.Core", "CarRecommender.Core.csproj", "{89E1B230-2BAA-4E1E-A027-16B59AA11FCD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CarRecommender.Api", "backend\CarRecommender.Api\CarRecommender.Api.csproj", "{47A3267C-5550-4A9C-9DF2-F581D3B4C84A}"
 EndProject

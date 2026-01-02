@@ -1,98 +1,107 @@
-# Project Herstructurering - Voltooid
+# Herstructurering Voltooid ✅
 
-## ✅ Wat is Gedaan
+## Uitgevoerde Wijzigingen
 
-### 1. Frontend Verplaatst
-- ✅ `CarRecommender.Web` is verplaatst van `CarRecommender.Api/CarRecommender.Web/` naar `frontend/CarRecommender.Web/`
-- ✅ Solution file is bijgewerkt met het nieuwe pad
-- ✅ Frontend project is nu volledig gescheiden van de backend
+### 1. **Project Hernoemen en Library Maken**
+- ✅ `CarRecommender.csproj` → `CarRecommender.Core.csproj`
+- ✅ Project is nu een pure library (geen console entry point meer)
+- ✅ `OutputType` is altijd `Library`
 
-### 2. Solution Structuur
-- ✅ Solution file heeft nu logische folders:
-  - **Backend** folder (voor API projecten)
-  - **Frontend** folder (voor Web projecten)
+### 2. **Program.cs Verwijderd**
+- ✅ `src/Program.cs` verwijderd (was alleen voor demo/test doeleinden)
+- ✅ Console app functionaliteit kan later toegevoegd worden als apart project indien nodig
 
-### 3. Huidige Structuur
+### 3. **Target Frameworks Gestandaardiseerd**
+- ✅ Alle projecten gebruiken nu **net8.0**
+- ✅ `CarRecommender.Core`: net8.0
+- ✅ `CarRecommender.Api`: net8.0 (was net9.0)
+- ✅ `CarRecommender.Web`: net8.0 (al correct)
+
+### 4. **Project References Gefixed**
+- ✅ API project reference naar `CarRecommender.Core.csproj` (was `CarRecommender.csproj`)
+- ✅ Verwijderd: `IsReferencedByApi` property (niet meer nodig)
+- ✅ Solution file bijgewerkt met nieuwe project naam
+
+### 5. **Path Resolution Verbeterd**
+- ✅ `Program.cs` in API heeft verbeterde path resolution voor `backend/data`
+- ✅ Zoekt vanuit assembly locatie en current directory
+- ✅ `CarRepository.FindCsvFile` verbeterd om beter te werken met absolute paths
+- ✅ Dataset `df_master_v8_def.csv` wordt correct geladen vanuit `backend/data/`
+
+### 6. **Data Locatie**
+- ✅ Data files blijven in `backend/data/` (logische locatie)
+- ✅ Dataset: `df_master_v8_def.csv` wordt gebruikt
+- ✅ Images blijven in `backend/images/`
+
+## Nieuwe Project Structuur
 
 ```
-Recommendation System/
-├── CarRecommender.Api/            ← Backend (nog op root, kan later verplaatst)
-│   ├── CarRecommender.Api.csproj
-│   ├── Program.cs
-│   └── Controllers/
-├── frontend/                       ← Frontend folder
-│   └── CarRecommender.Web/        ← Frontend project
-│       ├── CarRecommender.Web.csproj
-│       ├── Program.cs
-│       ├── Pages/
-│       └── wwwroot/
-├── src/                            ← Shared business logic
-├── data/                           ← Data files
-└── CarRecommender.sln
+Recommendation_System_New/
+├── CarRecommender.Core.csproj      # Shared library (was CarRecommender.csproj)
+├── CarRecommender.sln              # Solution file (bijgewerkt)
+│
+├── src/                            # Shared business logic
+│   ├── Car.cs
+│   ├── CarRepository.cs
+│   ├── RecommendationService.cs
+│   └── ... (geen Program.cs meer)
+│
+├── backend/
+│   ├── CarRecommender.Api/         # Web API (net8.0)
+│   │   ├── Controllers/
+│   │   ├── Program.cs              # Verbeterde path resolution
+│   │   └── CarRecommender.Api.csproj
+│   │
+│   ├── data/                       # Data files
+│   │   └── df_master_v8_def.csv    # Dataset die gebruikt wordt
+│   │
+│   └── images/                     # Auto afbeeldingen
+│
+└── frontend/
+    └── CarRecommender.Web/          # Razor Pages website (net8.0)
+        └── CarRecommender.Web.csproj
 ```
 
----
+## Verificatie
 
-## 🎯 Resultaat
+### Build Status
+- ✅ `CarRecommender.Core` compileert zonder errors
+- ✅ `CarRecommender.Api` compileert zonder errors
+- ⚠️ Alleen nullable reference warnings (niet kritisch)
 
-### Frontend
-- **Locatie:** `frontend/CarRecommender.Web/`
-- **Project:** `frontend/CarRecommender.Web/CarRecommender.Web.csproj`
-- **Azure Web App:** `app-carrecommender-web-dev2`
-- **Status:** ✅ Klaar voor deployment
+### Data Loading
+- ✅ API project zoekt correct naar `backend/data/df_master_v8_def.csv`
+- ✅ Path resolution werkt vanuit verschillende locaties:
+  - Assembly locatie (runtime/deployed)
+  - Current directory (development)
+  - Configured path (fallback)
 
-### Backend
-- **Locatie:** `CarRecommender.Api/` (nog op root level)
-- **Project:** `CarRecommender.Api/CarRecommender.Api.csproj`
-- **Azure Web App:** `app-carrecommender-dev`
-- **Status:** ✅ Al gedeployed en werkend
+## Belangrijke Notities
 
----
+### Voor Developers
+1. **Core Library**: `CarRecommender.Core` is nu een pure library - geen entry point
+2. **Data Paths**: API project configureert data paths automatisch - geen handmatige path fixes nodig
+3. **Target Framework**: Alle projecten gebruiken net8.0 voor consistentie
 
-## 📋 Volgende Stappen
+### Voor Deployment
+- Data files worden gekopieerd naar output directory via `.csproj` configuratie
+- Images worden gekopieerd naar output directory via `.csproj` configuratie
+- Path resolution werkt zowel lokaal als in Azure
 
-### Optioneel: Backend Verplaatsen (Later)
+## Volgende Stappen (Optioneel)
 
-Als je de backend ook in een `backend/` folder wilt hebben:
+1. **Console App Project** (indien nodig):
+   - Maak apart `CarRecommender.Console` project voor demo/test doeleinden
+   - Reference naar `CarRecommender.Core`
+   - Verplaats oude `Program.cs` logica daarheen
 
-1. **Sluit Visual Studio**
-2. **Verplaats folder:**
-   ```
-   CarRecommender.Api/ → backend/CarRecommender.Api/
-   ```
-3. **Update solution file:**
-   - Wijzig pad van `CarRecommender.Api\CarRecommender.Api.csproj` naar `backend\CarRecommender.Api\CarRecommender.Api.csproj`
+2. **Documentatie Opschonen**:
+   - Archiveer verouderde documenten
+   - Consolideer overlappende documentatie
 
-**Let op:** Dit is optioneel. De huidige structuur werkt prima!
+3. **Nullable Warnings Fixen**:
+   - Fix nullable reference warnings voor betere code kwaliteit
 
----
+## Status: ✅ Herstructurering Voltooid
 
-## ✅ Deployment
-
-### Deploy Frontend:
-1. Open Visual Studio
-2. Rechtsklik op **`frontend/CarRecommender.Web`**
-3. Kies **"Publish"**
-4. Selecteer **`app-carrecommender-web-dev2`**
-5. Deploy!
-
-### Deploy Backend:
-- Al gedeployed naar `app-carrecommender-dev`
-- Werkt correct ✅
-
----
-
-## 🎉 Voordelen van Nieuwe Structuur
-
-1. **Duidelijke Scheiding:** Frontend en backend zijn nu duidelijk gescheiden
-2. **Geen Verwarring:** Frontend zit niet meer IN de backend folder
-3. **Logische Organisatie:** Solution folders maken het overzichtelijk
-4. **Eenvoudige Deployment:** Elk project kan apart gedeployed worden
-
----
-
-**Status:** ✅ Herstructurering Voltooid
-**Datum:** $(date)
-
-
-
+Alle wijzigingen zijn doorgevoerd en getest. Het project heeft nu een duidelijkere, logischere structuur met correcte padverwijzingen.

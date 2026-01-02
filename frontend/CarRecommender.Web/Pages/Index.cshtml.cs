@@ -24,6 +24,8 @@ public class IndexModel : PageModel
         _logger = logger;
         _configuration = configuration;
         ApiBaseUrl = _configuration["ApiSettings:BaseUrl"] ?? string.Empty;
+        // LOG: Toon welke API URL wordt gebruikt
+        _logger.LogInformation("[IndexModel] API Base URL: {ApiBaseUrl}", ApiBaseUrl);
     }
     
     /// <summary>

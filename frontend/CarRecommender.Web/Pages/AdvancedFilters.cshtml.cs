@@ -178,7 +178,20 @@ public class AdvancedFiltersModel : PageModel
         
         return char.ToUpper(transmission[0]) + (transmission.Length > 1 ? transmission.Substring(1).ToLower() : "");
     }
+    
+    /// <summary>
+    /// Converteert vermogen van KW naar PK (paardenkracht).
+    /// Dataset bevat vermogen in KW, maar we tonen het in PK voor gebruikers.
+    /// Conversie: 1 KW = 1.35962 PK (afgerond naar 1.36)
+    /// </summary>
+    public int ConvertKwToHp(int powerKw)
+    {
+        return (int)Math.Round(powerKw * 1.35962);
+    }
 }
+
+
+
 
 
 

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Pure library project - geen entry point -->
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>CarRecommender</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+
+  <!-- Exclude backend and frontend project files from compilation -->
+  <ItemGroup>
+    <Compile Remove="backend/**" />
+    <Content Remove="backend/**" />
+    <EmbeddedResource Remove="backend/**" />
+    <None Remove="backend/**" />
+    <Compile Remove="frontend/**" />
+    <Content Remove="frontend/**" />
+    <EmbeddedResource Remove="frontend/**" />
+    <None Remove="frontend/**" />
+  </ItemGroup>
+  
+  <!-- Explicitly exclude Program.cs files from backend and frontend to avoid multiple entry points -->
+  <ItemGroup>
+    <Compile Remove="backend/CarRecommender.Api/Program.cs" />
+    <Compile Remove="frontend/CarRecommender.Web/Program.cs" />
+  </ItemGroup>
+
+  <!-- Exclude test scripts and tools from compilation -->
+  <ItemGroup>
+    <Compile Remove="tools/**" />
+  </ItemGroup>
+
+  <!-- Exclude src/Program.cs - console app is verplaatst naar apart project -->
+  <ItemGroup>
+    <Compile Remove="src/Program.cs" />
+  </ItemGroup>
+
+  <!-- ML.NET packages voor MlRecommendationService -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML" Version="3.0.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

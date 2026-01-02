@@ -83,16 +83,24 @@ public class RecommendationService : IRecommendationService
         if (_isInitialized)
             return;
 
+        Console.WriteLine("[EnsureInitialized] Start initialisatie...");
         List<Car> allCars = _carRepository.GetAllCars();
-        _featureVectorFactory.Initialize(allCars);
+        Console.WriteLine($"[EnsureInitialized] Auto's geladen: {allCars.Count}");
         
-        // Train ML model als dat nog niet gebeurd is
-        if (!_isModelTrained && allCars.Count > 0)
-        {
-            TrainMlModel(allCars);
-        }
+        _featureVectorFactory.Initialize(allCars);
+        Console.WriteLine("[EnsureInitialized] FeatureVectorFactory geïnitialiseerd");
+        
+        // ML model training UITGESCHAKELD voor performance (was te traag)
+        // TrainMlModel kan erg lang duren (50x RecommendSimilarCars calls)
+        // if (!_isModelTrained && allCars.Count > 0)
+        // {
+        //     Console.WriteLine("[EnsureInitialized] Start ML model training (dit kan lang duren)...");
+        //     TrainMlModel(allCars);
+        //     Console.WriteLine("[EnsureInitialized] ML model training voltooid");
+        // }
         
         _isInitialized = true;
+        Console.WriteLine("[EnsureInitialized] ✅ Initialisatie voltooid");
     }
 
     /// <summary>
@@ -140,17 +148,53 @@ public class RecommendationService : IRecommendationService
     /// Vindt de meest vergelijkbare auto's voor een target auto.
     /// Sorteert op similarity en geeft top N terug.
     /// </summary>
+    private static string GetLogPath()
+    {
+        var possiblePaths = new[]
+        {
+            @".cursor\debug.log",
+            Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log"),
+            @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log"
+        };
+        foreach (var path in possiblePaths)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(path);
+                if (dir != null && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                return Path.GetFullPath(path);
+            }
+            catch { }
+        }
+        return possiblePaths[0];
+    }
+
     public List<RecommendationResult> RecommendSimilarCars(Car target, int n)
     {
+        // #region agent log
+        var logPath = GetLogPath();
+        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:170", message = "RecommendSimilarCars Entry", data = new { targetId = target?.Id, targetBrand = target?.Brand, targetModel = target?.Model, n }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
+        // #endregion
         List<Car> allCars = _carRepository.GetAllCars();
         List<RecommendationResult> results = new List<RecommendationResult>();
+        // #region agent log
+        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:173", message = "After GetAllCars", data = new { allCarsCount = allCars?.Count ?? 0 }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
+        // #endregion
 
         // Bereken min/max waarden voor normalisatie (alleen voor auto's met geldige waarden)
         // Dit is nodig voor de similarity berekening
         var validCars = allCars.Where(c => c.Power > 0 && c.Budget > 0 && c.Year > 1900).ToList();
+        // #region agent log
+        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:177", message = "After validCars filter", data = new { validCarsCount = validCars.Count }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
+        // #endregion
         
         if (validCars.Count == 0)
         {
+            // #region agent log
+            try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:181", message = "No valid cars", data = new { }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
+            // #endregion
             return results; // Geen geldige data
         }
 
@@ -161,6 +205,9 @@ public class RecommendationService : IRecommendationService
         decimal maxBudget = validCars.Max(c => c.Budget);
         int minYear = validCars.Min(c => c.Year);
         int maxYear = validCars.Max(c => c.Year);
+        // #region agent log
+        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:190", message = "MinMax values", data = new { minPower, maxPower, minBudget = (double)minBudget, maxBudget = (double)maxBudget, minYear, maxYear, powerRange = maxPower - minPower, budgetRange = (double)(maxBudget - minBudget), yearRange = maxYear - minYear }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
+        // #endregion
 
         // Bereken similarity voor elke auto (behalve de target zelf)
         foreach (Car car in allCars)
@@ -188,13 +235,20 @@ public class RecommendationService : IRecommendationService
             });
         }
 
+        // #region agent log
+        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:218", message = "Before sorting", data = new { resultsCount = results.Count, resultsWithScore0 = results.Count(r => r.SimilarityScore == 0.0), resultsWithScoreNaN = results.Count(r => double.IsNaN(r.SimilarityScore)) }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
+        // #endregion
         // Sorteer op similarity, verwijder dubbele modellen (behoud hoogste similarity per merk+model), en pak top N
-        return results
+        var finalResults = results
             .OrderByDescending(r => r.SimilarityScore)
             .GroupBy(r => new { r.Car.Brand, r.Car.Model }) // Groepeer alleen op merk + model (zonder brandstof voor meer diversiteit)
             .Select(g => g.OrderByDescending(r => r.SimilarityScore).First()) // Behoud de auto met de hoogste similarity per groep
             .Take(n)
             .ToList();
+        // #region agent log
+        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:224", message = "RecommendSimilarCars Exit", data = new { finalResultsCount = finalResults.Count }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
+        // #endregion
+        return finalResults;
     }
 
     /// <summary>
@@ -214,19 +268,32 @@ public class RecommendationService : IRecommendationService
     {
         EnsureInitialized();
         
+        Console.WriteLine($"[RecommendFromTextAsync] Start - Input: {inputText?.Substring(0, Math.Min(50, inputText?.Length ?? 0))}");
+        
         List<Car> allCars = _carRepository.GetAllCars();
+        Console.WriteLine($"[RecommendFromTextAsync] Totaal aantal auto's: {allCars.Count}");
         
         // Parse tekst naar preferences
         UserPreferences prefs = _textParser.ParsePreferencesFromText(inputText);
+        Console.WriteLine($"[RecommendFromTextAsync] Preferences geparsed");
 
         // OLD AI: Rule-based filtering - bepaal candidate set met harde filters
         var filterCriteria = _ruleBasedFilter.ConvertPreferencesToCriteria(prefs);
         List<Car> candidateCars = _ruleBasedFilter.FilterCars(allCars, filterCriteria);
+        Console.WriteLine($"[RecommendFromTextAsync] Candidate cars na filtering: {candidateCars.Count}");
 
         // Als geen auto's matchten filters, gebruik alle auto's (maar met lagere scores)
         if (candidateCars.Count == 0)
         {
             candidateCars = allCars;
+            Console.WriteLine($"[RecommendFromTextAsync] Geen matches, gebruik alle auto's: {candidateCars.Count}");
+        }
+        
+        // Limiteer candidate cars om performance te verbeteren (max 200 auto's voor snellere response)
+        if (candidateCars.Count > 200)
+        {
+            Console.WriteLine($"[RecommendFromTextAsync] ⚠️ Te veel candidate cars ({candidateCars.Count}), beperk tot 200 voor performance");
+            candidateCars = candidateCars.Take(200).ToList();
         }
 
         // NEW AI: Content-based similarity + Advanced scoring
@@ -237,14 +304,24 @@ public class RecommendationService : IRecommendationService
         List<RecommendationResult> results = new List<RecommendationResult>();
 
         int carIndex = 0;
+        int processedCount = 0;
+        Console.WriteLine($"[RecommendFromTextAsync] Start verwerken van {candidateCars.Count} candidate cars...");
+        
         foreach (Car car in candidateCars)
         {
             // Skip auto's zonder geldige data
             if (car.Power <= 0 || car.Budget <= 0 || car.Year < 1900)
                 continue;
 
+            // Progress logging elke 50 auto's (vaker voor betere feedback)
+            if (carIndex % 50 == 0 && carIndex > 0)
+            {
+                Console.WriteLine($"[RecommendFromTextAsync] Verwerkt {carIndex}/{candidateCars.Count} auto's ({carIndex * 100 / candidateCars.Count}%)...");
+            }
+
             // Gebruik AdvancedScoringService voor slimmere scores met transparantie
-            var featureScores = _advancedScoringService.CalculateScores(car, prefs, idealVector, allCars);
+            // OPTIMALISATIE: Gebruik alleen candidateCars voor normalisatie in plaats van allCars (veel sneller!)
+            var featureScores = _advancedScoringService.CalculateScores(car, prefs, idealVector, candidateCars);
 
             // Gebruik finale score uit AdvancedScoringService
             double finalScore = featureScores.FinalScore;
@@ -259,38 +336,13 @@ public class RecommendationService : IRecommendationService
                 finalScore = (finalScore * 0.9) + (userRatingComponent * 0.1);
             }
 
-            // Voeg collaborative filtering score toe (als beschikbaar)
+            // Voeg collaborative filtering score toe (als beschikbaar) - UITGESCHAKELD VOOR PERFORMANCE
+            // Collaborative filtering kan erg lang duren, daarom tijdelijk uitgeschakeld
             CollaborativeScore? collaborativeScore = null;
-            if (_collaborativeService != null)
-            {
-                try
-                {
-                    var prefsSnapshot = new UserPreferenceSnapshot
-                    {
-                        MaxBudget = prefs.MaxBudget,
-                        PreferredFuel = prefs.PreferredFuel,
-                        PreferredBrand = prefs.PreferredBrand,
-                        AutomaticTransmission = prefs.AutomaticTransmission,
-                        MinPower = prefs.MinPower,
-                        BodyTypePreference = prefs.BodyTypePreference,
-                        ComfortVsSportScore = prefs.ComfortVsSportScore,
-                        PreferenceWeights = prefs.PreferenceWeights
-                    };
-
-                    collaborativeScore = await _collaborativeService.CalculateCollaborativeScoreAsync(car.Id, prefsSnapshot);
-                    
-                    // Collaborative score heeft 15% gewicht
-                    if (collaborativeScore.HasCollaborativeData)
-                    {
-                        finalScore = (finalScore * 0.85) + (collaborativeScore.Score * 0.15);
-                    }
-                }
-                catch (Exception)
-                {
-                    // Fail silently - collaborative filtering is optioneel
-                }
-            }
+            // TEMPORARILY DISABLED FOR PERFORMANCE
+            // if (_collaborativeService != null) { ... }
             carIndex++;
+            processedCount++;
 
             string explanation = _explanationBuilder.BuildExplanation(car, prefs, finalScore, collaborativeScore);
 
@@ -303,8 +355,12 @@ public class RecommendationService : IRecommendationService
             });
         }
 
+        Console.WriteLine($"[RecommendFromTextAsync] Verwerkt {processedCount} auto's, start ranking...");
+        
         // Sorteer op score met controlled randomness
         var rankedResults = _rankingService.RankWithControlledRandomness(results);
+        
+        Console.WriteLine($"[RecommendFromTextAsync] Ranking voltooid, selecteer top {n}...");
         
         // Verwijder dubbele modellen (behoud hoogste score per merk+model) en pak top N
         var finalResults = rankedResults
@@ -312,6 +368,31 @@ public class RecommendationService : IRecommendationService
             .Select(g => g.OrderByDescending(r => r.SimilarityScore).First())
             .Take(n)
             .ToList();
+        
+        Console.WriteLine($"[RecommendFromTextAsync] ✅ Klaar! {finalResults.Count} recommendations gegenereerd.");
+
+        // #region agent log
+        try {
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
+            var logDir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                Directory.CreateDirectory(logDir);
+            
+            // Log final results with vermogen before returning
+            var finalCarsData = finalResults.Take(5).Select(r => new { 
+                id = r.Car.Id, 
+                brand = r.Car.Brand, 
+                model = r.Car.Model, 
+                bouwjaar = r.Car.Year, 
+                vermogen = r.Car.Power, 
+                prijs = r.Car.Budget,
+                score = r.SimilarityScore
+            }).ToList();
+            
+            System.IO.File.AppendAllText(logPath, 
+                $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"D\",\"location\":\"RecommendationService.cs:786\",\"message\":\"RecommendFromManualFilters final results - first 5 with vermogen\",\"data\":{{\"totalResults\":{finalResults.Count},\"cars\":{System.Text.Json.JsonSerializer.Serialize(finalCarsData)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
+        } catch { }
+        // #endregion
 
         // Track feedback
         TrackRecommendations(finalResults, "manual-filters");

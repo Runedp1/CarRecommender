@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using CarRecommender;
 
 namespace CarRecommender.Api.Controllers;
 
@@ -21,6 +22,13 @@ namespace CarRecommender.Api.Controllers;
 [Route("api/[controller]")]
 public class HealthController : ControllerBase
 {
+    private readonly ICarRepository? _carRepository;
+
+    public HealthController(ICarRepository? carRepository = null)
+    {
+        _carRepository = carRepository;
+    }
+
     /// <summary>
     /// GET /api/health
     /// Retourneert de status van de API.
@@ -37,6 +45,27 @@ public class HealthController : ControllerBase
         // Azure gebruikt dit om te controleren of de Web App draait
         return Ok(new HealthStatus { Status = "OK" });
     }
+
+    /// <summary>
+    /// GET /api/health/info
+    /// Retourneert informatie over de geladen dataset.
+    /// </summary>
+    [HttpGet("info")]
+    [ProducesResponseType(typeof(HealthInfo), StatusCodes.Status200OK)]
+    public IActionResult GetInfo()
+    {
+        var cars = _carRepository?.GetAllCars() ?? new List<Car>();
+        var info = new HealthInfo
+        {
+            Status = "OK",
+            TotalCars = cars.Count,
+            DatasetLoaded = _carRepository != null,
+            ExpectedCars = 65128, // Verwacht aantal uit df_master_v8_def.csv
+            Warning = cars.Count < 10000 ? $"⚠️ Slechts {cars.Count} auto's geladen - verwacht ~65128. Mogelijk wordt een oud/ander bestand geladen!" : null
+        };
+
+        return Ok(info);
+    }
 }
 
 /// <summary>
@@ -48,5 +77,36 @@ public class HealthStatus
     /// Status van de API ("OK" als alles goed werkt).
     /// </summary>
     public string Status { get; set; } = "OK";
+}
+
+/// <summary>
+/// Health info response model met dataset informatie.
+/// </summary>
+public class HealthInfo
+{
+    /// <summary>
+    /// Status van de API.
+    /// </summary>
+    public string Status { get; set; } = "OK";
+
+    /// <summary>
+    /// Aantal auto's in de geladen dataset.
+    /// </summary>
+    public int TotalCars { get; set; }
+
+    /// <summary>
+    /// Of de dataset succesvol is geladen.
+    /// </summary>
+    public bool DatasetLoaded { get; set; }
+
+    /// <summary>
+    /// Verwacht aantal auto's in de dataset.
+    /// </summary>
+    public int ExpectedCars { get; set; }
+
+    /// <summary>
+    /// Waarschuwing als er een probleem is met de dataset.
+    /// </summary>
+    public string? Warning { get; set; }
 }
 

@@ -117,25 +117,48 @@ public class RecommendationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetRecommendationsFromText([FromBody] TextRecommendationRequest request)
     {
+        _logger.LogInformation("[Controller] POST /api/recommendations/text aangeroepen");
+        
         try
         {
             // Valideer request
             if (request == null || string.IsNullOrWhiteSpace(request.Text))
             {
+                _logger.LogWarning("[Controller] Ongeldige request: request is null of text is leeg");
                 return BadRequest(new { error = "Text veld is verplicht." });
             }
+
+            _logger.LogInformation("[Controller] Request ontvangen - Text: {Text}, Top: {Top}", 
+                request.Text?.Substring(0, Math.Min(50, request.Text?.Length ?? 0)), request.Top);
 
             // Valideer top parameter
             int top = request.Top ?? 5;
             if (top < 1 || top > 20)
             {
+                _logger.LogWarning("[Controller] Ongeldige top parameter: {Top}", top);
                 return BadRequest(new { error = "Top parameter moet tussen 1 en 20 zijn." });
             }
 
+            _logger.LogInformation("[Controller] Start aanroepen RecommendFromTextAsync...");
+            
             // Genereer recommendations op basis van tekst via business logica service
             // Deze service gebruikt TextParserService voor NLP parsing en RecommendationEngine voor similarity berekening
             // Gebruik async versie voor collaborative filtering support
-            var recommendations = await ((RecommendationService)_recommendationService).RecommendFromTextAsync(request.Text, top);
+            // Timeout van 30 seconden om te voorkomen dat de request oneindig hangt
+            var recommendationsTask = ((RecommendationService)_recommendationService).RecommendFromTextAsync(request.Text, top);
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
+            
+            var completedTask = await Task.WhenAny(recommendationsTask, timeoutTask);
+            
+            if (completedTask == timeoutTask)
+            {
+                _logger.LogError("[Controller] ⚠️ TIMEOUT: RecommendFromTextAsync duurde langer dan 30 seconden");
+                return StatusCode(504, new { error = "Request timeout - de recommendation service duurt te lang. Probeer het later opnieuw of vereenvoudig uw zoekopdracht." });
+            }
+            
+            var recommendations = await recommendationsTask;
+            
+            _logger.LogInformation("[Controller] RecommendFromTextAsync voltooid - {Count} recommendations", recommendations?.Count ?? 0);
 
             // Track recommendations voor feedback
             TrackRecommendations(recommendations, "text-based");

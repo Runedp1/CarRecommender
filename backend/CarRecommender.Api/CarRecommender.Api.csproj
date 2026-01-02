@@ -5,9 +5,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-    <!-- Reduce deployment package size -->
-    <DebugType>none</DebugType>
-    <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,27 +12,28 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\CarRecommender.csproj">
-      <Properties>IsReferencedByApi=true</Properties>
-    </ProjectReference>
+    <ProjectReference Include="..\..\CarRecommender.Core.csproj" />
   </ItemGroup>
 
-  <!-- Exclude src/Program.cs to avoid conflicts with top-level statements -->
-  <ItemGroup>
-    <Compile Remove="..\..\src\Program.cs" />
-  </ItemGroup>
+  <!-- src/Program.cs is already excluded in CarRecommender.Core.csproj -->
 
   <!-- Zorg dat data bestanden worden meegenomen tijdens deployment -->
+  <!-- Let op: Voor development gebruikt de API de source directory (backend/data) -->
+  <!-- Deze kopie is alleen voor deployment naar Azure -->
   <ItemGroup>
     <Content Include="..\data\df_master_v8_def.csv">
       <Link>data\df_master_v8_def.csv</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   
-  <!-- Images worden NIET meegenomen in deployment package (te groot voor Azure) -->
-  <!-- Images moeten apart worden geüpload naar Azure Storage of via andere methode -->
-  <!-- Voor nu: images worden lokaal geladen vanuit backend/images/ directory -->
+  <!-- Zorg dat images folder wordt meegenomen tijdens deployment -->
+  <ItemGroup>
+    <Content Include="..\images\**\*">
+      <Link>images\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
 </Project>
 

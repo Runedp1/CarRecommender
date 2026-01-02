@@ -250,7 +250,7 @@
                                 <strong>Prijs:</strong> €@recommendation.Car.Budget.ToString("N0")<br>
                                 <strong>Brandstof:</strong> @recommendation.Car.Fuel<br>
                                 <strong>Bouwjaar:</strong> @recommendation.Car.Year<br>
-                                <strong>Vermogen:</strong> @recommendation.Car.Power PK<br>
+                                <strong>Vermogen:</strong> @Model.ConvertKwToHp(recommendation.Car.Power) PK<br>
                                 <strong>Transmissie:</strong> @Model.FormatTransmission(recommendation.Car.Transmission)<br>
                                 @if (!string.IsNullOrWhiteSpace(recommendation.Car.BodyType))
                                 {
