@@ -58,10 +58,11 @@ public class MlEvaluationService : IMlEvaluationService
         if (validCars.Count < 20)
         {
             // Te weinig data voor train/test split
+            // Geef diagnostische informatie voor debugging
             return new MlEvaluationResult
             {
                 IsValid = false,
-                ErrorMessage = "Onvoldoende data voor ML evaluatie (minimaal 20 auto's vereist)"
+                ErrorMessage = $"Onvoldoende data voor ML evaluatie (minimaal 20 auto's vereist). Totaal auto's: {allCars?.Count ?? 0}, Geldige auto's: {validCars.Count}. Mogelijk is de dataset niet correct geladen in Azure."
             };
         }
         
