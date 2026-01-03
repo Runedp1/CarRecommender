@@ -128,8 +128,9 @@ builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
 // Registreer MlRecommendationService als singleton zodat alle services dezelfde instantie gebruiken
 // Dit zorgt ervoor dat het getrainde model gedeeld wordt tussen RecommendationService en de background service
 // Stel model directory in op data folder zodat het model wordt opgeslagen en geladen
-var dataDirectory = Path.Combine(builder.Environment.ContentRootPath, "data");
-var mlRecommendationService = new MlRecommendationService(dataDirectory);
+// Gebruik dezelfde dataDirectory die al eerder is bepaald voor CarRepository
+var mlModelDirectory = dataDirectory ?? Path.Combine(builder.Environment.ContentRootPath, "data");
+var mlRecommendationService = new MlRecommendationService(mlModelDirectory);
 builder.Services.AddSingleton<MlRecommendationService>(mlRecommendationService);
 
 // Registreer ML model training background service
