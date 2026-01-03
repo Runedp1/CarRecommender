@@ -1,4 +1,5 @@
 using CarRecommender;
+using CarRecommender.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -112,13 +113,28 @@ builder.Services.AddSingleton<ICarRepository>(sp => carRepository);
 // Registreer IRecommendationService als scoped (één per HTTP request)
 // Scoped betekent dat er één instantie is per HTTP request.
 // Dit is geschikt voor services die per request gebruikt worden.
-builder.Services.AddScoped<IRecommendationService, RecommendationService>();
+// Geef de gedeelde MlRecommendationService singleton door aan RecommendationService
+builder.Services.AddScoped<IRecommendationService>(sp => 
+    new RecommendationService(
+        sp.GetRequiredService<ICarRepository>(), 
+        sp.GetRequiredService<MlRecommendationService>()));
 
 // Registreer ML evaluatie services (voor /api/ml/evaluation endpoint)
 // Deze services zijn nodig voor de MlController
 builder.Services.AddScoped<HyperparameterTuningService>();
 builder.Services.AddScoped<ForecastingService>();
 builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
+
+// Registreer MlRecommendationService als singleton zodat alle services dezelfde instantie gebruiken
+// Dit zorgt ervoor dat het getrainde model gedeeld wordt tussen RecommendationService en de background service
+// Stel model directory in op data folder zodat het model wordt opgeslagen en geladen
+var dataDirectory = Path.Combine(builder.Environment.ContentRootPath, "data");
+var mlRecommendationService = new MlRecommendationService(dataDirectory);
+builder.Services.AddSingleton<MlRecommendationService>(mlRecommendationService);
+
+// Registreer ML model training background service
+// Traint ML.NET model in achtergrond na applicatie opstart (blokkeert niet)
+builder.Services.AddHostedService<MlModelTrainingBackgroundService>();
 
 // ============================================================================
 // SWAGGER/OPENAPI CONFIGURATIE

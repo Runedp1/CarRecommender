@@ -75,6 +75,102 @@
         </div>
     }
 
+    <!-- ML Model Training Status Sectie -->
+    @if (Model.ModelStatus != null)
+    {
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header @(Model.ModelStatus.IsTrained ? "bg-success" : "bg-warning") text-white">
+                        <h3 class="card-title mb-0">
+                            @if (Model.ModelStatus.IsTrained)
+                            {
+                                <span>✅ ML.NET Model Status - Getraind</span>
+                            }
+                            else
+                            {
+                                <span>⚠️ ML.NET Model Status - Niet Getraind</span>
+                            }
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Training Informatie</h5>
+                                <table class="table table-striped">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Status</strong></td>
+                                            <td>
+                                                @if (Model.ModelStatus.IsTrained)
+                                                {
+                                                    <span class="badge bg-success">Getraind</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-warning">Niet Getraind</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Laatste Training</strong></td>
+                                            <td>
+                                                @if (Model.ModelStatus.LastTrainingTime != DateTime.MinValue)
+                                                {
+                                                    @Model.ModelStatus.LastTrainingTime.ToString("dd/MM/yyyy HH:mm:ss")
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">Nog niet getraind</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Training Samples</strong></td>
+                                            <td>@Model.ModelStatus.TrainingDataCount</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Model Opgeslagen</strong></td>
+                                            <td>
+                                                @if (Model.ModelStatus.ModelExists)
+                                                {
+                                                    <span class="badge bg-success">Ja</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Nee</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Uitleg</h5>
+                                <p class="text-muted">
+                                    Het ML.NET model wordt automatisch getraind in de achtergrond na het opstarten van de applicatie.
+                                    Het model leert van recommendation patterns om de kwaliteit van recommendations te verbeteren.
+                                </p>
+                                @if (Model.ModelStatus.IsTrained)
+                                {
+                                    <div class="alert alert-success">
+                                        <strong>✅ Model is actief!</strong> Het ML.NET model wordt gebruikt in recommendations om scores te optimaliseren.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-warning">
+                                        <strong>⏳ Training in progress...</strong> Het model wordt momenteel getraind in de achtergrond. Dit kan enkele minuten duren.
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     @if (Model.EvaluationResult != null && Model.EvaluationResult.IsValid)
     {
         <!-- Evaluatie Metrics Sectie -->
@@ -89,11 +185,16 @@
                             <div class="col-md-6">
                                 <h5>Train/Test Split</h5>
                                 <p>
-                                    <strong>Training set:</strong> @Model.EvaluationResult.TrainingSetSize auto's (80%)<br>
-                                    <strong>Test set:</strong> @Model.EvaluationResult.TestSetSize auto's (20%)
+                                    @{
+                                        var totalSplitSize = Model.EvaluationResult.TrainingSetSize + Model.EvaluationResult.TestSetSize;
+                                        var trainingPercentage = totalSplitSize > 0 ? (Model.EvaluationResult.TrainingSetSize * 100.0 / totalSplitSize) : 0;
+                                        var testPercentage = totalSplitSize > 0 ? (Model.EvaluationResult.TestSetSize * 100.0 / totalSplitSize) : 0;
+                                    }
+                                    <strong>Training set:</strong> @Model.EvaluationResult.TrainingSetSize auto's (@trainingPercentage.ToString("F1")%)<br>
+                                    <strong>Test set:</strong> @Model.EvaluationResult.TestSetSize auto's (@testPercentage.ToString("F1")%)
                                 </p>
                                 <p class="text-muted">
-                                    <small>De dataset is gesplitst in een training set (om het model te trainen) en een test set (om te evalueren). 
+                                    <small>De dataset is gesplitst in een training set (om het model te trainen) en een test set (om te evalueren) met stratified sampling. 
                                     Dit is een standaard ML techniek om te voorkomen dat het model overfitted op de training data.</small>
                                 </p>
                             </div>

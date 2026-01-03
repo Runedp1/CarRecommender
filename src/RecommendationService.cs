@@ -38,7 +38,7 @@ public class RecommendationService : IRecommendationService
     /// <summary>
     /// Constructor - initialiseert alle services met dependency injection.
     /// </summary>
-    public RecommendationService(ICarRepository carRepository)
+    public RecommendationService(ICarRepository carRepository, MlRecommendationService? mlService = null)
     {
         _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
         _engine = new RecommendationEngine(); // Used by RecommendSimilarCars (legacy endpoint)
@@ -50,7 +50,8 @@ public class RecommendationService : IRecommendationService
         _featureVectorFactory = new CarFeatureVectorFactory();
         _similarityService = new SimilarityService();
         _rankingService = new RankingService();
-        _mlService = new MlRecommendationService();
+        // Gebruik de gedeelde singleton instantie als die beschikbaar is, anders maak een nieuwe
+        _mlService = mlService ?? new MlRecommendationService();
         _advancedScoringService = new AdvancedScoringService(
             featureVectorFactory: _featureVectorFactory,
             similarityService: _similarityService,
@@ -75,14 +76,9 @@ public class RecommendationService : IRecommendationService
         _featureVectorFactory.Initialize(allCars);
         Console.WriteLine("[EnsureInitialized] FeatureVectorFactory geïnitialiseerd");
         
-        // ML model training UITGESCHAKELD voor performance (was te traag)
-        // TrainMlModel kan erg lang duren (50x RecommendSimilarCars calls)
-        // if (!_isModelTrained && allCars.Count > 0)
-        // {
-        //     Console.WriteLine("[EnsureInitialized] Start ML model training (dit kan lang duren)...");
-        //     TrainMlModel(allCars);
-        //     Console.WriteLine("[EnsureInitialized] ML model training voltooid");
-        // }
+        // ML model training wordt uitgevoerd in achtergrond via MlModelTrainingBackgroundService
+        // Dit voorkomt dat training de opstarttijd blokkeert
+        // Het model wordt actief zodra training voltooid is
         
         _isInitialized = true;
         Console.WriteLine("[EnsureInitialized] ✅ Initialisatie voltooid");

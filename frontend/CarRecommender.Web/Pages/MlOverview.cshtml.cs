@@ -11,6 +11,7 @@ public class MlOverviewModel : PageModel
     private readonly ILogger<MlOverviewModel> _logger;
 
     public MlEvaluationResult? EvaluationResult { get; set; }
+    public MlModelStatus? ModelStatus { get; set; }
     public string? ErrorMessage { get; set; }
 
     public MlOverviewModel(CarApiClient apiClient, ILogger<MlOverviewModel> logger)
@@ -23,9 +24,16 @@ public class MlOverviewModel : PageModel
     {
         try
         {
-            _logger.LogInformation("[MlOverview] Start ophalen ML evaluatie resultaten...");
+            _logger.LogInformation("[MlOverview] Start ophalen ML evaluatie resultaten en model status...");
             
-            EvaluationResult = await _apiClient.GetMlEvaluationAsync();
+            // Haal zowel evaluatie als model status op
+            var evaluationTask = _apiClient.GetMlEvaluationAsync();
+            var statusTask = _apiClient.GetMlStatusAsync();
+            
+            await Task.WhenAll(evaluationTask, statusTask);
+            
+            EvaluationResult = await evaluationTask;
+            ModelStatus = await statusTask;
 
             if (EvaluationResult == null)
             {
@@ -41,6 +49,12 @@ public class MlOverviewModel : PageModel
             {
                 _logger.LogInformation("[MlOverview] ML evaluatie succesvol opgehaald. TrainingSet: {TrainingSize}, TestSet: {TestSize}", 
                     EvaluationResult.TrainingSetSize, EvaluationResult.TestSetSize);
+            }
+            
+            if (ModelStatus != null)
+            {
+                _logger.LogInformation("[MlOverview] ML model status opgehaald. IsTrained: {IsTrained}, LastTraining: {LastTraining}", 
+                    ModelStatus.IsTrained, ModelStatus.LastTrainingTime);
             }
         }
         catch (HttpRequestException ex)

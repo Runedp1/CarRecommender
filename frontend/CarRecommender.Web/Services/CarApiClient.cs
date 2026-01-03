@@ -256,6 +256,45 @@ public class CarApiClient
     }
 
     /// <summary>
+    /// Haalt ML model training status op via GET /api/ml/status
+    /// </summary>
+    public async Task<MlModelStatus?> GetMlStatusAsync()
+    {
+        try
+        {
+            _logger.LogInformation("[CarApiClient] Start ML status request naar {BaseAddress}api/ml/status", _httpClient.BaseAddress);
+            
+            var response = await _httpClient.GetAsync("/api/ml/status");
+            
+            _logger.LogInformation("[CarApiClient] ML status response status: {StatusCode}", response.StatusCode);
+            
+            response.EnsureSuccessStatusCode();
+            
+            var result = await response.Content.ReadFromJsonAsync<MlModelStatus>(_jsonOptions);
+            
+            if (result != null)
+            {
+                _logger.LogInformation("[CarApiClient] ML status ontvangen. IsTrained: {IsTrained}, LastTraining: {LastTraining}", 
+                    result.IsTrained, result.LastTrainingTime);
+            }
+            
+            return result;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "[CarApiClient] HTTP fout bij ML status. BaseAddress: {BaseAddress}, URL: {Url}", 
+                _httpClient.BaseAddress, "/api/ml/status");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[CarApiClient] Onverwachte fout bij ML status. BaseAddress: {BaseAddress}", 
+                _httpClient.BaseAddress);
+            throw new HttpRequestException("Er is een onverwachte fout opgetreden bij het ophalen van ML model status.", ex);
+        }
+    }
+
+    /// <summary>
     /// Haalt aggregated ratings op voor een auto via GET /api/ratings/car/{carId}
     /// </summary>
     public async Task<AggregatedRating?> GetRatingsForCarAsync(int carId)

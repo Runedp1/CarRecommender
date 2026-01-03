@@ -291,8 +291,8 @@ public class MlRecommendationService
             _trainedModel = trainingPipeline.Fit(dataView);
             _inputSchema = dataView.Schema; // Bewaar schema voor later gebruik bij save/load
 
-            // Sla model op naar disk (indien modelDirectory is ingesteld)
-            if (!string.IsNullOrEmpty(_modelDirectory) && _trainedModel != null && _inputSchema != null)
+            // Sla model altijd op naar disk (zodat het bij volgende opstart geladen kan worden)
+            if (_trainedModel != null && _inputSchema != null)
             {
                 try
                 {
