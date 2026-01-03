@@ -102,6 +102,12 @@ builder.Services.AddSingleton<ICarRepository>(sp => carRepository);
 // Dit is geschikt voor services die per request gebruikt worden.
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 
+// Registreer ML evaluatie services (voor /api/ml/evaluation endpoint)
+// Deze services zijn nodig voor de MlController
+builder.Services.AddScoped<HyperparameterTuningService>();
+builder.Services.AddScoped<ForecastingService>();
+builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
+
 // ============================================================================
 // SWAGGER/OPENAPI CONFIGURATIE
 // ============================================================================
@@ -115,12 +121,59 @@ builder.Services.AddSwaggerGen();
 // ============================================================================
 // CORS (Cross-Origin Resource Sharing) is nodig zodat de frontend (localhost:7000) 
 // kan verbinden met de backend API (localhost:5283)
+// In Azure: voeg frontend Azure URL toe aan WithOrigins
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:7000", "https://localhost:7001", "http://localhost:5000", "https://localhost:5001")
-              .AllowAnyHeader()
+        // Development origins
+        var origins = new List<string>
+        {
+            "http://localhost:7000",
+            "https://localhost:7001",
+            "http://localhost:5000",
+            "https://localhost:5001"
+        };
+        
+        // Azure frontend origins (uit configuratie of hardcoded voor nu)
+        // Voeg Azure frontend URL toe als die geconfigureerd is
+        var azureFrontendUrl = builder.Configuration["CorsSettings:AzureFrontendUrl"];
+        if (!string.IsNullOrEmpty(azureFrontendUrl))
+        {
+            origins.Add(azureFrontendUrl);
+            origins.Add(azureFrontendUrl.Replace("https://", "http://")); // Voeg ook HTTP versie toe
+        }
+        
+        // Voor Azure: sta ook alle azurewebsites.net subdomeinen toe (veiliger dan AllowAnyOrigin)
+        if (builder.Environment.IsProduction() || builder.Configuration["CorsSettings:AllowAzureOrigins"] == "true")
+        {
+            // Sta alle Azure App Service frontend URLs toe (pattern: *.azurewebsites.net)
+            // Dit is nodig omdat de frontend URL kan variëren per deployment
+            policy.SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrEmpty(origin))
+                    return false;
+                
+                var uri = new Uri(origin);
+                // Sta localhost toe (development)
+                if (uri.Host == "localhost" || uri.Host == "127.0.0.1")
+                    return true;
+                
+                // Sta Azure App Service URLs toe (*.azurewebsites.net)
+                if (uri.Host.EndsWith(".azurewebsites.net", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                
+                // Sta ook expliciet geconfigureerde origins toe
+                return origins.Any(o => origin.StartsWith(o, StringComparison.OrdinalIgnoreCase));
+            });
+        }
+        else
+        {
+            // Development: alleen specifieke origins
+            policy.WithOrigins(origins.ToArray());
+        }
+        
+        policy.AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });

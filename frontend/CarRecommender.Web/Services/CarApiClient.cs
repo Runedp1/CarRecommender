@@ -27,19 +27,37 @@ public class CarApiClient
 
     /// <summary>
     /// Haalt alle auto's op via GET /api/cars
-    /// Backend retourneert een PagedResult, maar we willen alle auto's, dus gebruiken we een grote pageSize
+    /// Backend retourneert een PagedResult met max pageSize van 100, dus we moeten pagineren om alle auto's op te halen.
     /// </summary>
     public async Task<List<Car>?> GetAllCarsAsync()
     {
         try
         {
-            // Gebruik een grote pageSize om alle auto's in één keer op te halen
-            var response = await _httpClient.GetAsync("/api/cars?page=1&pageSize=10000");
-            response.EnsureSuccessStatusCode();
+            // Backend heeft max pageSize van 100, dus we moeten pagineren
+            // Haal eerst de eerste pagina op om te weten hoeveel pagina's er zijn
+            var firstPageResponse = await _httpClient.GetAsync("/api/cars?page=1&pageSize=100");
+            firstPageResponse.EnsureSuccessStatusCode();
             
-            // Backend retourneert PagedResult<Car>, niet List<Car>
-            var pagedResult = await response.Content.ReadFromJsonAsync<PagedResult<Car>>(_jsonOptions);
-            return pagedResult?.Items;
+            var firstPageResult = await firstPageResponse.Content.ReadFromJsonAsync<PagedResult<Car>>(_jsonOptions);
+            if (firstPageResult == null)
+                return new List<Car>();
+            
+            var allCars = new List<Car>(firstPageResult.Items);
+            
+            // Haal de resterende pagina's op
+            for (int page = 2; page <= firstPageResult.TotalPages; page++)
+            {
+                var response = await _httpClient.GetAsync($"/api/cars?page={page}&pageSize=100");
+                response.EnsureSuccessStatusCode();
+                
+                var pagedResult = await response.Content.ReadFromJsonAsync<PagedResult<Car>>(_jsonOptions);
+                if (pagedResult?.Items != null)
+                {
+                    allCars.AddRange(pagedResult.Items);
+                }
+            }
+            
+            return allCars;
         }
         catch (HttpRequestException ex)
         {

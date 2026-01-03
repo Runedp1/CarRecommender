@@ -127,3 +127,4 @@ _logger.LogInformation("[API] GetAllCars() - Totaal: {TotalCount} auto's. Voorbe
 - File watcher toevoegen om automatisch te reloaden
 - Of singleton vervangen door scoped/transient (maar dit is minder efficiënt)
 
+
