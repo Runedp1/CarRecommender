@@ -72,10 +72,10 @@ venv/
 # Data files - grote CSV bestanden uitsluiten (overschrijden GitHub's 100MB limiet)
 backend/data/*.csv
 backend/data/*.xlsx
-!backend/data/Cleaned_Car_Data_For_App_Fully_Enriched.csv
+!backend/data/df_master_v8_def.csv
 
-# Images (optioneel - uncomment als je images niet wilt committen)
-# backend/images/**
+# Images 
+backend/images/**
 
 # NuGet
 *.nupkg

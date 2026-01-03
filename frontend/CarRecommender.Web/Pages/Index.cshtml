@@ -61,54 +61,244 @@
     }
 }
 
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <h1 class="display-4 mb-4">Zoek uw ideale auto</h1>
+<style>
+    :root {
+        --deep-purple: #4A148C;
+        --purple-dark: #311B92;
+        --purple-light: #7B1FA2;
+        --purple-accent: #9C27B0;
+    }
+
+    .hero-header {
+        background: linear-gradient(135deg, #000000 0%, var(--deep-purple) 50%, var(--purple-dark) 100%);
+        color: white;
+        padding: 4rem 0;
+        margin: -1rem -15px 3rem -15px;
+        border-radius: 0 0 30px 30px;
+    }
+
+    .hero-header h1 {
+        font-size: 3rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .hero-header .lead {
+        font-size: 1.3rem;
+        opacity: 0.95;
+    }
+
+    .search-section {
+        max-width: 1400px;
+        margin: 0 auto 3rem auto;
+        padding: 2.5rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+        border-left: 5px solid var(--deep-purple);
+    }
+
+    .search-section label {
+        color: var(--deep-purple);
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .search-section textarea {
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem;
+        font-size: 1.05rem;
+        transition: border-color 0.3s;
+    }
+
+    .search-section textarea:focus {
+        border-color: var(--deep-purple);
+        box-shadow: 0 0 0 0.2rem rgba(74, 20, 140, 0.25);
+        outline: none;
+    }
+
+    .form-text {
+        color: #666;
+        font-size: 0.95rem;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--deep-purple) 0%, var(--purple-accent) 100%);
+        border: none;
+        padding: 0.75rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(74, 20, 140, 0.3);
+        background: linear-gradient(135deg, var(--purple-dark) 0%, var(--deep-purple) 100%);
+    }
+
+    .results-header {
+        max-width: 1400px;
+        margin: 0 auto 2rem auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+        border-left: 5px solid var(--deep-purple);
+    }
+
+    .results-header h2 {
+        color: var(--deep-purple);
+        font-size: 2rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+        transition: transform 0.2s, box-shadow 0.3s;
+        overflow: hidden;
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(74, 20, 140, 0.2);
+    }
+
+    .card-title {
+        color: var(--deep-purple);
+        font-weight: 600;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .card-title a {
+        color: var(--deep-purple);
+        text-decoration: none;
+        transition: color 0.2s;
+    }
+
+    .card-title a:hover {
+        color: var(--purple-accent);
+    }
+
+    .card-text {
+        line-height: 1.8;
+        color: #333;
+    }
+
+    .card-text strong {
+        color: var(--deep-purple);
+    }
+
+    .alert-info {
+        background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+        border: none;
+        border-left: 4px solid var(--deep-purple);
+        color: #333;
+    }
+
+    .alert-info strong {
+        color: var(--deep-purple);
+    }
+
+    .alert-danger {
+        background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+        border: none;
+        border-left: 4px solid #d32f2f;
+        color: #333;
+    }
+
+    .btn-sm {
+        background: linear-gradient(135deg, var(--deep-purple) 0%, var(--purple-accent) 100%);
+        border: none;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        transition: transform 0.2s;
+    }
+
+    .btn-sm:hover {
+        transform: translateY(-2px);
+        background: linear-gradient(135deg, var(--purple-dark) 0%, var(--deep-purple) 100%);
+    }
+
+    .car-image-container {
+        height: 200px;
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .results-grid {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    @@media (max-width: 992px) {
+        .hero-header h1 {
+            font-size: 2rem;
+        }
+        
+        .hero-header .lead {
+            font-size: 1.1rem;
+        }
+    }
+</style>
+
+<div class="hero-header">
+    <div class="container-fluid">
+        <div class="text-center">
+            <h1>Zoek uw ideale auto</h1>
             <p class="lead">Beschrijf uw wensen en wij vinden de perfecte auto voor u!</p>
         </div>
     </div>
+</div>
 
+<div class="container-fluid" style="max-width: 1400px; padding: 0 2rem;">
     @if (!string.IsNullOrEmpty(Model.ErrorMessage))
     {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin-bottom: 2rem;">
             <strong>Fout:</strong> @Model.ErrorMessage
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
 
-    <div class="row">
-        <div class="col-lg-8 mx-auto">
-            <form method="post" class="mb-4">
-                <div class="mb-3">
-                    <label for="SearchText" class="form-label">Beschrijf uw ideale auto:</label>
-                    <textarea 
-                        class="form-control" 
-                        id="SearchText" 
-                        name="SearchText" 
-                        rows="4" 
-                        placeholder="Bijvoorbeeld: Ik zoek een auto met maximaal 25.000 euro budget, benzine, automaat, voor dagelijks woon-werkverkeer..."
-                        required>@Model.SearchText</textarea>
-                    <div class="form-text">
-                        Beschrijf uw voorkeuren zoals budget, brandstof, transmissie, gebruik, vermogen, etc.
-                    </div>
+    <div class="search-section">
+        <form method="post">
+            <div class="mb-3">
+                <label for="SearchText" class="form-label">Beschrijf uw ideale auto:</label>
+                <textarea 
+                    class="form-control" 
+                    id="SearchText" 
+                    name="SearchText" 
+                    rows="4" 
+                    placeholder="Bijvoorbeeld: Ik zoek een auto met maximaal 25.000 euro budget, benzine, automaat, voor dagelijks woon-werkverkeer..."
+                    required>@Model.SearchText</textarea>
+                <div class="form-text">
+                    Beschrijf uw voorkeuren zoals budget, brandstof, transmissie, type voertuig (bv. suv, hatchback), vermogen, etc.
                 </div>
-                <button type="submit" class="btn btn-primary btn-lg">
-                    <i class="bi bi-search"></i> Zoek mijn ideale auto
-                </button>
-            </form>
-        </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-search"></i> Zoek mijn ideale auto
+            </button>
+        </form>
     </div>
 
     @if (Model.Recommendations != null && Model.Recommendations.Count > 0)
     {
-        <div class="row mt-4">
-            <div class="col-12">
-                <h2 class="mb-4">Aanbevolen auto's</h2>
-            </div>
+        <div class="results-header">
+            <h2>Aanbevolen auto's</h2>
         </div>
 
-        <div class="row">
+        <div class="row results-grid">
             @foreach (var recommendation in Model.Recommendations)
             {
                 // DYNAMISCHE ROUTING: Elke auto-kaart gebruikt zijn eigen unieke ID
@@ -143,13 +333,11 @@
                         - carId wordt per iteratie opnieuw geëxtraheerd uit recommendation.Car.Id
                         - Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
                     *@
-                    <div class="card h-100 shadow-sm" 
-                         style="cursor: pointer; transition: transform 0.2s;" 
+                    <div class="card h-100" 
+                         style="cursor: pointer;" 
                          data-car-id="@carId"
-                         onclick="navigateToCarDetail(@carId);" 
-                         onmouseover="this.style.transform='scale(1.02)'" 
-                         onmouseout="this.style.transform='scale(1)'">
-                        <div style="height: 200px; background-color: #1a1a1a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                         onclick="navigateToCarDetail(@carId);">
+                        <div class="car-image-container">
                             @if (!string.IsNullOrEmpty(imageUrl))
                             {
                                 <img src="@imageUrl" 
@@ -170,7 +358,6 @@
                         <div class="card-body">
                             <h5 class="card-title">
                                 <a href="/car/@carId" 
-                                   class="text-decoration-none text-dark" 
                                    onclick="event.stopPropagation(); navigateToCarDetail(@carId); return false;"
                                    data-car-id="@carId">
                                     @carBrand @carModel
@@ -213,18 +400,18 @@
     - Gebruikt data-car-id attribute als backup
 *@
 <script>
-        function navigateToCarDetail(carId) {
-            // Validatie: check of carId geldig is
-            if (carId == null || carId === undefined || isNaN(carId)) {
-                console.error('Invalid carId:', carId);
-                return;
-            }
-            
-            // Navigeer naar detailpagina
-            const url = '/car/' + parseInt(carId, 10);
-            window.location.href = url;
+    function navigateToCarDetail(carId) {
+        // Validatie: check of carId geldig is
+        if (carId == null || carId === undefined || isNaN(carId)) {
+            console.error('Invalid carId:', carId);
+            return;
         }
-    
+        
+        // Navigeer naar detailpagina
+        const url = '/car/' + parseInt(carId, 10);
+        window.location.href = url;
+    }
+
     // FIX: Event listener voor data-car-id fallback (als onclick niet werkt)
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('[data-car-id]').forEach(function(element) {

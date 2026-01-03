@@ -21,164 +21,397 @@
     - Geen km-stand ondersteund (zoals gevraagd)
 *@
 
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <h1 class="display-4 mb-4">Geavanceerde Filters</h1>
+<style>
+    :root {
+        --deep-purple: #4A148C;
+        --purple-dark: #311B92;
+        --purple-light: #7B1FA2;
+        --purple-accent: #9C27B0;
+    }
+
+    .hero-header {
+        background: linear-gradient(135deg, #000000 0%, var(--deep-purple) 50%, var(--purple-dark) 100%);
+        color: white;
+        padding: 4rem 0;
+        margin: -1rem -15px 3rem -15px;
+        border-radius: 0 0 30px 30px;
+    }
+
+    .hero-header h1 {
+        font-size: 3rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .hero-header .lead {
+        font-size: 1.3rem;
+        opacity: 0.95;
+    }
+
+    .filter-form-container {
+        max-width: 1400px;
+        margin: 0 auto 3rem auto;
+        padding: 0;
+    }
+
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+        border-left: 5px solid var(--deep-purple);
+        overflow: hidden;
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, var(--deep-purple) 0%, var(--purple-accent) 100%);
+        border: none;
+        padding: 1.5rem;
+    }
+
+    .card-header h5 {
+        font-weight: 600;
+        font-size: 1.5rem;
+    }
+
+    .card-body {
+        padding: 2.5rem;
+    }
+
+    .form-label {
+        color: var(--deep-purple);
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 1rem;
+        transition: border-color 0.3s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--deep-purple);
+        box-shadow: 0 0 0 0.2rem rgba(74, 20, 140, 0.25);
+        outline: none;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--deep-purple) 0%, var(--purple-accent) 100%);
+        border: none;
+        padding: 0.75rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(74, 20, 140, 0.3);
+        background: linear-gradient(135deg, var(--purple-dark) 0%, var(--deep-purple) 100%);
+    }
+
+    .btn-secondary {
+        background: linear-gradient(135deg, #424242 0%, #616161 100%);
+        border: none;
+        padding: 0.75rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: transform 0.2s, box-shadow 0.2s;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(66, 66, 66, 0.3);
+        background: linear-gradient(135deg, #212121 0%, #424242 100%);
+    }
+
+    .alert-info {
+        background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+        border: none;
+        border-left: 4px solid var(--deep-purple);
+        color: #333;
+        border-radius: 8px;
+        padding: 1rem 1.5rem;
+    }
+
+    .alert-info strong {
+        color: var(--deep-purple);
+    }
+
+    .alert-danger {
+        background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+        border: none;
+        border-left: 4px solid #d32f2f;
+        color: #333;
+        border-radius: 8px;
+        padding: 1rem 1.5rem;
+    }
+
+    .results-header {
+        max-width: 1400px;
+        margin: 0 auto 2rem auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+        border-left: 5px solid var(--deep-purple);
+    }
+
+    .results-header h2 {
+        color: var(--deep-purple);
+        font-size: 2rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .results-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+        transition: transform 0.2s, box-shadow 0.3s;
+        overflow: hidden;
+    }
+
+    .results-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(74, 20, 140, 0.2);
+    }
+
+    .card-title {
+        color: var(--deep-purple);
+        font-weight: 600;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .card-title a {
+        color: var(--deep-purple);
+        text-decoration: none;
+        transition: color 0.2s;
+    }
+
+    .card-title a:hover {
+        color: var(--purple-accent);
+    }
+
+    .card-text {
+        line-height: 1.8;
+        color: #333;
+    }
+
+    .card-text strong {
+        color: var(--deep-purple);
+    }
+
+    .btn-sm {
+        background: linear-gradient(135deg, var(--deep-purple) 0%, var(--purple-accent) 100%);
+        border: none;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        transition: transform 0.2s;
+    }
+
+    .btn-sm:hover {
+        transform: translateY(-2px);
+        background: linear-gradient(135deg, var(--purple-dark) 0%, var(--deep-purple) 100%);
+    }
+
+    .car-image-container {
+        height: 200px;
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .results-grid {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .info-box {
+        max-width: 1400px;
+        margin: 0 auto 2rem auto;
+    }
+
+    @@media (max-width: 992px) {
+        .hero-header h1 {
+            font-size: 2rem;
+        }
+        
+        .hero-header .lead {
+            font-size: 1.1rem;
+        }
+    }
+</style>
+
+<div class="hero-header">
+    <div class="container-fluid">
+        <div class="text-center">
+            <h1>Geavanceerde Filters</h1>
             <p class="lead">Stel zelf alle filters in zonder tekst parsing - <strong>Manuele Filters Modus</strong></p>
-            <div class="alert alert-info">
-                <strong>Let op:</strong> Dit is de manuele filters modus. Alle velden zijn optioneel. 
-                Stel ten minste één filter in om te zoeken.
-            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid" style="max-width: 1400px; padding: 0 2rem;">
+    <div class="info-box">
+        <div class="alert alert-info">
+            <strong>Let op:</strong> Dit is de manuele filters modus. Alle velden zijn optioneel. 
+            Stel ten minste één filter in om te zoeken.
         </div>
     </div>
 
     @if (!string.IsNullOrEmpty(Model.ErrorMessage))
     {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin-bottom: 2rem;">
             <strong>Fout:</strong> @Model.ErrorMessage
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
 
-    <div class="row">
-        <div class="col-lg-10 mx-auto">
-            <form method="post" class="mb-4">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Filter Instellingen</h5>
+    <div class="filter-form-container">
+        <form method="post" class="mb-4">
+            <div class="card">
+                <div class="card-header text-white">
+                    <h5 class="mb-0">Filter Instellingen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Prijs Range -->
+                        <div class="col-md-6 mb-3">
+                            <label for="MinPrice" class="form-label">Minimum Prijs (€)</label>
+                            <input type="number" class="form-control" id="MinPrice" name="FilterRequest.MinPrice" 
+                                   value="@Model.FilterRequest?.MinPrice" min="0" step="100" placeholder="Bijv. 10000">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="MaxPrice" class="form-label">Maximum Prijs (€)</label>
+                            <input type="number" class="form-control" id="MaxPrice" name="FilterRequest.MaxPrice" 
+                                   value="@Model.FilterRequest?.MaxPrice" min="0" step="100" placeholder="Bijv. 30000">
+                        </div>
+
+                        <!-- Merk en Model -->
+                        <div class="col-md-6 mb-3">
+                            <label for="Brand" class="form-label">Merk</label>
+                            <select class="form-select" id="Brand" name="FilterRequest.Brand">
+                                @foreach (var brand in Model.Brands)
+                                {
+                                    <option value="@(brand == "" ? "" : brand.ToLower())" 
+                                            selected="@(Model.FilterRequest?.Brand?.ToLower() == brand.ToLower())">
+                                        @(brand == "" ? "-- Selecteer merk --" : brand)
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="Model" class="form-label">Model</label>
+                            <input type="text" class="form-control" id="Model" name="FilterRequest.Model" 
+                                   value="@Model.FilterRequest?.Model" placeholder="Bijv. X5, A4">
+                        </div>
+
+                        <!-- Brandstof en Transmissie -->
+                        <div class="col-md-6 mb-3">
+                            <label for="Fuel" class="form-label">Brandstof</label>
+                            <select class="form-select" id="Fuel" name="FilterRequest.Fuel">
+                                @foreach (var fuel in Model.FuelTypes)
+                                {
+                                    <option value="@(fuel == "" ? "" : fuel)" 
+                                            selected="@(Model.FilterRequest?.Fuel == fuel)">
+                                        @(fuel == "" ? "-- Selecteer brandstof --" : 
+                                            fuel == "petrol" ? "Benzine" :
+                                            fuel == "diesel" ? "Diesel" :
+                                            fuel == "hybrid" ? "Hybride" :
+                                            fuel == "electric" ? "Elektrisch" : fuel)
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="TransmissionString" class="form-label">Transmissie</label>
+                            <select class="form-select" id="TransmissionString" name="TransmissionString">
+                                <option value="">-- Selecteer transmissie --</option>
+                                <option value="Automaat" selected="@(Model.FilterRequest?.Transmission == true)">Automaat</option>
+                                <option value="Schakel" selected="@(Model.FilterRequest?.Transmission == false)">Schakel</option>
+                            </select>
+                        </div>
+
+                        <!-- Carrosserie -->
+                        <div class="col-md-6 mb-3">
+                            <label for="BodyType" class="form-label">Carrosserie</label>
+                            <select class="form-select" id="BodyType" name="FilterRequest.BodyType">
+                                @foreach (var bodyType in Model.BodyTypes)
+                                {
+                                    <option value="@(bodyType == "" ? "" : bodyType)" 
+                                            selected="@(Model.FilterRequest?.BodyType == bodyType)">
+                                        @(bodyType == "" ? "-- Selecteer carrosserie --" : 
+                                            bodyType == "suv" ? "SUV" :
+                                            bodyType == "sedan" ? "Sedan" :
+                                            bodyType == "hatchback" ? "Hatchback" :
+                                            bodyType == "station" ? "Station" :
+                                            bodyType == "cabrio" ? "Cabrio" :
+                                            bodyType == "coupe" ? "Coupé" : bodyType)
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <!-- Bouwjaar Range -->
+                        <div class="col-md-3 mb-3">
+                            <label for="MinYear" class="form-label">Minimum Bouwjaar</label>
+                            <input type="number" class="form-control" id="MinYear" name="FilterRequest.MinYear" 
+                                   value="@Model.FilterRequest?.MinYear" min="1900" max="@DateTime.Now.Year" 
+                                   placeholder="Bijv. 2015">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="MaxYear" class="form-label">Maximum Bouwjaar</label>
+                            <input type="number" class="form-control" id="MaxYear" name="FilterRequest.MaxYear" 
+                                   value="@Model.FilterRequest?.MaxYear" min="1900" max="@DateTime.Now.Year" 
+                                   placeholder="Bijv. 2023">
+                        </div>
+
+                        <!-- Minimum Vermogen -->
+                        <div class="col-md-6 mb-3">
+                            <label for="MinPower" class="form-label">Minimum Vermogen (KW)</label>
+                            <input type="number" class="form-control" id="MinPower" name="FilterRequest.MinPower" 
+                                   value="@Model.FilterRequest?.MinPower" min="0" step="10" placeholder="Bijv. 150">
+                        </div>
+
+                        <!-- Aantal Resultaten -->
+                        <div class="col-md-6 mb-3">
+                            <label for="Top" class="form-label">Aantal Resultaten</label>
+                            <input type="number" class="form-control" id="Top" name="FilterRequest.Top" 
+                                   value="@(Model.FilterRequest?.Top ?? 5)" min="1" max="20" step="1">
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <!-- Prijs Range -->
-                            <div class="col-md-6 mb-3">
-                                <label for="MinPrice" class="form-label">Minimum Prijs (€)</label>
-                                <input type="number" class="form-control" id="MinPrice" name="FilterRequest.MinPrice" 
-                                       value="@Model.FilterRequest?.MinPrice" min="0" step="100" placeholder="Bijv. 10000">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="MaxPrice" class="form-label">Maximum Prijs (€)</label>
-                                <input type="number" class="form-control" id="MaxPrice" name="FilterRequest.MaxPrice" 
-                                       value="@Model.FilterRequest?.MaxPrice" min="0" step="100" placeholder="Bijv. 30000">
-                            </div>
 
-                            <!-- Merk en Model -->
-                            <div class="col-md-6 mb-3">
-                                <label for="Brand" class="form-label">Merk</label>
-                                <select class="form-select" id="Brand" name="FilterRequest.Brand">
-                                    @foreach (var brand in Model.Brands)
-                                    {
-                                        <option value="@(brand == "" ? "" : brand.ToLower())" 
-                                                selected="@(Model.FilterRequest?.Brand?.ToLower() == brand.ToLower())">
-                                            @(brand == "" ? "-- Selecteer merk --" : brand)
-                                        </option>
-                                    }
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="Model" class="form-label">Model</label>
-                                <input type="text" class="form-control" id="Model" name="FilterRequest.Model" 
-                                       value="@Model.FilterRequest?.Model" placeholder="Bijv. X5, A4">
-                            </div>
-
-                            <!-- Brandstof en Transmissie -->
-                            <div class="col-md-6 mb-3">
-                                <label for="Fuel" class="form-label">Brandstof</label>
-                                <select class="form-select" id="Fuel" name="FilterRequest.Fuel">
-                                    @foreach (var fuel in Model.FuelTypes)
-                                    {
-                                        <option value="@(fuel == "" ? "" : fuel)" 
-                                                selected="@(Model.FilterRequest?.Fuel == fuel)">
-                                            @(fuel == "" ? "-- Selecteer brandstof --" : 
-                                                fuel == "petrol" ? "Benzine" :
-                                                fuel == "diesel" ? "Diesel" :
-                                                fuel == "hybrid" ? "Hybride" :
-                                                fuel == "electric" ? "Elektrisch" : fuel)
-                                        </option>
-                                    }
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="TransmissionString" class="form-label">Transmissie</label>
-                                <select class="form-select" id="TransmissionString" name="TransmissionString">
-                                    <option value="">-- Selecteer transmissie --</option>
-                                    <option value="Automaat" selected="@(Model.FilterRequest?.Transmission == true)">Automaat</option>
-                                    <option value="Schakel" selected="@(Model.FilterRequest?.Transmission == false)">Schakel</option>
-                                </select>
-                            </div>
-
-                            <!-- Carrosserie -->
-                            <div class="col-md-6 mb-3">
-                                <label for="BodyType" class="form-label">Carrosserie</label>
-                                <select class="form-select" id="BodyType" name="FilterRequest.BodyType">
-                                    @foreach (var bodyType in Model.BodyTypes)
-                                    {
-                                        <option value="@(bodyType == "" ? "" : bodyType)" 
-                                                selected="@(Model.FilterRequest?.BodyType == bodyType)">
-                                            @(bodyType == "" ? "-- Selecteer carrosserie --" : 
-                                                bodyType == "suv" ? "SUV" :
-                                                bodyType == "sedan" ? "Sedan" :
-                                                bodyType == "hatchback" ? "Hatchback" :
-                                                bodyType == "station" ? "Station" :
-                                                bodyType == "cabrio" ? "Cabrio" :
-                                                bodyType == "coupe" ? "Coupé" : bodyType)
-                                        </option>
-                                    }
-                                </select>
-                            </div>
-
-                            <!-- Bouwjaar Range -->
-                            <div class="col-md-3 mb-3">
-                                <label for="MinYear" class="form-label">Minimum Bouwjaar</label>
-                                <input type="number" class="form-control" id="MinYear" name="FilterRequest.MinYear" 
-                                       value="@Model.FilterRequest?.MinYear" min="1900" max="@DateTime.Now.Year" 
-                                       placeholder="Bijv. 2015">
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <label for="MaxYear" class="form-label">Maximum Bouwjaar</label>
-                                <input type="number" class="form-control" id="MaxYear" name="FilterRequest.MaxYear" 
-                                       value="@Model.FilterRequest?.MaxYear" min="1900" max="@DateTime.Now.Year" 
-                                       placeholder="Bijv. 2023">
-                            </div>
-
-                            <!-- Minimum Vermogen -->
-                            <div class="col-md-6 mb-3">
-                                <label for="MinPower" class="form-label">Minimum Vermogen (KW)</label>
-                                <input type="number" class="form-control" id="MinPower" name="FilterRequest.MinPower" 
-                                       value="@Model.FilterRequest?.MinPower" min="0" step="10" placeholder="Bijv. 150">
-                            </div>
-
-                            <!-- Aantal Resultaten -->
-                            <div class="col-md-6 mb-3">
-                                <label for="Top" class="form-label">Aantal Resultaten</label>
-                                <input type="number" class="form-control" id="Top" name="FilterRequest.Top" 
-                                       value="@(Model.FilterRequest?.Top ?? 5)" min="1" max="20" step="1">
-                            </div>
-                        </div>
-
-                        <div class="mt-3">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="bi bi-search"></i> Zoek met Manuele Filters
-                            </button>
-                            <a href="/" class="btn btn-secondary btn-lg ms-2">
-                                <i class="bi bi-arrow-left"></i> Terug naar Tekst Modus
-                            </a>
-                        </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-search"></i> Zoek met Manuele Filters
+                        </button>
+                        <a href="/" class="btn btn-secondary btn-lg ms-2">
+                            <i class="bi bi-arrow-left"></i> Terug naar Tekst Modus
+                        </a>
                     </div>
                 </div>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 
     @if (Model.Recommendations != null && Model.Recommendations.Count > 0)
     {
-        <div class="row mt-4">
-            <div class="col-12">
-                <h2 class="mb-4">Aanbevolen auto's (Manuele Filters Modus)</h2>
-            </div>
+        <div class="results-header">
+            <h2>Aanbevolen auto's (Manuele Filters Modus)</h2>
         </div>
 
-        <div class="row">
+        <div class="row results-grid">
             @foreach (var recommendation in Model.Recommendations)
             {
                 // DYNAMISCHE ROUTING: Elke auto-kaart gebruikt zijn eigen unieke ID
@@ -213,13 +446,11 @@
                         - carId wordt per iteratie opnieuw geëxtraheerd uit recommendation.Car.Id
                         - Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
                     *@
-                    <div class="card h-100 shadow-sm" 
-                         style="cursor: pointer; transition: transform 0.2s;" 
+                    <div class="results-card h-100" 
+                         style="cursor: pointer;" 
                          data-car-id="@carId"
-                         onclick="navigateToCarDetail(@carId)" 
-                         onmouseover="this.style.transform='scale(1.02)'" 
-                         onmouseout="this.style.transform='scale(1)'">
-                        <div style="height: 200px; background-color: #1a1a1a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                         onclick="navigateToCarDetail(@carId)">
+                        <div class="car-image-container">
                             @if (!string.IsNullOrEmpty(imageUrl))
                             {
                                 <img src="@imageUrl" 
@@ -240,7 +471,6 @@
                         <div class="card-body">
                             <h5 class="card-title">
                                 <a href="/car/@carId" 
-                                   class="text-decoration-none text-dark" 
                                    onclick="event.stopPropagation(); navigateToCarDetail(@carId); return false;"
                                    data-car-id="@carId">
                                     @carBrand @carModel
@@ -283,14 +513,14 @@
     - Gebruikt data-car-id attribute als backup
 *@
 <script>
-        function navigateToCarDetail(carId) {
-            // FIX: Expliciete validatie en logging voor debugging
-            // Let op: carId kan 0 zijn in sommige systemen, maar we checken alleen op null/undefined
-            if (carId == null || carId === undefined || isNaN(carId)) {
-                console.error('Invalid carId:', carId);
-                return;
-            }
-        
+    function navigateToCarDetail(carId) {
+        // FIX: Expliciete validatie en logging voor debugging
+        // Let op: carId kan 0 zijn in sommige systemen, maar we checken alleen op null/undefined
+        if (carId == null || carId === undefined || isNaN(carId)) {
+            console.error('Invalid carId:', carId);
+            return;
+        }
+    
         // FIX: Expliciete URL constructie met validatie
         const url = '/car/' + parseInt(carId, 10);
         console.log('Navigating to car detail:', url, 'for carId:', carId);
@@ -314,4 +544,3 @@
         });
     });
 </script>
-

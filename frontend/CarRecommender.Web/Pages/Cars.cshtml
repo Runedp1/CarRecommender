@@ -34,16 +34,199 @@
     }
 }
 
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <h1 class="display-4 mb-4">Blader door auto's</h1>
+<style>
+    :root {
+        --deep-purple: #4A148C;
+        --purple-dark: #311B92;
+        --purple-light: #7B1FA2;
+        --purple-accent: #9C27B0;
+    }
+
+    .hero-header {
+        background: linear-gradient(135deg, #000000 0%, var(--deep-purple) 50%, var(--purple-dark) 100%);
+        color: white;
+        padding: 4rem 0;
+        margin: -1rem -15px 3rem -15px;
+        border-radius: 0 0 30px 30px;
+    }
+
+    .hero-header h1 {
+        font-size: 3rem;
+        font-weight: 600;
+        margin-bottom: 0;
+    }
+
+    .filters-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+        border-left: 5px solid var(--deep-purple);
+        margin-bottom: 2rem;
+    }
+
+    .filters-card .card-body {
+        padding: 2rem;
+    }
+
+    .filters-card .card-title {
+        color: var(--deep-purple);
+        font-weight: 600;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        color: var(--deep-purple);
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-range {
+        accent-color: var(--deep-purple);
+    }
+
+    .form-range::-webkit-slider-thumb {
+        background: var(--deep-purple);
+    }
+
+    .form-range::-moz-range-thumb {
+        background: var(--deep-purple);
+    }
+
+    .form-select {
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 1rem;
+        transition: border-color 0.3s;
+    }
+
+    .form-select:focus {
+        border-color: var(--deep-purple);
+        box-shadow: 0 0 0 0.2rem rgba(74, 20, 140, 0.25);
+        outline: none;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--deep-purple) 0%, var(--purple-accent) 100%);
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(74, 20, 140, 0.3);
+        background: linear-gradient(135deg, var(--purple-dark) 0%, var(--deep-purple) 100%);
+    }
+
+    .btn-secondary {
+        background: linear-gradient(135deg, #424242 0%, #616161 100%);
+        border: none;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: transform 0.2s, box-shadow 0.2s;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(66, 66, 66, 0.3);
+        background: linear-gradient(135deg, #212121 0%, #424242 100%);
+    }
+
+    .car-card .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+        transition: transform 0.2s, box-shadow 0.3s;
+        overflow: hidden;
+    }
+
+    .car-card .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(74, 20, 140, 0.2);
+    }
+
+    .card-title {
+        color: var(--deep-purple);
+        font-weight: 600;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .card-title a {
+        color: var(--deep-purple);
+        text-decoration: none;
+        transition: color 0.2s;
+    }
+
+    .card-title a:hover {
+        color: var(--purple-accent);
+    }
+
+    .card-text {
+        line-height: 1.8;
+        color: #333;
+    }
+
+    .card-text strong {
+        color: var(--deep-purple);
+    }
+
+    .car-image-container {
+        height: 200px;
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    }
+
+    .alert-danger {
+        background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+        border: none;
+        border-left: 4px solid #d32f2f;
+        color: #333;
+        border-radius: 8px;
+        padding: 1rem 1.5rem;
+    }
+
+    .stats-text {
+        color: #666;
+        font-size: 1.05rem;
+        margin-top: 1rem;
+    }
+
+    .stats-text span {
+        color: var(--deep-purple);
+        font-weight: 600;
+    }
+
+    .content-wrapper {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 2rem;
+    }
+
+    @@media (max-width: 992px) {
+        .hero-header h1 {
+            font-size: 2rem;
+        }
+    }
+</style>
+
+<div class="hero-header">
+    <div class="container-fluid">
+        <div class="text-center">
+            <h1>Blader door auto's</h1>
         </div>
     </div>
+</div>
 
+<div class="content-wrapper">
     @if (!string.IsNullOrEmpty(Model.ErrorMessage))
     {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin-bottom: 2rem;">
             <strong>Fout:</strong> @Model.ErrorMessage
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
@@ -53,7 +236,7 @@
     {
         <div class="row mb-4">
             <div class="col-md-12">
-                <div class="card">
+                <div class="card filters-card">
                     <div class="card-body">
                         <h5 class="card-title">Filters</h5>
                         <div class="row">
@@ -119,11 +302,9 @@
                         - carId wordt per iteratie opnieuw geëxtraheerd uit car.Id
                         - Dit zorgt ervoor dat elke kaart naar zijn eigen detailpagina linkt
                     *@
-                    <div class="card h-100 shadow-sm" 
-                         style="cursor: pointer; transition: transform 0.2s;" 
-                         onclick="navigateToCarDetail(@carId)" 
-                         onmouseover="this.style.transform='scale(1.02)'" 
-                         onmouseout="this.style.transform='scale(1)'">
+                    <div class="card h-100" 
+                         style="cursor: pointer;" 
+                         onclick="navigateToCarDetail(@carId)">
                         @{
                             // Probeer eerst ImageUrl van API
                             var imageUrl = !string.IsNullOrEmpty(car.ImageUrl) 
@@ -142,15 +323,14 @@
                             var fallbackUrl = $"https://via.placeholder.com/400x300/0066CC/FFFFFF.png?text={Uri.EscapeDataString(car.Brand + " " + car.Model)}";
                         }
                         <img src="@imageUrl" 
-                             class="card-img-top" 
+                             class="card-img-top car-image-container" 
                              alt="@car.Brand @car.Model"
-                             style="height: 200px; object-fit: cover; background-color: #1a1a1a; display: block; width: 100%;"
+                             style="object-fit: cover; display: block; width: 100%;"
                              onerror="if (this.src !== '@fallbackUrl') { this.src = '@fallbackUrl'; this.onerror = null; }"
                              loading="lazy">
                         <div class="card-body">
                             <h5 class="card-title">
                                 <a href="/car/@carId" 
-                                   class="text-decoration-none text-dark" 
                                    onclick="event.stopPropagation(); navigateToCarDetail(@carId); return false;"
                                    data-car-id="@carId">
                                     @car.Brand @car.Model
@@ -181,7 +361,7 @@
 
         <div class="row mt-3">
             <div class="col-12">
-                <p class="text-muted">
+                <p class="stats-text">
                     <span id="filteredCount">@Model.AllCars.Count</span> van @Model.AllCars.Count auto's getoond
                 </p>
             </div>
@@ -274,4 +454,3 @@
         }
     </script>
 }
-

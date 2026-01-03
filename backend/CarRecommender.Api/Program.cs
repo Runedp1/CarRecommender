@@ -94,9 +94,8 @@ Console.WriteLine($"[DI] Initialiseren CarRepository singleton...");
 Console.WriteLine($"[DI] CSV File: {csvFileName}");
 Console.WriteLine($"[DI] Data Directory: {dataDirectory}");
 var carRepository = new CarRepository(csvFileName, dataDirectory);
-Console.WriteLine($"[DI] ✅ CarRepository singleton geïnitialiseerd met {carRepository.GetAllCars().Count} auto's");
+Console.WriteLine($"[DI] CarRepository singleton geïnitialiseerd met {carRepository.GetAllCars().Count} auto's");
 builder.Services.AddSingleton<ICarRepository>(sp => carRepository);
-
 // Registreer IRecommendationService als scoped (één per HTTP request)
 // Scoped betekent dat er één instantie is per HTTP request.
 // Dit is geschikt voor services die per request gebruikt worden.

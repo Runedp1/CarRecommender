@@ -1,8 +1,12 @@
 # Car Recommendation System
 
-Een content-based recommendation systeem voor auto's geschreven in C#.
+Een recommendation systeem voor auto's geschreven in C# gebaseerd op volgende AI-Algoritmen:
+- Rule-Based Filtering (deterministisch)
+- Content-Based Recommendation
+- Ranking & Scoring Engine
+- NLP / Text Parsing (lichte AI)
 
-## Project Structuur
+## Project Structuur (wordt nog aangepast)
 
 ```
 Recommendation System/
@@ -42,29 +46,28 @@ Recommendation System/
 
 ## Architectuur - Laag Scheiding
 
-Het project volgt een **clean architecture** met duidelijke scheiding van verantwoordelijkheden:
+Het project volgt een **clean architecture** met een duidelijke scheiding van verantwoordelijkheden:
 
-### 1. **Data Model Laag** (`Car.cs`)
-- Bevat domain entities (Car, RecommendationResult)
-- Geen business logica, alleen data structuren
-- Wordt gebruikt door alle andere lagen
+### 1. Data Model Laag (`Car.cs`, `UserWeights.cs`)
+* Bevat de **domain entities** die de kern van de applicatie vormen.
+* Definieert de datastructuren voor voertuigen en gebruikersvoorkeuren.
+* Volledig vrij van business logica.
 
-### 2. **Data Laag** (`CarRepository.cs`)
-- Verantwoordelijk voor data toegang (CSV lezen)
-- Implementeert Repository Pattern
-- Geen business logica, alleen data transformatie
-- Handelt fouten af bij data parsing
+### 2. Data Laag (`CarRepository.cs`, `Database.cs`, `master_v8_def.csv`)
+* Verantwoordelijk voor **data-acquisitie en persistentie**.
+* **master_v8_def.csv**: De fysieke dataset (backend) bestaande uit geaggregeerde data op basis van geselecteerde features.
+* **Database.cs**: Verzorgt de in-memory representatie en ontsluiting van de CSV-data.
+* **CarRepository.cs**: Implementeert het Repository Pattern voor een gestructureerde toegang tot de voertuiggegevens.
 
-### 3. **Business Logica Laag**
-- **RecommendationEngine.cs**: Core algoritmes voor similarity berekening
-- **RecommendationService.cs**: Service layer die recommendations coördineert
-- Geen data toegang, geen presentatie
-- Testbare, pure business logica
+### 3. Business Logica Laag (`RecommendationEngine.cs`, `RecommendationService.cs`)
+* **RecommendationEngine.cs**: Bevat de core algoritmes voor de similarity-berekeningen.
+* **RecommendationService.cs**: De service layer die de logica coördineert tussen de data en de presentatie.
+* Focus op testbare, pure business logica zonder directe afhankelijkheid van de UI.
 
-### 4. **Presentatie Laag** (`Program.cs`)
-- Console UI en gebruikersinteractie
-- Coördineert tussen lagen
-- Geen business logica, geen data toegang
+### 4. Presentatie Laag (`Program.cs`, `Menu.cs`)
+* Verantwoordelijk voor de **gebruikersinteractie en interface-navigatie**.
+* **Menu.cs**: Beheert de visuele weergave en menustructuur in de console.
+* **Program.cs**: Fungeert als de 'composition root' die de applicatie opstart en de verschillende lagen verbindt.
 
 ## Hoe te Gebruiken
 
@@ -80,7 +83,7 @@ dotnet run --project CarRecommender.csproj
 ```
 
 De applicatie:
-1. Laadt auto's uit `data/Cleaned_Car_Data_For_App_Fully_Enriched.csv`
+1. Laadt auto's uit `data/df.master_v8_def.csv`
 2. Genereert image paths voor alle auto's
 3. Toont eerste 5 auto's
 4. Demonstreert recommendation engine met top 5 suggestions
@@ -110,14 +113,17 @@ python test_database_quality.py
 
 ## Features
 
-- ✅ Content-based recommendations zonder ML.NET
-- ✅ Similarity berekening op basis van Power, Budget, Year, Fuel
-- ✅ Robuuste CSV parsing met foutafhandeling
-- ✅ Image path ondersteuning voor frontend
-- ✅ Clean architecture met duidelijke laag scheiding
-- ✅ Uitgebreide Nederlandse documentatie
+- Content-based recommendations zonder ML.NET  
+- Similarity berekening op basis van o.a. vermogen, budget, bouwjaar en brandstof  
+- Regelgebaseerde filtering (carrosserietype, transmissie, budgetgrenzen)  
+- Robuuste datasetverwerking met fouttolerante parsing  
+- Image mapping en image path ondersteuning voor frontend  
+- Architectuur gebaseerd op clean-architecture-principes met duidelijke laagscheiding  
+- Uitlegbare recommendations (scoring en ranking inzichtelijk)  
+- Uitgebreide Nederlandstalige technische documentatie  
 
-## Database
+
+## Database (nog aanpassen naar nieuwe)
 
 - **Totaal auto's**: 20,755
 - **Met afbeelding**: ~52.6%
@@ -127,12 +133,15 @@ python test_database_quality.py
 
 ## Licentie & Copyright
 
-**BELANGRIJK**: Dit project gebruikt GEEN web scraping voor afbeeldingen. 
-Alle afbeeldingen moeten legaal worden verkregen (zie `src/CarRepository.cs` voor details).
+### Afbeeldingen & Databron
+
+De afbeeldingen die in dit project worden gebruikt, zijn afkomstig uit de Kaggle-dataset **“60,000+ Images of Cars”**, samengesteld door **Paul Rondeau**.  
+De dataset wordt gebruikt uitsluitend voor educatieve en niet-commerciële doeleinden.
+
+**Bron:**  
+Paul Rondeau, *60,000+ Images of Cars*. Kaggle.  
+https://www.kaggle.com/datasets/prondeau/the-car-connection-picture-dataset
 
 ## Contact
 
 Voor vragen over het project, zie de documentatie in de `docs/` map.
-
-
-

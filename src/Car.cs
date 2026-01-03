@@ -17,6 +17,8 @@ public class Car
     public string? BodyType { get; set; }  // carrosserie (suv/sedan/hatchback/etc.)
     public string ImagePath { get; set; } = string.Empty;  // pad naar de afbeelding (bijv. "images/brand/model/id.jpg")
     public string ImageUrl { get; set; } = string.Empty;  // URL naar een externe afbeelding van de auto
+    public string ImageKey =>
+        $"{Brand}|{Model}|{Year}".ToLower().Trim();
 }
 
 /// <summary>

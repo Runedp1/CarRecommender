@@ -17,7 +17,7 @@ public class CarRepository : ICarRepository
     private List<Car> _cars = new List<Car>();
     private readonly string _csvFileName;
     private readonly string _dataDirectory;
-    private Dictionary<int, List<string>> _imageMapping = new Dictionary<int, List<string>>();
+    private Dictionary<string, List<string>> _imageMapping = new Dictionary<string, List<string>>();
 
     /// <summary>
     /// Constructor - laadt auto's uit CSV bij initialisatie.
@@ -678,8 +678,10 @@ public class CarRepository : ICarRepository
     {
         foreach (Car car in cars)
         {
+            Console.WriteLine($"[IMG-KEY] {car.ImageKey}");
+
             // Eerst checken of er images zijn in de mapping
-            if (_imageMapping.TryGetValue(car.Id, out List<string>? images) && images != null && images.Count > 0)
+            if (_imageMapping.TryGetValue(car.ImageKey, out List<string>? images) && images != null && images.Count > 0)
             {
                 // Gebruik de eerste image uit de mapping voor ImageUrl (voor main pagina)
                 car.ImageUrl = images[0];
@@ -1082,80 +1084,53 @@ public class CarRepository : ICarRepository
     {
         try
         {
-            string mappingPath = Path.Combine(_dataDirectory, "car_image_mapping.json");
-            
-            // Probeer ook vanuit huidige directory
-            if (!File.Exists(mappingPath))
-            {
-                mappingPath = Path.Combine(Directory.GetCurrentDirectory(), _dataDirectory, "car_image_mapping.json");
-            }
-            
-            // Laatste poging: zoek omhoog in directory tree
-            if (!File.Exists(mappingPath))
-            {
-                string? searchDir = Directory.GetCurrentDirectory();
-                for (int i = 0; i < 5 && searchDir != null; i++)
-                {
-                    string testPath = Path.Combine(searchDir, _dataDirectory, "car_image_mapping.json");
-                    if (File.Exists(testPath))
-                    {
-                        mappingPath = testPath;
-                        break;
-                    }
-                    searchDir = Directory.GetParent(searchDir)?.FullName;
-                }
-            }
+            _imageMapping.Clear();
 
-            if (!File.Exists(mappingPath))
+            string imagesDir = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "images"
+            );
+
+            if (!Directory.Exists(imagesDir))
             {
-                Console.WriteLine($"Waarschuwing: car_image_mapping.json niet gevonden. Images worden niet geladen.");
+                Console.WriteLine($"Images directory niet gevonden: {imagesDir}");
                 return;
             }
 
-            string jsonContent = File.ReadAllText(mappingPath);
-            var mappingDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonContent);
+            var imageFiles = Directory.GetFiles(imagesDir, "*.jpg", SearchOption.AllDirectories);
 
-            if (mappingDict == null)
+            foreach (var imagePath in imageFiles)
             {
-                Console.WriteLine("Waarschuwing: car_image_mapping.json kon niet worden geparsed.");
-                return;
-            }
+                string fileName = Path.GetFileNameWithoutExtension(imagePath);
 
-            // Converteer string keys naar int keys en JsonElement arrays naar List<string>
-            foreach (var kvp in mappingDict)
-            {
-                if (int.TryParse(kvp.Key, out int carId))
+                // Verwacht formaat: Brand_Model_Year_...
+                var parts = fileName.Split('_');
+                if (parts.Length < 3)
+                    continue;
+
+                string brand = parts[0];
+                string model = parts[1];
+
+                if (!int.TryParse(parts[2], out int year))
+                    continue;
+
+                string imageKey = $"{brand}|{model}|{year}".ToLower().Trim();
+
+                string relativePath = "/images/" + Path.GetFileName(imagePath);
+
+                if (!_imageMapping.ContainsKey(imageKey))
                 {
-                    List<string> imageUrls = new List<string>();
-                    
-                    if (kvp.Value.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var element in kvp.Value.EnumerateArray())
-                        {
-                            if (element.ValueKind == JsonValueKind.String)
-                            {
-                                imageUrls.Add(element.GetString() ?? string.Empty);
-                            }
-                        }
-                    }
-                    else if (kvp.Value.ValueKind == JsonValueKind.String)
-                    {
-                        // Backward compatibility: single string instead of array
-                        imageUrls.Add(kvp.Value.GetString() ?? string.Empty);
-                    }
-                    
-                    if (imageUrls.Count > 0)
-                    {
-                        _imageMapping[carId] = imageUrls;
-                    }
+                    _imageMapping[imageKey] = new List<string>();
                 }
+
+                _imageMapping[imageKey].Add(relativePath);
             }
 
-            Console.WriteLine($"Image mapping geladen: {_imageMapping.Count} auto's met images.");
+            Console.WriteLine($"Image mapping opgebouwd: {_imageMapping.Count} image keys");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Fout bij het laden van image mapping: {ex.Message}");
+            Console.WriteLine($"Fout bij laden images: {ex.Message}");
         }
     }
 
@@ -1170,7 +1145,7 @@ public class CarRepository : ICarRepository
             return new List<string>();
         }
 
-        if (_imageMapping.TryGetValue(car.Id, out List<string>? images))
+        if (_imageMapping.TryGetValue(car.ImageKey, out List<string>? images))
         {
             return images;
         }
