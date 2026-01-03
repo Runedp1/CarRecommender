@@ -19,11 +19,11 @@
 
   <!-- Zorg dat data bestanden worden meegenomen tijdens deployment -->
   <!-- Let op: Voor development gebruikt de API de source directory (backend/data) -->
-  <!-- Deze kopie is alleen voor deployment naar Azure -->
+  <!-- Voor Azure deployment moet het CSV bestand in de output directory staan -->
   <ItemGroup>
     <Content Include="..\data\df_master_v8_def.csv">
       <Link>data\df_master_v8_def.csv</Link>
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   
