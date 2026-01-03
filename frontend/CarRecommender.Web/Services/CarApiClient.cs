@@ -208,20 +208,50 @@ public class CarApiClient
 
     /// <summary>
     /// Haalt ML evaluatie resultaten op via GET /api/ml/evaluation
+    /// ML evaluatie kan lang duren (30-60 seconden), gebruik langere timeout
     /// </summary>
     public async Task<MlEvaluationResult?> GetMlEvaluationAsync()
     {
         try
         {
-            var response = await _httpClient.GetAsync("/api/ml/evaluation");
+            _logger.LogInformation("[CarApiClient] Start ML evaluatie request naar {BaseAddress}api/ml/evaluation", _httpClient.BaseAddress);
+            
+            // ML evaluatie kan lang duren, gebruik langere timeout (120 seconden)
+            // HttpClient timeout is al ingesteld op 120 seconden in Program.cs
+            // Gebruik POST voor langlopende operaties (beter dan GET voor processing)
+            var response = await _httpClient.PostAsync("/api/ml/evaluation", null);
+            
+            _logger.LogInformation("[CarApiClient] ML evaluatie response status: {StatusCode}", response.StatusCode);
+            
             response.EnsureSuccessStatusCode();
             
-            return await response.Content.ReadFromJsonAsync<MlEvaluationResult>(_jsonOptions);
+            var result = await response.Content.ReadFromJsonAsync<MlEvaluationResult>(_jsonOptions);
+            
+            if (result != null)
+            {
+                _logger.LogInformation("[CarApiClient] ML evaluatie resultaat ontvangen. IsValid: {IsValid}, TrainingSet: {TrainingSize}, TestSet: {TestSize}", 
+                    result.IsValid, result.TrainingSetSize, result.TestSetSize);
+            }
+            
+            return result;
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogError(ex, "[CarApiClient] Timeout bij ML evaluatie (duurt langer dan {Timeout} seconden). BaseAddress: {BaseAddress}", 
+                _httpClient.Timeout.TotalSeconds, _httpClient.BaseAddress);
+            throw new HttpRequestException($"ML evaluatie duurt te lang (timeout na {_httpClient.Timeout.TotalSeconds} seconden). Dit kan 30-60 seconden duren. Probeer het later opnieuw.", ex);
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Fout bij het ophalen van ML evaluatie resultaten");
+            _logger.LogError(ex, "[CarApiClient] HTTP fout bij ML evaluatie. BaseAddress: {BaseAddress}, URL: {Url}", 
+                _httpClient.BaseAddress, "/api/ml/evaluation");
             throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[CarApiClient] Onverwachte fout bij ML evaluatie. BaseAddress: {BaseAddress}", 
+                _httpClient.BaseAddress);
+            throw new HttpRequestException("Er is een onverwachte fout opgetreden bij het ophalen van ML evaluatie resultaten.", ex);
         }
     }
 

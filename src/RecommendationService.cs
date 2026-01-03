@@ -20,21 +20,17 @@ namespace CarRecommender;
 public class RecommendationService : IRecommendationService
 {
     private readonly ICarRepository _carRepository;
-    private readonly RecommendationEngine _engine; // Behouden voor backward compatibility
+    private readonly RecommendationEngine _engine; // Used by RecommendSimilarCars (legacy endpoint)
     private readonly TextParserService _textParser;
     private readonly ExplanationBuilder _explanationBuilder;
     
-    // Nieuwe AI componenten
+    // Core AI components
     private readonly RuleBasedFilter _ruleBasedFilter;
     private readonly CarFeatureVectorFactory _featureVectorFactory;
     private readonly SimilarityService _similarityService;
     private readonly RankingService _rankingService;
     private readonly MlRecommendationService _mlService;
     private readonly AdvancedScoringService _advancedScoringService;
-    private readonly FeedbackTrackingService? _feedbackService;
-    private readonly ModelRetrainingService? _retrainingService;
-    private readonly CollaborativeFilteringService? _collaborativeService;
-    private readonly IUserRatingRepository? _ratingRepository;
     
     private bool _isInitialized = false;
     private bool _isModelTrained = false;
@@ -42,21 +38,14 @@ public class RecommendationService : IRecommendationService
     /// <summary>
     /// Constructor - initialiseert alle services met dependency injection.
     /// </summary>
-    public RecommendationService(
-        ICarRepository carRepository,
-        FeedbackTrackingService? feedbackService = null,
-        ModelRetrainingService? retrainingService = null,
-        CollaborativeFilteringService? collaborativeService = null,
-        IUserRatingRepository? ratingRepository = null)
+    public RecommendationService(ICarRepository carRepository)
     {
         _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
-        _engine = new RecommendationEngine(); // Behouden voor backward compatibility
+        _engine = new RecommendationEngine(); // Used by RecommendSimilarCars (legacy endpoint)
         _textParser = new TextParserService();
-        _collaborativeService = collaborativeService;
-        _ratingRepository = ratingRepository;
-        _explanationBuilder = new ExplanationBuilder(collaborativeService);
+        _explanationBuilder = new ExplanationBuilder(); // No longer needs CollaborativeFilteringService
         
-        // Initialiseer nieuwe AI componenten
+        // Initialize core AI components
         _ruleBasedFilter = new RuleBasedFilter();
         _featureVectorFactory = new CarFeatureVectorFactory();
         _similarityService = new SimilarityService();
@@ -67,10 +56,6 @@ public class RecommendationService : IRecommendationService
             similarityService: _similarityService,
             mlService: _mlService,
             carRepository: _carRepository);
-        
-        // Optionele services voor continue learning
-        _feedbackService = feedbackService;
-        _retrainingService = retrainingService;
     }
 
     /// <summary>
@@ -256,6 +241,66 @@ public class RecommendationService : IRecommendationService
     }
 
     /// <summary>
+    /// Efficiënte versie van RecommendSimilarCars die alleen door een specifieke candidate set itereert.
+    /// Gebruikt voor ML evaluatie om alleen de training set te gebruiken in plaats van alle auto's.
+    /// Internal zodat MlEvaluationService deze kan gebruiken.
+    /// </summary>
+    internal List<RecommendationResult> RecommendSimilarCarsFromSet(Car target, List<Car> candidateCars, int n)
+    {
+        if (candidateCars == null || candidateCars.Count == 0 || target == null)
+            return new List<RecommendationResult>();
+
+        // Bereken min/max waarden voor normalisatie (alleen voor candidate auto's met geldige waarden)
+        var validCars = candidateCars.Where(c => c.Power > 0 && c.Budget > 0 && c.Year > 1900).ToList();
+        
+        if (validCars.Count == 0)
+            return new List<RecommendationResult>();
+
+        // Vind min/max waarden in candidate set
+        int minPower = validCars.Min(c => c.Power);
+        int maxPower = validCars.Max(c => c.Power);
+        decimal minBudget = validCars.Min(c => c.Budget);
+        decimal maxBudget = validCars.Max(c => c.Budget);
+        int minYear = validCars.Min(c => c.Year);
+        int maxYear = validCars.Max(c => c.Year);
+
+        // Bereken similarity alleen voor candidate auto's (veel sneller!)
+        var results = new List<RecommendationResult>();
+        
+        foreach (Car car in candidateCars)
+        {
+            // Skip target auto
+            if (car.Id == target.Id || 
+                (car.Brand == target.Brand && car.Model == target.Model && car.Year == target.Year))
+            {
+                continue;
+            }
+
+            // Bereken similarity
+            double similarity = _engine.CalculateSimilarity(
+                target, 
+                car, 
+                minPower, maxPower, 
+                minBudget, maxBudget, 
+                minYear, maxYear);
+
+            results.Add(new RecommendationResult
+            {
+                Car = car,
+                SimilarityScore = similarity
+            });
+        }
+
+        // Sorteer en pak top N
+        return results
+            .OrderByDescending(r => r.SimilarityScore)
+            .GroupBy(r => new { r.Car.Brand, r.Car.Model })
+            .Select(g => g.OrderByDescending(r => r.SimilarityScore).First())
+            .Take(n)
+            .ToList();
+    }
+
+    /// <summary>
     /// Genereert recommendations op basis van tekst input van gebruiker.
     /// Gebruikt nieuwe AI structuur: Old AI (rule-based filters) + New AI (content-based similarity).
     /// </summary>
@@ -401,12 +446,6 @@ public class RecommendationService : IRecommendationService
                 $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"D\",\"location\":\"RecommendationService.cs:786\",\"message\":\"RecommendFromManualFilters final results - first 5 with vermogen\",\"data\":{{\"totalResults\":{finalResults.Count},\"cars\":{System.Text.Json.JsonSerializer.Serialize(finalCarsData)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
         } catch { }
         // #endregion
-
-        // Track feedback
-        TrackRecommendations(finalResults, "manual-filters");
-
-        // Check of retraining nodig is
-        TryTriggerRetraining();
 
         return finalResults;
     }
@@ -828,58 +867,7 @@ public class RecommendationService : IRecommendationService
             .Take(n)
             .ToList();
 
-        // Track feedback
-        TrackRecommendations(finalResults, "manual-filters");
-
-        // Check of retraining nodig is
-        TryTriggerRetraining();
-
         return finalResults;
-    }
-
-    /// <summary>
-    /// Trackt recommendations voor feedback tracking (zonder clicks).
-    /// </summary>
-    private void TrackRecommendations(List<RecommendationResult> results, string context)
-    {
-        if (_feedbackService == null)
-            return;
-
-        // Genereer session ID voor deze recommendation request
-        var sessionId = Guid.NewGuid().ToString();
-
-        for (int i = 0; i < results.Count; i++)
-        {
-            var result = results[i];
-            // Track recommendation (zonder click) - dit wordt gebruikt voor CTR berekening
-            // Clicks worden apart getrackt via API endpoint
-        }
-    }
-
-    /// <summary>
-    /// Probeert retraining te triggeren als er voldoende nieuwe feedback is.
-    /// </summary>
-    private void TryTriggerRetraining()
-    {
-        if (_retrainingService == null)
-            return;
-
-        try
-        {
-            // Check en retrain asynchroon (niet blokkerend)
-            Task.Run(() =>
-            {
-                var result = _retrainingService.CheckAndRetrainIfNeeded();
-                if (result.Retrained)
-                {
-                    Console.WriteLine($"ML model opnieuw getraind: {result.Reason} (Training data: {result.TrainingDataCount}, Feedback: {result.FeedbackCount})");
-                }
-            });
-        }
-        catch
-        {
-            // Fail silently - retraining is niet kritiek
-        }
     }
 }
 

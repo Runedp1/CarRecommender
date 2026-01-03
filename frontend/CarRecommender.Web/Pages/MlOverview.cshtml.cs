@@ -23,17 +23,40 @@ public class MlOverviewModel : PageModel
     {
         try
         {
+            _logger.LogInformation("[MlOverview] Start ophalen ML evaluatie resultaten...");
+            
             EvaluationResult = await _apiClient.GetMlEvaluationAsync();
 
-            if (EvaluationResult == null || !EvaluationResult.IsValid)
+            if (EvaluationResult == null)
             {
-                ErrorMessage = EvaluationResult?.ErrorMessage ?? "Geen evaluatie resultaten beschikbaar";
+                ErrorMessage = "Geen evaluatie resultaten ontvangen van de API.";
+                _logger.LogWarning("[MlOverview] EvaluationResult is null");
             }
+            else if (!EvaluationResult.IsValid)
+            {
+                ErrorMessage = EvaluationResult.ErrorMessage ?? "ML evaluatie is mislukt zonder specifieke foutmelding.";
+                _logger.LogWarning("[MlOverview] EvaluationResult.IsValid = false. ErrorMessage: {ErrorMessage}", ErrorMessage);
+            }
+            else
+            {
+                _logger.LogInformation("[MlOverview] ML evaluatie succesvol opgehaald. TrainingSet: {TrainingSize}, TestSet: {TestSize}", 
+                    EvaluationResult.TrainingSetSize, EvaluationResult.TestSetSize);
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "[MlOverview] HTTP fout bij het ophalen van ML evaluatie resultaten");
+            ErrorMessage = ex.Message; // Gebruik de specifieke error message van de HttpClient
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogError(ex, "[MlOverview] Timeout bij het ophalen van ML evaluatie resultaten");
+            ErrorMessage = "ML evaluatie duurt te lang. Dit kan 30-60 seconden duren. Probeer het later opnieuw of wacht even en ververs de pagina.";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fout bij het ophalen van ML evaluatie resultaten");
-            ErrorMessage = "Er is een fout opgetreden bij het verbinden met de API. Controleer of de API bereikbaar is.";
+            _logger.LogError(ex, "[MlOverview] Onverwachte fout bij het ophalen van ML evaluatie resultaten");
+            ErrorMessage = $"Er is een fout opgetreden: {ex.Message}. Controleer of de API bereikbaar is op http://localhost:5283";
         }
 
         return Page();

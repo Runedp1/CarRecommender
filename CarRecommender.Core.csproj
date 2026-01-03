@@ -34,6 +34,27 @@
     <Compile Remove="tools/**" />
   </ItemGroup>
 
+  <!-- Exclude Legacy folder from compilation -->
+  <ItemGroup>
+    <Compile Remove="src/Legacy/**" />
+    <Content Remove="src/Legacy/**" />
+    <EmbeddedResource Remove="src/Legacy/**" />
+    <None Remove="src/Legacy/**" />
+  </ItemGroup>
+  
+  <!-- Exclude duplicate/non-core files that may be synced by OneDrive -->
+  <ItemGroup>
+    <Compile Remove="src/ModelRetrainingService.cs" />
+    <Compile Remove="src/FeedbackTrackingService.cs" />
+    <Compile Remove="src/UserFeedback.cs" />
+    <Compile Remove="src/UserRating.cs" />
+    <Compile Remove="src/FeedbackRepository.cs" />
+    <Compile Remove="src/IFeedbackRepository.cs" />
+    <Compile Remove="src/IUserRatingRepository.cs" />
+    <Compile Remove="src/UserRatingRepository.cs" />
+    <Compile Remove="src/ModelPerformanceMonitor.cs" />
+  </ItemGroup>
+
   <!-- Exclude src/Program.cs - console app is verplaatst naar apart project -->
   <ItemGroup>
     <Compile Remove="src/Program.cs" />

@@ -46,18 +46,20 @@ public class MlController : ControllerBase
     /// - Beste hyperparameter configuratie
     /// - Forecasting/trend analyse resultaten
     /// </summary>
-    [HttpGet("evaluation")]
+    [HttpPost("evaluation")]
+    [HttpGet("evaluation")] // Behoud GET voor backward compatibility
     [ProducesResponseType(typeof(MlEvaluationResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public IActionResult GetEvaluation()
+    public async Task<IActionResult> GetEvaluation()
     {
         try
         {
             _logger.LogInformation("ML evaluatie wordt uitgevoerd... (dit kan 30-60 seconden duren)");
             
-            // ML evaluatie kan lang duren, gebruik Task.Run om te voorkomen dat de request thread wordt geblokkeerd
+            // ML evaluatie kan lang duren, gebruik async Task.Run om te voorkomen dat de request thread wordt geblokkeerd
             // Timeout is standaard 30 seconden in Azure, maar ML evaluatie kan langer duren
-            var result = Task.Run(() => _mlEvaluationService.EvaluateModel()).GetAwaiter().GetResult();
+            // Gebruik async/await in plaats van GetAwaiter().GetResult() om deadlocks te voorkomen
+            var result = await Task.Run(() => _mlEvaluationService.EvaluateModel());
             
             if (!result.IsValid)
             {
