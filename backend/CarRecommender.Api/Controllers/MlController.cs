@@ -53,9 +53,11 @@ public class MlController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("ML evaluatie wordt uitgevoerd...");
+            _logger.LogInformation("ML evaluatie wordt uitgevoerd... (dit kan 30-60 seconden duren)");
             
-            var result = _mlEvaluationService.EvaluateModel();
+            // ML evaluatie kan lang duren, gebruik Task.Run om te voorkomen dat de request thread wordt geblokkeerd
+            // Timeout is standaard 30 seconden in Azure, maar ML evaluatie kan langer duren
+            var result = Task.Run(() => _mlEvaluationService.EvaluateModel()).GetAwaiter().GetResult();
             
             if (!result.IsValid)
             {

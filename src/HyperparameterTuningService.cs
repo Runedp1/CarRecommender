@@ -74,7 +74,7 @@ public class HyperparameterTuningService
         // Test subset van combinaties (volledige grid search zou te lang duren)
         // Test elke 2e waarde voor efficiency
         int testCount = 0;
-        const int MAX_TESTS = 20; // Beperk aantal tests voor performance
+        const int MAX_TESTS = 10; // Verlaagd van 20 naar 10 voor performance (Azure timeout)
         
         foreach (var powerWeight in powerWeights.Where((_, i) => i % 2 == 0))
         {
@@ -146,15 +146,18 @@ public class HyperparameterTuningService
         double totalScore = 0.0;
         int testCount = 0;
         
-        // Test op subset van test set voor performance
-        var testSample = testSet.Take(Math.Min(20, testSet.Count)).ToList();
+        // Test op subset van test set voor performance (Azure timeout)
+        var testSample = testSet.Take(Math.Min(10, testSet.Count)).ToList(); // Verlaagd van 20 naar 10
+        
+        // Beperk ook training set size voor performance
+        var trainingSample = trainingSet.Take(Math.Min(100, trainingSet.Count)).ToList(); // Max 100 training auto's
         
         foreach (var testCar in testSample)
         {
             // Vind beste match in training set met deze configuratie
             double bestSimilarity = 0.0;
             
-            foreach (var trainingCar in trainingSet)
+            foreach (var trainingCar in trainingSample)
             {
                 if (trainingCar.Id == testCar.Id)
                     continue;

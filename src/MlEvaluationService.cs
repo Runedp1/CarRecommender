@@ -171,8 +171,9 @@ public class MlEvaluationService : IMlEvaluationService
         var allRecallScores = new List<double>();
         var pricePredictions = new List<(Car Predicted, Car Actual)>();
         
-        // Evalueer voor elke test auto
-        int evaluationCount = Math.Min(50, testCars.Count); // Beperk voor performance
+        // Evalueer voor elke test auto - beperk voor performance (Azure timeout)
+        // Gebruik kleinere sample voor snellere evaluatie
+        int evaluationCount = Math.Min(20, testCars.Count); // Verlaagd van 50 naar 20 voor performance
         var testSample = testCars.Take(evaluationCount).ToList();
         
         foreach (var testCar in testSample)

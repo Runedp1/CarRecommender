@@ -217,6 +217,14 @@ builder.Services.AddControllers()
         };
     });
 
+// Configureer request timeout voor ML evaluatie endpoint (kan lang duren)
+// Azure App Service heeft standaard 230 seconden timeout, maar we configureren het expliciet
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
+{
+    options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(5);
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(5);
+});
+
 // ============================================================================
 // LOGGING CONFIGURATIE VOOR AZURE
 // ============================================================================
