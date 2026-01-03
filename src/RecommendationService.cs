@@ -183,6 +183,10 @@ public class RecommendationService : IRecommendationService
         try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:173", message = "After GetAllCars", data = new { allCarsCount = allCars?.Count ?? 0 }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
         // #endregion
 
+        // Null check
+        if (allCars == null || target == null)
+            return results;
+
         // Bereken min/max waarden voor normalisatie (alleen voor auto's met geldige waarden)
         // Dit is nodig voor de similarity berekening
         var validCars = allCars.Where(c => c.Power > 0 && c.Budget > 0 && c.Year > 1900).ToList();
@@ -268,7 +272,11 @@ public class RecommendationService : IRecommendationService
     {
         EnsureInitialized();
         
-        Console.WriteLine($"[RecommendFromTextAsync] Start - Input: {inputText?.Substring(0, Math.Min(50, inputText?.Length ?? 0))}");
+        // Null check
+        if (string.IsNullOrWhiteSpace(inputText))
+            return new List<RecommendationResult>();
+        
+        Console.WriteLine($"[RecommendFromTextAsync] Start - Input: {inputText.Substring(0, Math.Min(50, inputText.Length))}");
         
         List<Car> allCars = _carRepository.GetAllCars();
         Console.WriteLine($"[RecommendFromTextAsync] Totaal aantal auto's: {allCars.Count}");

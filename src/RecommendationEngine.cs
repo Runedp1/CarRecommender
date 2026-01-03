@@ -53,6 +53,10 @@ public class RecommendationEngine
         int minYear, int maxYear,
         double weightPower, double weightBudget, double weightYear, double weightFuel)
     {
+        // Null checks
+        if (car1 == null || car2 == null)
+            return 0.0;
+        
         // #region agent log
         var logPath = GetLogPath();
         try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "B", location = "RecommendationEngine.cs:50", message = "CalculateSimilarity Entry", data = new { car1Id = car1?.Id, car2Id = car2?.Id, minPower, maxPower, minBudget = (double)minBudget, maxBudget = (double)maxBudget, minYear, maxYear, weightPower, weightBudget, weightYear, weightFuel }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
