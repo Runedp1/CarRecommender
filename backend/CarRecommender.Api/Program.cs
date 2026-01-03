@@ -16,18 +16,30 @@ var configuredDataDirectory = builder.Configuration["DataSettings:DataDirectory"
 string? dataDirectory = null;
 
 // 1. Probeer vanuit assembly locatie (runtime - deployed)
+// In Azure staat het CSV bestand in data/ folder naast de DLL
 var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
 if (!string.IsNullOrEmpty(assemblyLocation))
 {
     var assemblyDir = Path.GetDirectoryName(assemblyLocation);
-    // Van bin/Debug/net8.0/CarRecommender.Api.dll naar backend/data
-    // bin/Debug/net8.0 -> bin -> Debug -> .. -> backend/CarRecommender.Api -> .. -> backend -> data
-    var testPath = Path.Combine(assemblyDir ?? "", "..", "..", "..", "..", "data");
-    testPath = Path.GetFullPath(testPath);
-    if (Directory.Exists(testPath) && File.Exists(Path.Combine(testPath, csvFileName)))
+    
+    // Eerst: probeer data/ folder direct naast de DLL (Azure deployment)
+    var dataPathNextToDll = Path.Combine(assemblyDir ?? "", "data");
+    if (Directory.Exists(dataPathNextToDll) && File.Exists(Path.Combine(dataPathNextToDll, csvFileName)))
     {
-        dataDirectory = testPath;
-        Console.WriteLine($"[CONFIG] Found backend/data from assembly location: {dataDirectory}");
+        dataDirectory = dataPathNextToDll;
+        Console.WriteLine($"[CONFIG] Found data folder next to DLL (Azure): {dataDirectory}");
+    }
+    else
+    {
+        // Fallback: zoek omhoog vanuit assembly directory (development)
+        // Van bin/Debug/net8.0/CarRecommender.Api.dll naar backend/data
+        var testPath = Path.Combine(assemblyDir ?? "", "..", "..", "..", "..", "data");
+        testPath = Path.GetFullPath(testPath);
+        if (Directory.Exists(testPath) && File.Exists(Path.Combine(testPath, csvFileName)))
+        {
+            dataDirectory = testPath;
+            Console.WriteLine($"[CONFIG] Found backend/data from assembly location: {dataDirectory}");
+        }
     }
 }
 
