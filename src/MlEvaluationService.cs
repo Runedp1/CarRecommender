@@ -215,10 +215,27 @@ public class MlEvaluationService : IMlEvaluationService
             // OPTIMALISATIE: Gebruik efficiënte RecommendSimilarCarsFromSet in plaats van RecommendSimilarCars
             // Dit is veel sneller omdat we alleen door training set itereren, niet door alle auto's
             Console.WriteLine($"[ML EVALUATION]     Calling RecommendSimilarCarsFromSet (optimized for ML evaluation)...");
-            var recommendationService = _recommendationService as RecommendationService;
-            var recommendations = recommendationService != null 
-                ? recommendationService.RecommendSimilarCarsFromSet(testCar, trainingSampleForEvaluation, PRECISION_RECALL_K)
-                : _recommendationService.RecommendSimilarCars(testCar, PRECISION_RECALL_K); // Fallback
+            List<RecommendationResult> recommendations;
+            try
+            {
+                var recommendationService = _recommendationService as RecommendationService;
+                if (recommendationService != null)
+                {
+                    recommendations = recommendationService.RecommendSimilarCarsFromSet(testCar, trainingSampleForEvaluation, PRECISION_RECALL_K);
+                }
+                else
+                {
+                    Console.WriteLine($"[ML EVALUATION]     WARNING: RecommendationService cast failed, using fallback RecommendSimilarCars");
+                    recommendations = _recommendationService.RecommendSimilarCars(testCar, PRECISION_RECALL_K); // Fallback
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ML EVALUATION]     ERROR: Exception during recommendation generation: {ex.Message}");
+                Console.WriteLine($"[ML EVALUATION]     Stack trace: {ex.StackTrace}");
+                // Gebruik fallback als er een error is
+                recommendations = _recommendationService.RecommendSimilarCars(testCar, PRECISION_RECALL_K);
+            }
             Console.WriteLine($"[ML EVALUATION]     Received {recommendations.Count} recommendations");
             
             // Bepaal relevante auto's (auto's met vergelijkbare prijs ± 20%)

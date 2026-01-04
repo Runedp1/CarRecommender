@@ -128,3 +128,5 @@ _logger.LogInformation("[API] GetAllCars() - Totaal: {TotalCount} auto's. Voorbe
 - Of singleton vervangen door scoped/transient (maar dit is minder efficiënt)
 
 
+
+

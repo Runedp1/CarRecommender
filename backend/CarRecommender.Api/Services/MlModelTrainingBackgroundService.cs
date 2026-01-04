@@ -141,6 +141,19 @@ public class MlModelTrainingBackgroundService : BackgroundService
                     {
                         Console.WriteLine("[ML Training] ML.NET model succesvol getraind! Model is nu actief.");
                         _logger.LogInformation("[ML Training] ML.NET model succesvol getraind! Model is nu actief.");
+                        
+                        // Expliciet model opslaan (extra beveiliging)
+                        try
+                        {
+                            _mlService.SaveModel();
+                            Console.WriteLine("[ML Training] ✅ Model expliciet opgeslagen via SaveModel()");
+                            _logger.LogInformation("[ML Training] Model expliciet opgeslagen");
+                        }
+                        catch (Exception saveEx)
+                        {
+                            Console.WriteLine($"[ML Training] ❌ ERROR bij expliciet opslaan model: {saveEx.Message}");
+                            _logger.LogError(saveEx, "[ML Training] Fout bij expliciet opslaan model");
+                        }
                     }
                     else
                     {

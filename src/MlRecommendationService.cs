@@ -298,17 +298,57 @@ public class MlRecommendationService
                 {
                     var modelPath = GetModelPath();
                     var modelDir = Path.GetDirectoryName(modelPath);
+                    
+                    Console.WriteLine($"[ML] Probeer model op te slaan naar: {modelPath}");
+                    Console.WriteLine($"[ML] Model directory: {modelDir}");
+                    
+                    // Zorg dat directory bestaat
                     if (!string.IsNullOrEmpty(modelDir) && !Directory.Exists(modelDir))
                     {
+                        Console.WriteLine($"[ML] Maak directory aan: {modelDir}");
                         Directory.CreateDirectory(modelDir);
                     }
+                    
+                    // Check write permissions
+                    if (!string.IsNullOrEmpty(modelDir) && Directory.Exists(modelDir))
+                    {
+                        try
+                        {
+                            var testFile = Path.Combine(modelDir, "test_write.tmp");
+                            File.WriteAllText(testFile, "test");
+                            File.Delete(testFile);
+                            Console.WriteLine($"[ML] Write permissions OK voor directory: {modelDir}");
+                        }
+                        catch (Exception permEx)
+                        {
+                            Console.WriteLine($"[ML] ERROR: Geen write permissions voor directory {modelDir}: {permEx.Message}");
+                            throw;
+                        }
+                    }
+                    
+                    // Sla model op
                     _mlContext.Model.Save(_trainedModel, _inputSchema, modelPath);
-                    Console.WriteLine($"[ML] Model opgeslagen naar: {modelPath}");
+                    
+                    // Verifieer dat bestand bestaat
+                    if (File.Exists(modelPath))
+                    {
+                        var fileInfo = new FileInfo(modelPath);
+                        Console.WriteLine($"[ML] ✅ Model succesvol opgeslagen naar: {modelPath}");
+                        Console.WriteLine($"[ML] ✅ Model bestandsgrootte: {fileInfo.Length:N0} bytes");
+                        Console.WriteLine($"[ML] ✅ Model laatste wijziging: {fileInfo.LastWriteTime}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[ML] ❌ ERROR: Model bestand bestaat niet na opslaan! Pad: {modelPath}");
+                        throw new InvalidOperationException($"Model bestand niet aangemaakt na Save: {modelPath}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[ML] Waarschuwing: Kon model niet opslaan: {ex.Message}");
-                    // Doorgaan zonder model op te slaan - training is geslaagd
+                    Console.WriteLine($"[ML] ❌ ERROR: Kon model niet opslaan: {ex.Message}");
+                    Console.WriteLine($"[ML] ❌ ERROR Stack trace: {ex.StackTrace}");
+                    // Gooi exception door zodat we weten dat save gefaald is
+                    throw new InvalidOperationException($"Fout bij opslaan ML model: {ex.Message}", ex);
                 }
             }
 

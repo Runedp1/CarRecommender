@@ -188,6 +188,31 @@ public class AdvancedFiltersModel : PageModel
     {
         return (int)Math.Round(powerKw * 1.35962);
     }
+
+    /// <summary>
+    /// Formatteert body type naar Nederlandse termen met hoofdletters.
+    /// </summary>
+    public string FormatBodyType(string? bodyType)
+    {
+        if (string.IsNullOrWhiteSpace(bodyType))
+            return "Niet opgegeven";
+        
+        string lower = bodyType.ToLower().Trim();
+        
+        // Map naar Nederlandse termen met hoofdletters
+        return lower switch
+        {
+            "suv" => "SUV",
+            "sedan" => "Sedan",
+            "hatchback" => "Hatchback",
+            "station" => "Station",
+            "cabrio" => "Cabrio",
+            "coupe" => "Coupé",
+            "wagon" => "Station",
+            "convertible" => "Cabrio",
+            _ => char.ToUpper(bodyType[0]) + (bodyType.Length > 1 ? bodyType.Substring(1).ToLower() : "")
+        };
+    }
 }
 
 

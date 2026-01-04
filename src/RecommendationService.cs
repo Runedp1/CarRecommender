@@ -245,9 +245,9 @@ public class RecommendationService : IRecommendationService
     /// <summary>
     /// Efficiënte versie van RecommendSimilarCars die alleen door een specifieke candidate set itereert.
     /// Gebruikt voor ML evaluatie om alleen de training set te gebruiken in plaats van alle auto's.
-    /// Internal zodat MlEvaluationService deze kan gebruiken.
+    /// Public zodat MlEvaluationService deze kan gebruiken.
     /// </summary>
-    internal List<RecommendationResult> RecommendSimilarCarsFromSet(Car target, List<Car> candidateCars, int n)
+    public List<RecommendationResult> RecommendSimilarCarsFromSet(Car target, List<Car> candidateCars, int n)
     {
         if (candidateCars == null || candidateCars.Count == 0 || target == null)
             return new List<RecommendationResult>();

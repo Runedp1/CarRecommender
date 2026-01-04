@@ -270,6 +270,8 @@ public class CarRepository : ICarRepository
             int brandstofIndex = FindColumnIndex(headerColumns, new[] { "brandstof", "fuel", "fuel types" });
             int budgetIndex = FindColumnIndex(headerColumns, new[] { "prijs", "price", "budget", "cars prices" }); // PRIJS eerst voor nieuwe dataset
             int bouwjaarIndex = FindColumnIndex(headerColumns, new[] { "bouwjaar", "year", "jaar" });
+            int transmissieIndex = FindColumnIndex(headerColumns, new[] { "transmissie", "transmission", "trans" });
+            int typeAutoIndex = FindColumnIndex(headerColumns, new[] { "type_auto", "bodytype", "body_type", "carrosserie", "type" });
             int imagePathIndex = FindColumnIndex(headerColumns, new[] { "image_path", "Image_Path", "imagepath", "image name", "genmodel_id", "Image_ID" });
             
             // VALIDATIE: Controleer of kritieke kolommen zijn gevonden
@@ -452,6 +454,43 @@ public class CarRepository : ICarRepository
                         if (yearMatch.Success && int.TryParse(yearMatch.Value, out int year) && year >= 1900 && year <= DateTime.Now.Year + 1)
                         {
                             car.Year = year;
+                        }
+                    }
+
+                    // Parse Transmissie (Transmission)
+                    if (transmissieIndex >= 0 && transmissieIndex < columns.Length)
+                    {
+                        string transmissieStr = columns[transmissieIndex]?.Trim() ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(transmissieStr))
+                        {
+                            // Normaliseer transmissie waarden
+                            string lower = transmissieStr.ToLower();
+                            if (lower.Contains("automatic") || lower.Contains("automaat") || lower.Contains("automatisch") || lower.Contains("cvt") || lower.Contains("dct"))
+                            {
+                                car.Transmission = "automatic";
+                            }
+                            else if (lower.Contains("manual") || lower.Contains("handmatig") || lower.Contains("schakel") || lower.Contains("handbak"))
+                            {
+                                car.Transmission = "manual";
+                            }
+                            else
+                            {
+                                // Behoud originele waarde als het niet herkend wordt
+                                car.Transmission = transmissieStr;
+                            }
+                        }
+                    }
+
+                    // Parse Type Auto / Carrosserie (BodyType)
+                    if (typeAutoIndex >= 0 && typeAutoIndex < columns.Length)
+                    {
+                        string typeAutoStr = columns[typeAutoIndex]?.Trim() ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(typeAutoStr))
+                        {
+                            // Normaliseer body type waarden naar lowercase
+                            string lower = typeAutoStr.ToLower().Trim();
+                            // Behoud originele waarde (suv, sedan, hatchback, etc.)
+                            car.BodyType = lower;
                         }
                     }
 

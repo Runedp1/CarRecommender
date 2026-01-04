@@ -1,7 +1,7 @@
-@page "/advanced-filters"
+@page "/"
 @model AdvancedFiltersModel
 @{
-    ViewData["Title"] = "Geavanceerde Filters";
+    ViewData["Title"] = "Zoek uw ideale auto";
 }
 
 @*
@@ -256,8 +256,8 @@
 <div class="hero-header">
     <div class="container-fluid">
         <div class="text-center">
-            <h1>Geavanceerde Filters</h1>
-            <p class="lead">Stel zelf alle filters in zonder tekst parsing - <strong>Manuele Filters Modus</strong></p>
+            <h1>Zoek uw ideale auto</h1>
+            <p class="lead">Stel filters in om de perfecte auto te vinden</p>
         </div>
     </div>
 </div>
@@ -265,8 +265,8 @@
 <div class="container-fluid" style="max-width: 1400px; padding: 0 2rem;">
     <div class="info-box">
         <div class="alert alert-info">
-            <strong>Let op:</strong> Dit is de manuele filters modus. Alle velden zijn optioneel. 
-            Stel ten minste één filter in om te zoeken.
+            <strong>Tip:</strong> Alle velden zijn optioneel. Stel ten minste één filter in om te zoeken. 
+            Gebruik <a href="/text-search" class="alert-link">Tekst Zoeken</a> voor een snelle zoekopdracht in vrije tekst.
         </div>
     </div>
 
@@ -396,7 +396,7 @@
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="bi bi-search"></i> Zoek met Manuele Filters
                         </button>
-                        <a href="/" class="btn btn-secondary btn-lg ms-2">
+                        <a href="/text-search" class="btn btn-secondary btn-lg ms-2">
                             <i class="bi bi-arrow-left"></i> Terug naar Tekst Modus
                         </a>
                     </div>
@@ -484,7 +484,7 @@
                                 <strong>Transmissie:</strong> @Model.FormatTransmission(recommendation.Car.Transmission)<br>
                                 @if (!string.IsNullOrWhiteSpace(recommendation.Car.BodyType))
                                 {
-                                    <strong>Carrosserie:</strong> @recommendation.Car.BodyType<br>
+                                    <strong>Carrosserie:</strong> @Model.FormatBodyType(recommendation.Car.BodyType)<br>
                                 }
                                 <strong>Match:</strong> @((recommendation.SimilarityScore * 100).ToString("F1"))%
                             </p>

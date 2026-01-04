@@ -1,7 +1,7 @@
-﻿@page
+﻿@page "/text-search"
 @model IndexModel
 @{
-    ViewData["Title"] = "Zoek uw ideale auto";
+    ViewData["Title"] = "Tekst Zoeken";
 }
 
 @*
@@ -58,6 +58,31 @@
         // 1 KW = 1.35962 PK (metrische paardenkracht)
         // Afgerond naar 1.36 voor eenvoud
         return (int)Math.Round(powerKw * 1.35962);
+    }
+
+    /// <summary>
+    /// Formatteert body type naar Nederlandse termen met hoofdletters.
+    /// </summary>
+    string FormatBodyType(string? bodyType)
+    {
+        if (string.IsNullOrWhiteSpace(bodyType))
+            return "Niet opgegeven";
+        
+        string lower = bodyType.ToLower().Trim();
+        
+        // Map naar Nederlandse termen met hoofdletters
+        return lower switch
+        {
+            "suv" => "SUV",
+            "sedan" => "Sedan",
+            "hatchback" => "Hatchback",
+            "station" => "Station",
+            "cabrio" => "Cabrio",
+            "coupe" => "Coupé",
+            "wagon" => "Station",
+            "convertible" => "Cabrio",
+            _ => char.ToUpper(bodyType[0]) + (bodyType.Length > 1 ? bodyType.Substring(1).ToLower() : "")
+        };
     }
 }
 
@@ -256,13 +281,20 @@
 <div class="hero-header">
     <div class="container-fluid">
         <div class="text-center">
-            <h1>Zoek uw ideale auto</h1>
-            <p class="lead">Beschrijf uw wensen en wij vinden de perfecte auto voor u!</p>
+            <h1>Tekst Zoeken</h1>
+            <p class="lead">Beschrijf uw wensen in vrije tekst en wij vinden de perfecte auto voor u!</p>
         </div>
     </div>
 </div>
 
 <div class="container-fluid" style="max-width: 1400px; padding: 0 2rem;">
+    <div class="info-box" style="max-width: 1400px; margin: 0 auto 2rem auto;">
+        <div class="alert alert-info">
+            <strong>Tip:</strong> Beschrijf uw voorkeuren in vrije tekst. 
+            Gebruik <a href="/" class="alert-link">Geavanceerde Filters</a> voor een gedetailleerde zoekopdracht met dropdowns.
+        </div>
+    </div>
+
     @if (!string.IsNullOrEmpty(Model.ErrorMessage))
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin-bottom: 2rem;">
@@ -371,7 +403,7 @@
                                 <strong>Transmissie:</strong> @FormatTransmission(recommendation.Car.Transmission)<br>
                                 @if (!string.IsNullOrWhiteSpace(recommendation.Car.BodyType))
                                 {
-                                    <strong>Carrosserie:</strong> @recommendation.Car.BodyType<br>
+                                    <strong>Carrosserie:</strong> @FormatBodyType(recommendation.Car.BodyType)<br>
                                 }
                                 <strong>Match:</strong> @((recommendation.SimilarityScore * 100).ToString("F1"))%
                             </p>

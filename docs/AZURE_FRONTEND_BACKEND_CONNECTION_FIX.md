@@ -96,3 +96,4 @@ De backend geeft een 500.37 error, wat betekent dat de ASP.NET Core applicatie n
 3. **Test verbinding** tussen frontend en backend
 4. **Configureer Azure App Settings** voor extra zekerheid
 
+

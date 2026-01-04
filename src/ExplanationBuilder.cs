@@ -80,7 +80,7 @@ public class ExplanationBuilder
 
         if (prefs.BodyTypePreference != null)
         {
-            string bodyMatch = MatchBodyType(car.Model, prefs.BodyTypePreference);
+            string bodyMatch = MatchBodyType(car.BodyType, prefs.BodyTypePreference);
             if (!string.IsNullOrEmpty(bodyMatch))
             {
                 double bodyWeight = prefs.PreferenceWeights.GetValueOrDefault("bodytype", 1.0);
@@ -88,14 +88,40 @@ public class ExplanationBuilder
                 reasons.Add($"{bodyMatch} (belangrijkheid: {weightText})");
             }
         }
+        // Als er geen voorkeur is maar de auto heeft wel een body type, toon het als informatie
+        else if (!string.IsNullOrWhiteSpace(car.BodyType))
+        {
+            string bodyTypeName = GetBodyTypeName(car.BodyType);
+            if (!string.IsNullOrEmpty(bodyTypeName))
+            {
+                reasons.Add($"heeft {bodyTypeName} koetswerk");
+            }
+        }
 
         if (prefs.AutomaticTransmission.HasValue)
         {
             double transWeight = prefs.PreferenceWeights.GetValueOrDefault("transmission", 1.0);
             string weightText = GetWeightDescription(transWeight);
-            // Note: we hebben geen Transmission property in Car, dus voor nu alleen in uitleg als context
-            string transText = prefs.AutomaticTransmission.Value ? "automaat" : "schakel";
-            // reasons.Add($"heeft {transText} transmissie ({weightText})"); // Toekomstig
+            
+            // Check of de auto de gewenste transmissie heeft
+            bool carIsAutomatic = !string.IsNullOrWhiteSpace(car.Transmission) && 
+                                  car.Transmission.ToLower().Contains("automatic");
+            bool userWantsAutomatic = prefs.AutomaticTransmission.Value;
+            
+            if (carIsAutomatic == userWantsAutomatic)
+            {
+                string transText = userWantsAutomatic ? "automaat" : "schakel";
+                reasons.Add($"heeft {transText} transmissie (belangrijkheid: {weightText})");
+            }
+        }
+        // Als er geen voorkeur is maar de auto heeft wel transmissie info, toon het als informatie
+        else if (!string.IsNullOrWhiteSpace(car.Transmission))
+        {
+            string transText = GetTransmissionName(car.Transmission);
+            if (!string.IsNullOrEmpty(transText))
+            {
+                reasons.Add($"heeft {transText} transmissie");
+            }
         }
 
         // Bouw de uitleg
@@ -208,30 +234,82 @@ public class ExplanationBuilder
     }
 
     /// <summary>
-    /// Check of model match met body type voorkeur.
+    /// Check of car body type match met voorkeur.
     /// </summary>
-    private string MatchBodyType(string model, string preferredBodyType)
+    private string MatchBodyType(string? carBodyType, string preferredBodyType)
     {
-        string modelLower = model.ToLower();
-        string prefLower = preferredBodyType.ToLower();
+        if (string.IsNullOrWhiteSpace(carBodyType))
+            return string.Empty;
+            
+        string carBodyLower = carBodyType.ToLower().Trim();
+        string prefLower = preferredBodyType.ToLower().Trim();
 
-        // Simpele matching op model naam keywords
-        if (prefLower == "suv" && (
-            modelLower.Contains("x3") || modelLower.Contains("x5") || 
-            modelLower.Contains("q5") || modelLower.Contains("q7") ||
-            modelLower.Contains("tiguan") || modelLower.Contains("touareg")))
+        // Exacte match
+        if (carBodyLower == prefLower)
         {
-            return "een SUV koetswerk heeft";
+            return $"een {GetBodyTypeName(carBodyType)} koetswerk heeft";
         }
 
-        if (prefLower == "station" && (
-            modelLower.Contains("touring") || modelLower.Contains("combi") ||
-            modelLower.Contains("break") || modelLower.Contains("estate")))
+        // Gedeeltelijke match
+        if (carBodyLower.Contains(prefLower) || prefLower.Contains(carBodyLower))
+        {
+            return $"een {GetBodyTypeName(carBodyType)} koetswerk heeft";
+        }
+
+        // Speciale gevallen
+        if ((prefLower == "wagon" || prefLower == "estate") && carBodyLower == "station")
         {
             return "een stationwagen koetswerk heeft";
         }
+        if (prefLower == "convertible" && carBodyLower == "cabrio")
+        {
+            return "een cabrio koetswerk heeft";
+        }
 
         return string.Empty;
+    }
+
+    /// <summary>
+    /// Geef leesbare body type naam.
+    /// </summary>
+    private string GetBodyTypeName(string? bodyType)
+    {
+        if (string.IsNullOrWhiteSpace(bodyType))
+            return string.Empty;
+            
+        string lower = bodyType.ToLower().Trim();
+        return lower switch
+        {
+            "suv" => "SUV",
+            "sedan" => "sedan",
+            "hatchback" => "hatchback",
+            "station" => "stationwagen",
+            "cabrio" => "cabrio",
+            "coupe" => "coupé",
+            "wagon" => "stationwagen",
+            "convertible" => "cabrio",
+            _ => bodyType
+        };
+    }
+
+    /// <summary>
+    /// Geef leesbare transmissie naam.
+    /// </summary>
+    private string GetTransmissionName(string? transmission)
+    {
+        if (string.IsNullOrWhiteSpace(transmission))
+            return string.Empty;
+            
+        string lower = transmission.ToLower().Trim();
+        if (lower.Contains("automatic") || lower.Contains("automaat") || lower.Contains("automatisch") || lower.Contains("cvt") || lower.Contains("dct"))
+        {
+            return "automaat";
+        }
+        if (lower.Contains("manual") || lower.Contains("handmatig") || lower.Contains("schakel") || lower.Contains("handbak"))
+        {
+            return "schakel";
+        }
+        return transmission;
     }
 
     /// <summary>
