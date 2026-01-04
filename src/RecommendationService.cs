@@ -9,9 +9,12 @@ namespace CarRecommender;
 /// - Gebruikt dependency injection om ICarRepository te krijgen (data laag)
 /// - Onafhankelijk van hoe data wordt opgeslagen (CSV, SQL, etc.)
 /// 
-/// AI Architectuur:
+/// AI Architectuur (MEERDERE OPTIES):
 /// - Old AI: RuleBasedFilter bepaalt candidate set (harde filters)
-/// - New AI: CarFeatureVector + SimilarityService + RankingService voor content-based recommendations
+/// - New AI Optie 1: CarFeatureVector + SimilarityService (Cosine similarity)
+/// - New AI Optie 2: KNN (K-Nearest Neighbours uit Les 4 - Euclidische afstand)
+/// - Ranking: RankingService voor finale volgorde
+/// - ML.NET: Optioneel voor popularity prediction
 /// 
 /// Voor Azure deployment:
 /// - Deze service blijft hetzelfde werken
@@ -25,9 +28,10 @@ public class RecommendationService : IRecommendationService
     private readonly ExplanationBuilder _explanationBuilder;
     
     // Core AI components
-    private readonly RuleBasedFilter _ruleBasedFilter;
+     private readonly RuleBasedFilter _ruleBasedFilter;
     private readonly CarFeatureVectorFactory _featureVectorFactory;
     private readonly SimilarityService _similarityService;
+    private readonly KnnRecommendationService _knnService;  // ← NIEUW: KNN uit Les 4
     private readonly RankingService _rankingService;
     private readonly MlRecommendationService _mlService;
     private readonly AdvancedScoringService _advancedScoringService;
@@ -49,6 +53,7 @@ public class RecommendationService : IRecommendationService
         _ruleBasedFilter = new RuleBasedFilter();
         _featureVectorFactory = new CarFeatureVectorFactory();
         _similarityService = new SimilarityService();
+        _knnService = new KnnRecommendationService(k: 5);  //K=5 voor top 5 recommendations
         _rankingService = new RankingService();
         // Gebruik de gedeelde singleton instantie als die beschikbaar is, anders maak een nieuwe
         _mlService = mlService ?? new MlRecommendationService();
@@ -74,14 +79,15 @@ public class RecommendationService : IRecommendationService
         Console.WriteLine($"[EnsureInitialized] Auto's geladen: {allCars.Count}");
         
         _featureVectorFactory.Initialize(allCars);
-        Console.WriteLine("[EnsureInitialized] FeatureVectorFactory geïnitialiseerd");
+        _knnService.Initialize(allCars);  //Initialiseer KNN met alle auto's
+        Console.WriteLine("[EnsureInitialized] FeatureVectorFactory + KNN geïnitialiseerd");
         
         // ML model training wordt uitgevoerd in achtergrond via MlModelTrainingBackgroundService
         // Dit voorkomt dat training de opstarttijd blokkeert
         // Het model wordt actief zodra training voltooid is
         
         _isInitialized = true;
-        Console.WriteLine("[EnsureInitialized] ✅ Initialisatie voltooid");
+        Console.WriteLine("[EnsureInitialized] Initialisatie voltooid");
     }
 
     /// <summary>
@@ -442,6 +448,68 @@ public class RecommendationService : IRecommendationService
                 $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"D\",\"location\":\"RecommendationService.cs:786\",\"message\":\"RecommendFromManualFilters final results - first 5 with vermogen\",\"data\":{{\"totalResults\":{finalResults.Count},\"cars\":{System.Text.Json.JsonSerializer.Serialize(finalCarsData)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
         } catch { }
         // #endregion
+
+        return finalResults;
+    }
+
+    /// <summary>
+    /// KNN-GEBASEERDE RECOMMENDATIONS (LES 4: Spotify Recommendations)
+    /// </summary>
+    public List<RecommendationResult> RecommendFromTextWithKnn(string inputText, int k = 5)
+    {
+        EnsureInitialized();
+        
+        // Null check
+        if (string.IsNullOrWhiteSpace(inputText))
+            return new List<RecommendationResult>();
+        
+        Console.WriteLine($"[KNN] Start - Input: {inputText.Substring(0, Math.Min(50, inputText.Length))}");
+        
+        List<Car> allCars = _carRepository.GetAllCars();
+        Console.WriteLine($"[KNN] Totaal aantal auto's: {allCars.Count}");
+        
+        // Parse tekst naar preferences
+        UserPreferences prefs = _textParser.ParsePreferencesFromText(inputText);
+        Console.WriteLine($"[KNN] Preferences geparsed: Budget={prefs.MaxBudget}, Fuel={prefs.PreferredFuel}");
+
+        // OLD AI: Rule-based filtering - bepaal candidate set met harde filters
+        var filterCriteria = _ruleBasedFilter.ConvertPreferencesToCriteria(prefs);
+        List<Car> candidateCars = _ruleBasedFilter.FilterCars(allCars, filterCriteria);
+        Console.WriteLine($"[KNN] Candidate cars na filtering: {candidateCars.Count}");
+
+        // Als geen auto's matchten filters, gebruik alle auto's
+        if (candidateCars.Count == 0)
+        {
+            candidateCars = allCars;
+            Console.WriteLine($"[KNN] Geen matches, gebruik alle auto's: {candidateCars.Count}");
+        }
+
+        // NEW AI: KNN - vind K nearest neighbors via Euclidische afstand
+        Console.WriteLine($"[KNN] Start KNN algoritme (K={k})...");
+        List<RecommendationResult> knnResults = _knnService.FindNearestNeighborsFromPreferences(
+            prefs, 
+            candidateCars);
+        
+        Console.WriteLine($"[KNN] KNN resultaten: {knnResults.Count}");
+
+        // Voeg explanations toe
+        foreach (var result in knnResults)
+        {
+            result.Explanation = _explanationBuilder.BuildExplanation(
+                result.Car, 
+                prefs, 
+                result.SimilarityScore, 
+                null);  // Geen collaborative score
+        }
+
+        // Deduplicatie: verwijder dubbele merk+model combinaties
+        var finalResults = knnResults
+            .GroupBy(r => new { r.Car.Brand, r.Car.Model })
+            .Select(g => g.OrderByDescending(r => r.SimilarityScore).First())
+            .Take(k)
+            .ToList();
+        
+        Console.WriteLine($"[KNN] Klaar! {finalResults.Count} KNN-based recommendations gegenereerd.");
 
         return finalResults;
     }

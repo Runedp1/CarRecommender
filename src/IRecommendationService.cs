@@ -11,6 +11,11 @@ namespace CarRecommender;
 public interface IRecommendationService
 {
     /// <summary>
+    /// KNN-gebaseerde recommendations 
+    /// </summary>
+    List<RecommendationResult> RecommendFromTextWithKnn(string inputText, int k = 5);
+
+    /// <summary>
     /// Vindt de meest vergelijkbare auto's voor een target auto.
     /// Sorteert op similarity en geeft top N terug.
     /// </summary>

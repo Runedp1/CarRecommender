@@ -3,6 +3,8 @@ namespace CarRecommender;
 /// <summary>
 /// Factory voor het maken van CarFeatureVector objecten uit Car objecten.
 /// Handelt normalisatie en one-hot encoding af.
+/// 
+/// AANGEPAST VOOR KNN: Toegevoegd CreateIdealVector overload zonder availableCars parameter.
 /// </summary>
 public class CarFeatureVectorFactory
 {
@@ -129,6 +131,15 @@ public class CarFeatureVectorFactory
 
     /// <summary>
     /// Maakt een feature vector voor een ideale auto op basis van user preferences.
+    /// OVERLOAD (KNN): Gebruikt default waarden voor price/power als geen availableCars beschikbaar zijn.
+    /// </summary>
+    public CarFeatureVector CreateIdealVector(UserPreferences prefs)
+    {
+        return CreateIdealVector(prefs, new List<Car>()); // Gebruik lege lijst als fallback
+    }
+
+    /// <summary>
+    /// Maakt een feature vector voor een ideale auto op basis van user preferences.
     /// </summary>
     public CarFeatureVector CreateIdealVector(UserPreferences prefs, List<Car> availableCars)
     {
@@ -216,4 +227,3 @@ public class CarFeatureVectorFactory
         }
     }
 }
-
