@@ -126,7 +126,7 @@
 </div>
 
 <div class="privacy-content">
-    <p class="last-updated">Laatst bijgewerkt: 3 januari 2026</p>
+    <p class="last-updated">Laatst bijgewerkt: 5 januari 2026</p>
 
     <div class="privacy-section">
         <h2>Overzicht</h2>
@@ -150,16 +150,18 @@
         
         <div class="two-column-section">
             <div>
-                <h3>Gebruikersinput (Tijdelijk)</h3>
-                <p>Wanneer u zoekt naar een auto, geeft u voorkeuren op zoals:</p>
+                <h3>Filtering Systeem</h3>
+                <p>Wanneer u zoekt naar een auto, stelt u voorkeuren in zoals:</p>
                 <ul>             
                     <li> Budget</li>
-                    <li> Type auto (sedan, SUV, hatchback, etc.)</li>
-                    <li> Vermogen</li>
+                    <li> Merk</li>
+                    <li> Model</li>
                     <li> Brandstoftype</li>
-                    <li> Prijs</li>
+                    <li> Type carrosserie (sedan, SUV, hatchback, etc.)</li>
+                    <li> Minimum vermogen</li>
                     <li> Transmissie</li>
-                    <li> Andere technische specificaties</li>
+                    <li> Bouwjaar</li>
+                    <li> Aantal gewenste resultaten</li>
                 </ul>
             </div>
 
@@ -167,16 +169,16 @@
                 <h3>Verwerking (In Real-Time)</h3>
                 <p>Het systeem verwerkt uw input direct en voert de volgende stappen uit:</p>
                 <ul>
-                    <li><strong>Filteren:</strong> Auto's die niet aan uw criteria voldoen worden uitgefilterd</li>
-                    <li><strong>Scoren:</strong> Overgebleven auto's krijgen een score op basis van hoe goed ze aansluiten bij uw voorkeuren</li>
-                    <li><strong>Rangschikken:</strong> Auto's worden gesorteerd van meest naar minst geschikt</li>
+                    <li><strong>Filteren:</strong> Auto's die niet aan uw criteria voldoen worden uitgefilterd via Rule-Based filters</li>
+                    <li><strong>Scoren:</strong> Overgebleven auto's krijgen een score op basis van hoe goed ze aansluiten bij uw voorkeuren via Hybride AI (KNN + Content-based similarity + ML.NET prediction)</li>
+                    <li><strong>Rangschikken:</strong> Auto's worden gesorteerd van meest naar minst geschikt door controlled randomness</li>
                 </ul>
             </div>
         </div>
 
         <h3>Resultaat</h3>
         <p>
-            U ontvangt een top 5 (indien mogelijk) van aanbevolen auto's die het beste passen bij uw opgegeven criteria.
+            U ontvangt aanbevolen auto's die het beste passen bij uw opgegeven criteria.
         </p>
 
         <div class="highlight-box">
@@ -206,38 +208,21 @@
     </div>
 
     <div class="privacy-section">
-        <div class="two-column-section">
-            <div>
-                <h2>Technische Cookies</h2>
-                <p>
-                    De applicatie maakt gebruik van essentiële sessie-cookies die noodzakelijk zijn voor de basisfunctionaliteit 
-                    van de website. Deze cookies:
-                </p>
-                <ul>
-                    <li>Worden alleen gebruikt voor de duur van uw browsersessie</li>
-                    <li>Bevatten geen persoonlijke informatie</li>
-                    <li>Worden automatisch verwijderd wanneer u uw browser sluit</li>
-                    <li>Zijn noodzakelijk voor het correct functioneren van de applicatie</li>
-                </ul>
-            </div>
-
-            <div>
-                <h2>AI technieken</h2>
-                <p>
-                    Dit project maakt gebruik van verschillende AI-technieken om aanbevelingen te genereren, waaronder:
-                </p>
-                <ul>
-                    <li>Rule-Based Filtering</li>
-                    <li>Content-Based Recommendation</li>
-                    <li>Ranking & Scoring Engine</li>
-                    <li>NLP / Text Parsing (lichte AI)</li>
-                </ul>
-                <p>
-                    <strong>Belangrijk:</strong> Deze modellen worden getraind op een statische dataset van auto's en hun 
-                    specificaties. Er worden geen gebruikersgegevens gebruikt voor training of verbetering van de modellen.
-                </p>
-            </div>
-        </div>
+        <h2>AI technieken</h2>
+        <p>
+            Dit project maakt gebruik van verschillende AI-technieken om aanbevelingen te genereren, waaronder:
+        </p>
+        <ul>
+            <li>Rule-Based Filtering</li>
+            <li>KNN</li>
+            <li>ML.NET</li>
+            <li>Cosine Similarity</li>
+            <li>NLP / Text Parsing (lichte AI)</li>
+        </ul>
+        <p>
+            <strong>Belangrijk:</strong> Deze modellen worden getraind op een statische dataset van auto's en hun 
+            specificaties. Er worden geen gebruikersgegevens gebruikt voor training of verbetering van de modellen.
+        </p>
     </div>
 
     <div class="privacy-section">
@@ -256,7 +241,7 @@
             </ul>
         </div>
         <p style="margin-top: 1.5rem;">
-            Het doel is educatief en de applicatie is ontworpen met privacy-by-design principes.
+            Het doel is van de applicatie is educatief en er is geen commercieel belang. 
         </p>
     </div>
 
@@ -268,7 +253,6 @@
         </p>
         <div class="two-column-section">
             <ul>
-                <li>Veilige HTTPS-verbinding (waar van toepassing)</li>
                 <li>Geen permanente opslag van gebruikersinput</li>
             </ul>
             <ul>

@@ -1,30 +1,3 @@
-@* 
-    DYNAMISCHE DETAILPAGINA - ROUTE MET PARAMETER:
-    ===============================================
-    
-    ROUTE: @page "/car/{id}" 
-    - De {id} is een route parameter die dynamisch wordt ingevuld vanuit de auto-kaart
-    - Voorbeeld: /car/123 -> id = 123
-    
-    ID DOORGEVEN VAN KAART NAAR DETAILPAGINA:
-    ==========================================
-    1. In kaart componenten (Index.cshtml, AdvancedFilters.cshtml, Cars.cshtml):
-       - var carId = recommendation.Car.Id (of car.Id)
-       - Links gebruiken: href="/car/@carId" of onclick="window.location.href='/car/@(carId)'"
-       - Elke kaart heeft zijn eigen unieke carId uit recommendation.Car.Id
-    
-    2. Route matching:
-       - URL /car/123 wordt gematcht met @page "/car/{id}"
-       - Razor Pages mapt automatisch {id} naar de int id parameter in OnGetAsync(int id)
-    
-    3. In CarDetailModel.OnGetAsync(int id):
-       - De id parameter bevat de waarde uit de URL (bijv. 123)
-       - Deze id wordt gebruikt om GET /api/cars/{id} aan te roepen
-       - De API retourneert de juiste auto data op basis van deze id
-    
-    VOOR: Hardcoded naar één BMW X5 (alle kaarten linkten naar dezelfde auto)
-    NU: Elke kaart linkt naar zijn eigen detailpagina via unieke car.Id
-*@
 @page "/car/{id:int}"
 @model CarDetailModel
 @{
@@ -49,18 +22,175 @@
         return char.ToUpper(transmission[0]) + (transmission.Length > 1 ? transmission.Substring(1).ToLower() : "");
     }
     
-    /// <summary>
-    /// Converteert vermogen van KW naar PK (paardenkracht).
-    /// Dataset bevat vermogen in KW, maar we tonen het in PK voor gebruikers.
-    /// Conversie: 1 KW = 1.35962 PK (afgerond naar 1.36)
-    /// </summary>
     int ConvertKwToHp(int powerKw)
     {
         return (int)Math.Round(powerKw * 1.35962);
     }
+
+    string FormatBodyType(string? bodyType)
+    {
+        if (string.IsNullOrWhiteSpace(bodyType))
+            return "Niet opgegeven";
+        
+        string lower = bodyType.ToLower().Trim();
+        
+        return lower switch
+        {
+            "suv" => "SUV",
+            "sedan" => "Sedan",
+            "hatchback" => "Hatchback",
+            "station" => "Station",
+            "cabrio" => "Cabrio",
+            "coupe" => "Coupé",
+            "wagon" => "Station",
+            "convertible" => "Cabrio",
+            _ => char.ToUpper(bodyType[0]) + (bodyType.Length > 1 ? bodyType.Substring(1).ToLower() : "")
+        };
+    }
 }
 
-<div class="container mt-4">
+<style>
+    :root {
+        --deep-purple: #4A148C;
+        --purple-dark: #311B92;
+        --purple-light: #7B1FA2;
+        --purple-accent: #9C27B0;
+    }
+
+    .hero-header {
+        background: linear-gradient(135deg, #000000 0%, var(--deep-purple) 50%, var(--purple-dark) 100%);
+        color: white;
+        padding: 3rem 0;
+        margin: -1rem -15px 3rem -15px;
+        border-radius: 0 0 30px 30px;
+    }
+
+    .hero-header h1 {
+        font-size: 2.5rem;
+        font-weight: 600;
+        margin-bottom: 0;
+    }
+
+    .btn-secondary {
+        background: linear-gradient(135deg, #424242 0%, #616161 100%);
+        border: none;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: transform 0.2s, box-shadow 0.2s;
+        color: white;
+        padding: 0.5rem 1rem;
+    }
+
+    .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(66, 66, 66, 0.3);
+        background: linear-gradient(135deg, #212121 0%, #424242 100%);
+    }
+
+    .details-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+        border-left: 5px solid var(--deep-purple);
+    }
+
+    .details-card .card-body {
+        padding: 2rem;
+    }
+
+    .details-card .card-title {
+        color: var(--deep-purple);
+        font-weight: 600;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .details-card dt {
+        color: var(--deep-purple);
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .details-card dd {
+        color: #333;
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .carousel-container {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
+    }
+
+    .carousel-item img {
+        border-radius: 12px;
+    }
+
+    .car-placeholder {
+        border-radius: 12px;
+    }
+
+    .image-gallery {
+        margin-top: 3rem;
+    }
+
+    .image-gallery h3 {
+        color: var(--deep-purple);
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+    }
+
+    .img-thumbnail {
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    }
+
+    .img-thumbnail:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(74, 20, 140, 0.2);
+        border-color: var(--deep-purple);
+    }
+
+    .content-wrapper {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 2rem;
+    }
+
+    .alert-danger {
+        background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+        border: none;
+        border-left: 4px solid #d32f2f;
+        color: #333;
+        border-radius: 8px;
+        padding: 1rem 1.5rem;
+    }
+
+    @@media (max-width: 992px) {
+        .hero-header h1 {
+            font-size: 1.75rem;
+        }
+    }
+</style>
+
+<div class="hero-header">
+    <div class="container-fluid">
+        <div class="content-wrapper">
+            @if (Model.Car != null)
+            {
+                <h1>@Model.Car.Brand @Model.Car.Model</h1>
+            }
+            else
+            {
+                <h1>Auto Details</h1>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
     @if (!string.IsNullOrEmpty(Model.ErrorMessage))
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -71,7 +201,7 @@
 
     @if (Model.Car != null)
     {
-        <div class="row mb-3">
+        <div class="row mb-4">
             <div class="col-12">
                 <a href="/" class="btn btn-secondary">
                     <i class="bi bi-arrow-left"></i> Terug naar zoeken
@@ -80,67 +210,10 @@
         </div>
 
         <div class="row">
-            <div class="col-12">
-                <h1 class="display-4 mb-4">@Model.Car.Brand @Model.Car.Model</h1>
-            </div>
-        </div>
-
-        <div class="row">
             <div class="col-md-6">
-                @if (Model.Images.Count > 0)
-                {
-                    <div id="carImageCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
-                        <div class="carousel-inner">
-                            @for (int i = 0; i < Model.Images.Count; i++)
-                            {
-                                var imageSrc = Model.Images[i];
-                                // Als image relatief pad is (begint met /), voeg API base URL toe voor Azure
-                                if (!string.IsNullOrEmpty(imageSrc) && imageSrc.StartsWith("/") && !string.IsNullOrEmpty(apiBaseUrl))
-                                {
-                                    imageSrc = apiBaseUrl + imageSrc;
-                                }
-                                <div class="carousel-item @(i == 0 ? "active" : "")">
-                                    <img src="@imageSrc" 
-                                         class="d-block w-100" 
-                                         alt="@Model.Car.Brand @Model.Car.Model - Foto @(i + 1)"
-                                         style="height: 400px; object-fit: cover; background-color: #1a1a1a;"
-                                         onerror="this.src='https://via.placeholder.com/800x400/0066CC/FFFFFF.png?text=@Uri.EscapeDataString(Model.Car.Brand + " " + Model.Car.Model)'">
-                                </div>
-                            }
-                        </div>
-                        @if (Model.Images.Count > 1)
-                        {
-                            <button class="carousel-control-prev" type="button" data-bs-target="#carImageCarousel" data-bs-slide="prev">
-                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Vorige</span>
-                            </button>
-                            <button class="carousel-control-next" type="button" data-bs-target="#carImageCarousel" data-bs-slide="next">
-                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Volgende</span>
-                            </button>
-                        }
-                    </div>
-
-                    <div class="mb-4">
-                        <p class="text-muted">
-                            <strong>@Model.Images.Count</strong> foto@(Model.Images.Count != 1 ? "'s" : "") beschikbaar
-                        </p>
-                    </div>
-                }
-                else
-                {
-                    <div class="mb-4">
-                        <img src="https://via.placeholder.com/800x400/0066CC/FFFFFF.png?text=@Uri.EscapeDataString(Model.Car.Brand + " " + Model.Car.Model)" 
-                             class="img-fluid" 
-                             alt="@Model.Car.Brand @Model.Car.Model">
-                    </div>
-                }
-            </div>
-
-            <div class="col-md-6">
-                <div class="card">
+                <div class="card details-card">
                     <div class="card-body">
-                        <h3 class="card-title mb-4">Auto Details</h3>
+                        <h3 class="card-title">Specificaties</h3>
                         <dl class="row">
                             <dt class="col-sm-5">Prijs:</dt>
                             <dd class="col-sm-7">€@Model.Car.Budget.ToString("N0")</dd>
@@ -160,7 +233,7 @@
                             @if (!string.IsNullOrWhiteSpace(Model.Car.BodyType))
                             {
                                 <dt class="col-sm-5">Carrosserie:</dt>
-                                <dd class="col-sm-7">@Model.Car.BodyType</dd>
+                                <dd class="col-sm-7">@FormatBodyType(Model.Car.BodyType)</dd>
                             }
 
                             @if (!string.IsNullOrWhiteSpace(Model.Car.DriveType))
@@ -171,68 +244,34 @@
                         </dl>
                     </div>
                 </div>
+            </div>
+
+            <div class="col-md-6">
+                @{
+                    // Negeer API ImageUrl en probeer direct Auto-Data.net
+                    var safeBrand = Model.Car.Brand?.Trim().Replace(" ", "-").Replace("&", "and").ToLower() ?? "";
+                    var safeModel = Model.Car.Model?.Trim().Replace(" ", "-").Replace("&", "and").ToLower() ?? "";
+                    var mainImageUrl = $"https://www.auto-data.net/images/{safeBrand}/{safeModel}.jpg";
+                    
+                    var brandLower = Model.Car.Brand?.ToLower() ?? "auto";
+                    var modelLower = Model.Car.Model?.ToLower() ?? "";
+                }
                 
-                @* Ratings Sectie *@
-                <div class="card mt-4">
-                    <div class="card-body">
-                        <h4 class="card-title mb-3">Beoordelingen</h4>
-                        @if (Model.Rating != null && Model.Rating.TotalRatings > 0)
-                        {
-                            <div class="mb-3">
-                                <div class="d-flex align-items-center mb-2">
-                                    <div class="me-3">
-                                        <span class="display-6 fw-bold">@Model.Rating.AverageRating.ToString("F1")</span>
-                                        <span class="text-muted">/ 5.0</span>
-                                    </div>
-                                    <div>
-                                        @for (int i = 1; i <= 5; i++)
-                                        {
-                                            <i class="bi @(i <= Math.Round(Model.Rating.AverageRating) ? "bi-star-fill text-warning" : "bi-star text-muted")"></i>
-                                        }
-                                    </div>
-                                </div>
-                                <p class="text-muted mb-0">Gebaseerd op @Model.Rating.TotalRatings beoordeling@(Model.Rating.TotalRatings != 1 ? "en" : "")</p>
-                            </div>
-                            
-                            <div class="mb-3">
-                                @for (int stars = 5; stars >= 1; stars--)
-                                {
-                                    var count = stars == 5 ? Model.Rating.FiveStarRatings :
-                                                stars == 4 ? Model.Rating.FourStarRatings :
-                                                stars == 3 ? Model.Rating.ThreeStarRatings :
-                                                stars == 2 ? Model.Rating.TwoStarRatings :
-                                                Model.Rating.OneStarRatings;
-                                    var percentage = Model.Rating.TotalRatings > 0 ? (count * 100.0 / Model.Rating.TotalRatings) : 0;
-                                    
-                                    <div class="d-flex align-items-center mb-1">
-                                        <span class="me-2" style="width: 60px;">@stars <i class="bi bi-star-fill text-warning"></i></span>
-                                        <div class="progress flex-grow-1 me-2" style="height: 20px;">
-                                            <div class="progress-bar bg-warning" role="progressbar" style="width: @percentage.ToString("F0")%"></div>
-                                        </div>
-                                        <span class="text-muted" style="width: 50px; text-align: right;">@count</span>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <p class="text-muted">Nog geen beoordelingen voor deze auto.</p>
-                        }
-                        
-                        @* Rating Formulier *@
-                        <div class="mt-4">
-                            <h5>Geef je beoordeling</h5>
-                            <div class="mb-3">
-                                <div class="rating-stars" data-car-id="@Model.Car.Id">
-                                    @for (int i = 1; i <= 5; i++)
-                                    {
-                                        <i class="bi bi-star rating-star" data-rating="@i" style="font-size: 2rem; cursor: pointer; color: #ccc; margin-right: 5px;"></i>
-                                    }
-                                </div>
-                                <p class="text-muted mt-2" id="rating-text">Klik op een ster om te beoordelen</p>
-                            </div>
-                            <button type="button" class="btn btn-primary" id="submit-rating" disabled>Beoordeling verzenden</button>
-                            <div id="rating-message" class="mt-2"></div>
+                <div class="carousel-container">
+                    <img src="@mainImageUrl" 
+                         class="d-block w-100" 
+                         alt="@Model.Car.Brand @Model.Car.Model"
+                         style="height: 400px; object-fit: cover; display: block; width: 100%;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                         loading="lazy">
+                    <div class="car-placeholder" 
+                         style="display: none; height: 400px; background: #2d2d2d; flex-direction: column; align-items: center; justify-content: center; color: #ccc;">
+                        <svg width="120" height="120" viewBox="0 0 24 24" fill="currentColor" style="margin-bottom: 1.5rem;">
+                            <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+                        </svg>
+                        <div style="font-size: 1.3rem; font-weight: 500; text-align: center;">
+                            @brandLower<br>
+                            @modelLower
                         </div>
                     </div>
                 </div>
@@ -241,25 +280,24 @@
 
         @if (Model.Images.Count > 1)
         {
-            <div class="row mt-4">
+            <div class="row image-gallery">
                 <div class="col-12">
                     <h3>Alle Foto's</h3>
                     <div class="row">
                         @foreach (var imageUrl in Model.Images)
                         {
                             var imageSrc = imageUrl;
-                            // Als image relatief pad is (begint met /), voeg API base URL toe voor Azure
                             if (!string.IsNullOrEmpty(imageSrc) && imageSrc.StartsWith("/") && !string.IsNullOrEmpty(apiBaseUrl))
                             {
                                 imageSrc = apiBaseUrl + imageSrc;
                             }
                             <div class="col-md-3 col-sm-4 col-6 mb-3">
                                 <img src="@imageSrc" 
-                                     class="img-thumbnail" 
+                                     class="img-thumbnail w-100" 
                                      alt="@Model.Car.Brand @Model.Car.Model"
                                      style="height: 200px; object-fit: cover; cursor: pointer;"
                                      onclick="showImageModal('@imageSrc')"
-                                     onerror="this.src='https://via.placeholder.com/300x200/0066CC/FFFFFF.png?text=@Uri.EscapeDataString(Model.Car.Brand + " " + Model.Car.Model)'">
+                                     onerror="this.style.display='none';">
                             </div>
                         }
                     </div>
@@ -269,153 +307,26 @@
     }
 </div>
 
-<!-- Image Modal -->
 <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header" style="background: linear-gradient(135deg, var(--deep-purple) 0%, var(--purple-accent) 100%); color: white;">
                 <h5 class="modal-title">@(Model.Car?.Brand) @(Model.Car?.Model)</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body text-center">
+            <div class="modal-body text-center" style="background: #f5f5f5;">
                 <img id="modalImage" src="" class="img-fluid" alt="@(Model.Car?.Brand) @(Model.Car?.Model)">
             </div>
         </div>
     </div>
 </div>
 
-<script>
-    function showImageModal(imageUrl) {
-        document.getElementById('modalImage').src = imageUrl;
-        var modal = new bootstrap.Modal(document.getElementById('imageModal'));
-        modal.show();
-    }
-
-    // Rating functionaliteit
-    document.addEventListener('DOMContentLoaded', async function() {
-        const carId = @(Model.Car?.Id ?? 0);
-        if (carId === 0) return; // Geen auto, skip rating functionaliteit
-        
-        // Haal of maak user ID op (gebruik localStorage voor persistentie)
-        let userId = localStorage.getItem('carRecommenderUserId');
-        if (!userId) {
-            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('carRecommenderUserId', userId);
+@section Scripts {
+    <script>
+        function showImageModal(imageUrl) {
+            document.getElementById('modalImage').src = imageUrl;
+            var modal = new bootstrap.Modal(document.getElementById('imageModal'));
+            modal.show();
         }
-        
-        let selectedRating = 0;
-        const stars = document.querySelectorAll('.rating-star');
-        const submitButton = document.getElementById('submit-rating');
-        const ratingText = document.getElementById('rating-text');
-        const ratingMessage = document.getElementById('rating-message');
-        const apiBaseUrl = '@Model.ApiBaseUrl';
-        const ratingStarsContainer = document.querySelector('.rating-stars');
-
-        if (!stars.length || !submitButton || !ratingText || !ratingStarsContainer) {
-            console.error('Rating elements not found');
-            return;
-        }
-
-        // Haal bestaande rating op van deze gebruiker voor deze auto
-        try {
-            const userRatingUrl = apiBaseUrl && apiBaseUrl.trim() !== '' 
-                ? `${apiBaseUrl}/api/ratings/user/${encodeURIComponent(userId)}/car/${carId}` 
-                : `/api/ratings/user/${encodeURIComponent(userId)}/car/${carId}`;
-            
-            const ratingResponse = await fetch(userRatingUrl);
-            if (ratingResponse.ok) {
-                const userRating = await ratingResponse.json();
-                if (userRating && userRating.rating) {
-                    selectedRating = userRating.rating;
-                    highlightStars(selectedRating);
-                    submitButton.disabled = false;
-                    ratingText.textContent = `Je huidige beoordeling: ${selectedRating} ster${selectedRating !== 1 ? 'ren' : ''}. Klik op een ster om te wijzigen.`;
-                    submitButton.textContent = 'Beoordeling bijwerken';
-                }
-            }
-        } catch (error) {
-            console.log('Geen bestaande rating gevonden of fout bij ophalen:', error);
-        }
-
-        function highlightStars(count) {
-            stars.forEach((star, index) => {
-                if (index < count) {
-                    star.classList.remove('bi-star');
-                    star.classList.add('bi-star-fill');
-                    star.style.color = '#ffc107';
-                } else {
-                    star.classList.remove('bi-star-fill');
-                    star.classList.add('bi-star');
-                    star.style.color = '#ccc';
-                }
-            });
-        }
-
-        // Star hover en click events
-        stars.forEach((star, index) => {
-            star.addEventListener('mouseenter', function() {
-                highlightStars(index + 1);
-            });
-
-            star.addEventListener('click', function() {
-                selectedRating = index + 1;
-                highlightStars(selectedRating);
-                submitButton.disabled = false;
-                ratingText.textContent = `Je hebt ${selectedRating} ster${selectedRating !== 1 ? 'ren' : ''} geselecteerd`;
-            });
-        });
-
-        // Reset stars op mouseleave (behoud geselecteerde rating)
-        ratingStarsContainer.addEventListener('mouseleave', function() {
-            highlightStars(selectedRating);
-        });
-
-        // Submit rating
-        submitButton.addEventListener('click', async function() {
-            if (selectedRating === 0) return;
-
-            submitButton.disabled = true;
-            submitButton.textContent = 'Verzenden...';
-            ratingMessage.innerHTML = '';
-
-            try {
-                // Gebruik relatieve URL als apiBaseUrl leeg is (same-origin)
-                const apiUrl = apiBaseUrl && apiBaseUrl.trim() !== '' 
-                    ? `${apiBaseUrl}/api/ratings` 
-                    : '/api/ratings';
-                
-                console.log('Sending rating to:', apiUrl, 'with data:', { carId, rating: selectedRating });
-                
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        carId: carId,
-                        rating: selectedRating,
-                        userId: userId  // Stuur user ID mee zodat backend kan checken of er al een rating is
-                    })
-                });
-
-                if (response.ok) {
-                    const isUpdate = selectedRating > 0 && submitButton.textContent.includes('bijwerken');
-                    ratingMessage.innerHTML = `<div class="alert alert-success">${isUpdate ? 'Beoordeling bijgewerkt' : 'Bedankt voor je beoordeling'}! De pagina wordt vernieuwd...</div>`;
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                } else {
-                    const error = await response.json();
-                    ratingMessage.innerHTML = `<div class="alert alert-danger">Fout: ${error.error || 'Onbekende fout'}</div>`;
-                    submitButton.disabled = false;
-                    submitButton.textContent = 'Beoordeling verzenden';
-                }
-            } catch (error) {
-                ratingMessage.innerHTML = `<div class="alert alert-danger">Fout bij het verzenden: ${error.message}</div>`;
-                submitButton.disabled = false;
-                submitButton.textContent = 'Beoordeling verzenden';
-            }
-        });
-    });
-</script>
-
+    </script>
+}

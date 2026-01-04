@@ -379,7 +379,7 @@
 
                         <!-- Minimum Vermogen -->
                         <div class="col-md-6 mb-3">
-                            <label for="MinPower" class="form-label">Minimum Vermogen (KW)</label>
+                            <label for="MinPower" class="form-label">Minimum Vermogen (PK)</label>
                             <input type="number" class="form-control" id="MinPower" name="FilterRequest.MinPower" 
                                    value="@Model.FilterRequest?.MinPower" min="0" step="10" placeholder="Bijv. 150">
                         </div>
@@ -396,9 +396,6 @@
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="bi bi-search"></i> Zoek met Manuele Filters
                         </button>
-                        <a href="/text-search" class="btn btn-secondary btn-lg ms-2">
-                            <i class="bi bi-arrow-left"></i> Terug naar Tekst Modus
-                        </a>
                     </div>
                 </div>
             </div>

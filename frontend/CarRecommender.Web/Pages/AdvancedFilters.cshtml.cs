@@ -26,7 +26,7 @@ public class AdvancedFiltersModel : PageModel
     public string? ErrorMessage { get; set; }
     public string ApiBaseUrl { get; set; } = string.Empty;
 
-    // Dropdown opties (statisch voor nu, kan later dynamisch worden opgehaald)
+    // Dropdown opties 
     public List<string> Brands { get; set; } = new List<string>
     {
         "", "BMW", "Audi", "Mercedes-Benz", "Volkswagen", "Ford", "Opel", "Peugeot", 
@@ -38,7 +38,7 @@ public class AdvancedFiltersModel : PageModel
 
     public List<string> FuelTypes { get; set; } = new List<string>
     {
-        "", "petrol", "diesel", "hybrid", "electric"
+        "", "petrol", "diesel", "hybrid"
     };
 
     public List<string> TransmissionTypes { get; set; } = new List<string>
