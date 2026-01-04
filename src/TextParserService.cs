@@ -289,7 +289,7 @@ public class TextParserService
     {
         double? powerValue = null;
 
-        // 1️⃣ Eerst: expliciete PK (bv "200 pk", "minstens 180 pk")
+        // 1Eerst: expliciete PK (bv "200 pk", "minstens 180 pk")
         powerValue = ExtractExplicitPower(text);
 
         if (powerValue.HasValue)
@@ -300,16 +300,18 @@ public class TextParserService
             return;
         }
 
-        // 2️⃣ Informele omschrijvingen → map naar REALISTISCHE PK
+        // Informele omschrijvingen 
         if (ContainsKeywords(text, new[] { "veel vermogen", "veel pk", "sterke motor", "krachtig", "veel power" }))
-        {
+        {  
             prefs.MinPower = 180; // sportief maar realistisch
             prefs.PreferenceWeights["power"] = DetectImportanceWeight(text, "vermogen");
         }
-        else if (ContainsKeywords(text, new[] { "sportief", "sporty", "performance", "prestaties", "sportwagen" }))
+        else if (ContainsKeywords(text, new[] { "sportief", "sportieve", "sporty", "performance", "prestaties", "sportwagen" }))
         {
+            Console.WriteLine("[DEBUG] SPORTIEF DETECTED!");
             prefs.MinPower = 200;
             prefs.PreferenceWeights["power"] = DetectImportanceWeight(text, "sportief");
+            Console.WriteLine($"[DEBUG] MinPower set to: {prefs.MinPower}");
         }
         else if (ContainsKeywords(text, new[] { "voldoende", "genoeg", "voor snelweg", "snelweg" }))
         {
