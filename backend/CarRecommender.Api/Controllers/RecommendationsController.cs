@@ -53,11 +53,36 @@ public class RecommendationsController : ControllerBase
     /// 
     /// Azure: Werkt in Production zonder Swagger. Retourneert 404 als auto niet bestaat.
     /// </summary>
-    [HttpGet("{id}")]
-    [ProducesResponseType(typeof(List<RecommendationResult>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+
+    /// <summary>
+    /// KNN-gebaseerde recommendations (Les 4: Spotify style).
+    /// </summary>
+    [HttpPost("from-text-knn")]
+    public ActionResult<List<RecommendationResult>> RecommendFromTextKnn([FromBody] TextRecommendationRequest request)  // ← Gebruik TextRecommendationRequest ipv dynamic
+    {
+        try
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Text))
+            {
+                return BadRequest("Text is verplicht");
+            }
+
+            int top = request.Top ?? 5;
+            var results = _recommendationService.RecommendFromTextWithKnn(request.Text, top);
+            return Ok(results);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in RecommendFromTextKnn");
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("{id}")]  
+    [ProducesResponseType(typeof(List<RecommendationResult>), StatusCodes.Status200OK)] 
+    [ProducesResponseType(StatusCodes.Status400BadRequest)] 
+    [ProducesResponseType(StatusCodes.Status404NotFound)] 
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)] 
     public IActionResult GetRecommendations(int id, [FromQuery] int top = 5)
     {
         try
