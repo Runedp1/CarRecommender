@@ -19,11 +19,21 @@ public class MlRecommendationService
     private MLContext? _mlContext;
     private ITransformer? _trainedModel;
     private PredictionEngine<CarFeatureData, ScorePrediction>? _predictionEngine;
+    private DataViewSchema? _inputSchema;
     private bool _isModelTrained = false;
     private DateTime _lastTrainingTime = DateTime.MinValue;
     private int _trainingDataCount = 0;
     private bool _isInitialized = false;
     private Exception? _initializationError = null;
+    private readonly string? _modelDirectory;
+
+    /// <summary>
+    /// Constructor - optioneel model directory voor save/load functionaliteit.
+    /// </summary>
+    public MlRecommendationService(string? modelDirectory = null)
+    {
+        _modelDirectory = modelDirectory;
+    }
 
     /// <summary>
     /// Input data voor ML model - features van een auto.
@@ -64,11 +74,6 @@ public class MlRecommendationService
         public float PredictedScore { get; set; }
     }
 
-    public MlRecommendationService()
-    {
-        // Lazy initialization - MLContext wordt alleen geïnitialiseerd wanneer nodig
-        // Dit voorkomt crashes tijdens startup als ML.NET native dependencies ontbreken
-    }
 
     /// <summary>
     /// Initialiseert MLContext lazy - alleen wanneer nodig.
@@ -162,8 +167,9 @@ public class MlRecommendationService
     /// om te leren welke features leiden tot hogere scores.
     /// 
     /// Kan ook user feedback gebruiken voor continue learning.
+    /// NOTE: AggregatedFeedback type removed - userFeedback parameter kept for API compatibility but ignored.
     /// </summary>
-    public void TrainModel(List<Car> cars, List<RecommendationResult> recommendationResults, Dictionary<int, AggregatedFeedback>? userFeedback = null)
+    public void TrainModel(List<Car> cars, List<RecommendationResult> recommendationResults, Dictionary<int, object>? userFeedback = null)
     {
         // Lazy initialize ML.NET - als het faalt, skip training maar crash niet
         if (!EnsureInitialized())
@@ -214,16 +220,9 @@ public class MlRecommendationService
                     ? (float)(car.Power - minPower) / (maxPower - minPower)
                     : 0.5f;
 
-                // Bepaal label: gebruik recommendation score, maar pas aan op basis van user feedback
+                // Bepaal label: gebruik recommendation score
+                // NOTE: User feedback support removed - AggregatedFeedback type no longer exists
                 float label = (float)result.SimilarityScore;
-                
-                // Als er user feedback is, pas label aan op basis van populairiteit
-                if (userFeedback != null && userFeedback.TryGetValue(car.Id, out var feedback))
-                {
-                    // Combineer recommendation score met populairiteit score
-                    // Populairiteit heeft 30% gewicht, recommendation score 70%
-                    label = (float)((result.SimilarityScore * 0.7) + (feedback.PopularityScore * 0.3));
-                }
 
                 trainingData.Add(new CarFeatureData
                 {
@@ -290,6 +289,28 @@ public class MlRecommendationService
 
             // Train het model
             _trainedModel = trainingPipeline.Fit(dataView);
+            _inputSchema = dataView.Schema; // Bewaar schema voor later gebruik bij save/load
+
+            // Sla model altijd op naar disk (zodat het bij volgende opstart geladen kan worden)
+            if (_trainedModel != null && _inputSchema != null)
+            {
+                try
+                {
+                    var modelPath = GetModelPath();
+                    var modelDir = Path.GetDirectoryName(modelPath);
+                    if (!string.IsNullOrEmpty(modelDir) && !Directory.Exists(modelDir))
+                    {
+                        Directory.CreateDirectory(modelDir);
+                    }
+                    _mlContext.Model.Save(_trainedModel, _inputSchema, modelPath);
+                    Console.WriteLine($"[ML] Model opgeslagen naar: {modelPath}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ML] Waarschuwing: Kon model niet opslaan: {ex.Message}");
+                    // Doorgaan zonder model op te slaan - training is geslaagd
+                }
+            }
 
             // Maak prediction engine voor snelle voorspellingen
             _predictionEngine = _mlContext.Model.CreatePredictionEngine<CarFeatureData, ScorePrediction>(_trainedModel);
@@ -393,17 +414,112 @@ public class MlRecommendationService
     /// <summary>
     /// Retraint het model met nieuwe data (incremental learning).
     /// Combineert oude training data met nieuwe feedback.
+    /// NOTE: AggregatedFeedback type removed - userFeedback parameter kept for API compatibility but ignored.
     /// </summary>
     public void RetrainModel(
         List<Car> cars, 
         List<RecommendationResult> newRecommendations, 
-        Dictionary<int, AggregatedFeedback>? userFeedback = null)
+        Dictionary<int, object>? userFeedback = null)
     {
         // Voor incremental learning: combineer nieuwe data met bestaande patterns
         // In een echte implementatie zou je hier oude training data kunnen bewaren
         // Voor nu trainen we opnieuw met alle beschikbare data
         
         TrainModel(cars, newRecommendations, userFeedback);
+    }
+
+    /// <summary>
+    /// Slaat het getrainde model op naar disk.
+    /// </summary>
+    /// <param name="modelPath">Pad waar het model moet worden opgeslagen. Als null, gebruikt het de standaard locatie.</param>
+    public void SaveModel(string? modelPath = null)
+    {
+        if (!EnsureInitialized() || _trainedModel == null || _mlContext == null || _inputSchema == null)
+        {
+            throw new InvalidOperationException("Model is niet getraind. Train eerst het model voordat u het opslaat.");
+        }
+
+        try
+        {
+            var path = modelPath ?? GetModelPath();
+            var modelDir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(modelDir) && !Directory.Exists(modelDir))
+            {
+                Directory.CreateDirectory(modelDir);
+            }
+            
+            _mlContext.Model.Save(_trainedModel, _inputSchema, path);
+            Console.WriteLine($"[ML] Model opgeslagen naar: {path}");
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Fout bij opslaan van model: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Laadt een getraind model van disk.
+    /// </summary>
+    /// <param name="modelPath">Pad naar het opgeslagen model. Als null, gebruikt het de standaard locatie.</param>
+    public bool LoadModel(string? modelPath = null)
+    {
+        if (!EnsureInitialized() || _mlContext == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var path = modelPath ?? GetModelPath();
+            
+            if (!File.Exists(path))
+            {
+                Console.WriteLine($"[ML] Model bestand niet gevonden: {path}");
+                return false;
+            }
+
+            // Laad model van disk
+            DataViewSchema schema;
+            _trainedModel = _mlContext.Model.Load(path, out schema);
+            
+            // Maak prediction engine voor snelle voorspellingen
+            _predictionEngine = _mlContext.Model.CreatePredictionEngine<CarFeatureData, ScorePrediction>(_trainedModel);
+            
+            _isModelTrained = true;
+            
+            // Probeer last modified tijd van bestand te lezen
+            var fileInfo = new FileInfo(path);
+            _lastTrainingTime = fileInfo.LastWriteTimeUtc;
+            _trainingDataCount = 0; // We weten niet hoeveel training data gebruikt werd
+            
+            Console.WriteLine($"[ML] Model geladen van: {path}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ML] Fout bij laden van model: {ex.Message}");
+            _isModelTrained = false;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Bepaalt het pad waar het model wordt opgeslagen/geplaatst.
+    /// </summary>
+    private string GetModelPath()
+    {
+        if (!string.IsNullOrEmpty(_modelDirectory))
+        {
+            return Path.Combine(_modelDirectory, "recommendation_model.mlnet");
+        }
+
+        // Standaard locatie: data directory of current directory
+        var dataDir = Path.Combine(Directory.GetCurrentDirectory(), "data");
+        if (!Directory.Exists(dataDir))
+        {
+            dataDir = Directory.GetCurrentDirectory();
+        }
+        return Path.Combine(dataDir, "recommendation_model.mlnet");
     }
 
     /// <summary>
@@ -415,7 +531,9 @@ public class MlRecommendationService
         {
             IsTrained = _isModelTrained,
             LastTrainingTime = _lastTrainingTime,
-            TrainingDataCount = _trainingDataCount
+            TrainingDataCount = _trainingDataCount,
+            ModelPath = GetModelPath(),
+            ModelExists = File.Exists(GetModelPath())
         };
     }
 }
@@ -428,5 +546,7 @@ public class ModelStatistics
     public bool IsTrained { get; set; }
     public DateTime LastTrainingTime { get; set; }
     public int TrainingDataCount { get; set; }
+    public string? ModelPath { get; set; }
+    public bool ModelExists { get; set; }
 }
 

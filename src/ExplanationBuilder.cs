@@ -3,15 +3,11 @@ namespace CarRecommender;
 /// <summary>
 /// Bouwt uitleg teksten voor recommendations op basis van echte data.
 /// Gebruikt alleen informatie uit Car en UserPreferences.
-/// Kan ook collaborative filtering data gebruiken.
 /// </summary>
 public class ExplanationBuilder
 {
-    private readonly CollaborativeFilteringService? _collaborativeService;
-
-    public ExplanationBuilder(CollaborativeFilteringService? collaborativeService = null)
+    public ExplanationBuilder()
     {
-        _collaborativeService = collaborativeService;
     }
 
     /// <summary>
@@ -114,30 +110,7 @@ public class ExplanationBuilder
             explanation += " op basis van algemene similarity";
         }
 
-        // Voeg collaborative filtering uitleg toe als beschikbaar
-        if (collaborativeScore != null && collaborativeScore.HasCollaborativeData && _collaborativeService != null)
-        {
-            var prefsSnapshot = new UserPreferenceSnapshot
-            {
-                MaxBudget = prefs.MaxBudget,
-                PreferredFuel = prefs.PreferredFuel,
-                PreferredBrand = prefs.PreferredBrand,
-                AutomaticTransmission = prefs.AutomaticTransmission,
-                MinPower = prefs.MinPower,
-                BodyTypePreference = prefs.BodyTypePreference,
-                ComfortVsSportScore = prefs.ComfortVsSportScore,
-                PreferenceWeights = prefs.PreferenceWeights
-            };
-
-            var collaborativeExplanation = _collaborativeService.GenerateCollaborativeExplanation(
-                collaborativeScore, 
-                prefsSnapshot);
-
-            if (!string.IsNullOrEmpty(collaborativeExplanation))
-            {
-                explanation += $". {collaborativeExplanation}";
-            }
-        }
+        // Collaborative filtering is disabled for performance
 
         explanation += $". Similarity score: {similarityScore:F3}";
 
@@ -273,5 +246,39 @@ public class ExplanationBuilder
         else
             return "alle doeleinden";
     }
+}
+
+/// <summary>
+/// Collaborative filtering score voor een auto.
+/// NOTE: This class is kept here for compatibility with ExplanationBuilder.
+/// The CollaborativeFilteringService that used to populate this has been moved to Legacy.
+/// </summary>
+public class CollaborativeScore
+{
+    /// <summary>
+    /// Genormaliseerde score (0-1) op basis van gelijkaardige gebruikers.
+    /// </summary>
+    public double Score { get; set; }
+
+    /// <summary>
+    /// Aantal gelijkaardige gebruikers die deze auto hebben beoordeeld.
+    /// </summary>
+    public int UserCount { get; set; }
+
+    /// <summary>
+    /// Gemiddelde rating (1-5) van gelijkaardige gebruikers.
+    /// </summary>
+    public double AverageRating { get; set; }
+
+    /// <summary>
+    /// Of er collaborative data beschikbaar is.
+    /// </summary>
+    public bool HasCollaborativeData { get; set; }
+
+    /// <summary>
+    /// Top ratings (4+ sterren) van gelijkaardige gebruikers.
+    /// NOTE: UserRating type removed, this property is kept for compatibility but will be empty.
+    /// </summary>
+    public List<object> TopRatings { get; set; } = new();
 }
 

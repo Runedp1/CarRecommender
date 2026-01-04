@@ -48,45 +48,68 @@ public class MlEvaluationService : IMlEvaluationService
     /// </summary>
     public MlEvaluationResult EvaluateModel()
     {
+        Console.WriteLine("[ML EVALUATION] Starting ML evaluation pipeline...");
+        
         // ML Pipeline Stap 1: DATA PREPROCESSING
         // Filter auto's met geldige waarden voor ML training
+        Console.WriteLine("[ML EVALUATION] Step 1: Loading and preprocessing dataset...");
         var allCars = _carRepository.GetAllCars();
+        Console.WriteLine($"[ML EVALUATION] Total cars loaded: {allCars?.Count ?? 0}");
         var validCars = allCars
             .Where(c => c.Power > 0 && c.Budget > 0 && c.Year >= 1900 && c.Year <= DateTime.Now.Year + 1)
             .ToList();
+        Console.WriteLine($"[ML EVALUATION] Valid cars after filtering: {validCars.Count}");
         
         if (validCars.Count < 20)
         {
             // Te weinig data voor train/test split
+            // Geef diagnostische informatie voor debugging
+            Console.WriteLine($"[ML EVALUATION] ERROR: Insufficient data for evaluation (minimum 20 cars required)");
             return new MlEvaluationResult
             {
                 IsValid = false,
-                ErrorMessage = "Onvoldoende data voor ML evaluatie (minimaal 20 auto's vereist)"
+                ErrorMessage = $"Onvoldoende data voor ML evaluatie (minimaal 20 auto's vereist). Totaal auto's: {allCars?.Count ?? 0}, Geldige auto's: {validCars.Count}. Mogelijk is de dataset niet correct geladen in Azure."
             };
         }
         
         // ML Pipeline Stap 2: TRAIN/TEST SPLIT
         // Split dataset in training (80%) en test (20%) sets
         // Gebruik stratified split op basis van bouwjaar ranges voor betere representatie
+        Console.WriteLine("[ML EVALUATION] Step 2: Performing train/test split (80/20)...");
         var splitResult = PerformTrainTestSplit(validCars);
         var trainingCars = splitResult.TrainingSet;
         var testCars = splitResult.TestSet;
+        Console.WriteLine($"[ML EVALUATION] Training set size: {trainingCars.Count} cars ({trainingCars.Count * 100.0 / validCars.Count:F1}%)");
+        Console.WriteLine($"[ML EVALUATION] Test set size: {testCars.Count} cars ({testCars.Count * 100.0 / validCars.Count:F1}%)");
         
         // ML Pipeline Stap 3: TRAINING
         // Voor dit project gebruiken we de bestaande recommendation service
         // In een echte ML pipeline zou hier een model getraind worden op de training set
         // We simuleren training door recommendations te genereren voor training auto's
+        Console.WriteLine("[ML EVALUATION] Step 3: Training skipped (using existing recommendation service)");
         
         // ML Pipeline Stap 4: EVALUATIE
         // Evalueer recommendations op test set met verschillende metrics
+        Console.WriteLine("[ML EVALUATION] Step 4: Evaluating recommendations with metrics (Precision@K, Recall@K, MAE, RMSE)...");
         var evaluationMetrics = EvaluateRecommendations(trainingCars, testCars);
+        Console.WriteLine($"[ML EVALUATION] Evaluation metrics computed:");
+        Console.WriteLine($"[ML EVALUATION]   Precision@K: {evaluationMetrics.PrecisionAtK:F4}");
+        Console.WriteLine($"[ML EVALUATION]   Recall@K: {evaluationMetrics.RecallAtK:F4}");
+        Console.WriteLine($"[ML EVALUATION]   MAE: {evaluationMetrics.MAE:F2}");
+        Console.WriteLine($"[ML EVALUATION]   RMSE: {evaluationMetrics.RMSE:F2}");
         
         // ML Pipeline Stap 5: HYPERPARAMETER TUNING
         // Optimaliseer similarity gewichten door meerdere configuraties te testen
+        Console.WriteLine("[ML EVALUATION] Step 5: Hyperparameter tuning (testing 3 configurations)...");
         var hyperparameterResults = _hyperparameterTuningService.TuneHyperparameters(trainingCars, testCars);
+        Console.WriteLine($"[ML EVALUATION] Hyperparameter tuning completed. Tested {hyperparameterResults.AllResults.Count} configurations.");
         
         // Forecasting/Trend analyse
+        Console.WriteLine("[ML EVALUATION] Computing forecasting/trend analysis...");
         var forecastingResults = _forecastingService.AnalyzeTrends(validCars);
+        Console.WriteLine("[ML EVALUATION] Forecasting analysis completed.");
+        
+        Console.WriteLine("[ML EVALUATION] ML evaluation pipeline completed successfully.");
         
         return new MlEvaluationResult
         {
@@ -170,14 +193,33 @@ public class MlEvaluationService : IMlEvaluationService
         var allRecallScores = new List<double>();
         var pricePredictions = new List<(Car Predicted, Car Actual)>();
         
-        // Evalueer voor elke test auto
-        int evaluationCount = Math.Min(50, testCars.Count); // Beperk voor performance
-        var testSample = testCars.Take(evaluationCount).ToList();
+        // OPTIMALISATIE: Gebruik alleen training set voor recommendations (veel sneller!)
+        // In plaats van alle auto's te doorzoeken, gebruiken we alleen de training set
+        // Dit is correct voor ML evaluatie: we testen of het model goede recommendations kan maken
+        // op basis van alleen de training data
+        var trainingSampleForEvaluation = trainingCars.Take(Math.Min(500, trainingCars.Count)).ToList();
+        Console.WriteLine($"[ML EVALUATION]   Using {trainingSampleForEvaluation.Count} training cars for similarity calculations (from {trainingCars.Count} total training cars)");
         
+        // Evalueer voor elke test auto - beperk voor performance (Azure timeout)
+        // Gebruik kleinere sample voor snellere evaluatie
+        int evaluationCount = Math.Min(20, testCars.Count); // Verlaagd van 50 naar 20 voor performance
+        var testSample = testCars.Take(evaluationCount).ToList();
+        Console.WriteLine($"[ML EVALUATION]   Evaluating on {testSample.Count} test cars (from {testCars.Count} total test cars)");
+        
+        int processed = 0;
         foreach (var testCar in testSample)
         {
-            // Genereer recommendations voor deze test auto
-            var recommendations = _recommendationService.RecommendSimilarCars(testCar, PRECISION_RECALL_K);
+            processed++;
+            Console.WriteLine($"[ML EVALUATION]   Processing test car {processed}/{testSample.Count} (ID: {testCar.Id}, {testCar.Brand} {testCar.Model})...");
+            
+            // OPTIMALISATIE: Gebruik efficiënte RecommendSimilarCarsFromSet in plaats van RecommendSimilarCars
+            // Dit is veel sneller omdat we alleen door training set itereren, niet door alle auto's
+            Console.WriteLine($"[ML EVALUATION]     Calling RecommendSimilarCarsFromSet (optimized for ML evaluation)...");
+            var recommendationService = _recommendationService as RecommendationService;
+            var recommendations = recommendationService != null 
+                ? recommendationService.RecommendSimilarCarsFromSet(testCar, trainingSampleForEvaluation, PRECISION_RECALL_K)
+                : _recommendationService.RecommendSimilarCars(testCar, PRECISION_RECALL_K); // Fallback
+            Console.WriteLine($"[ML EVALUATION]     Received {recommendations.Count} recommendations");
             
             // Bepaal relevante auto's (auto's met vergelijkbare prijs ± 20%)
             // In een echte ML setup zou dit gebaseerd zijn op echte user feedback/interacties
@@ -358,6 +400,7 @@ public class MlEvaluationResult
     public ForecastingResult? ForecastingResults { get; set; }
     public DateTime EvaluationTimestamp { get; set; }
 }
+
 
 
 

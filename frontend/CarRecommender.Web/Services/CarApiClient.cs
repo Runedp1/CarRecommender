@@ -27,19 +27,37 @@ public class CarApiClient
 
     /// <summary>
     /// Haalt alle auto's op via GET /api/cars
-    /// Backend retourneert een PagedResult, maar we willen alle auto's, dus gebruiken we een grote pageSize
+    /// Backend retourneert een PagedResult met max pageSize van 100, dus we moeten pagineren om alle auto's op te halen.
     /// </summary>
     public async Task<List<Car>?> GetAllCarsAsync()
     {
         try
         {
-            // Gebruik een grote pageSize om alle auto's in één keer op te halen
-            var response = await _httpClient.GetAsync("/api/cars?page=1&pageSize=10000");
-            response.EnsureSuccessStatusCode();
+            // Backend heeft max pageSize van 100, dus we moeten pagineren
+            // Haal eerst de eerste pagina op om te weten hoeveel pagina's er zijn
+            var firstPageResponse = await _httpClient.GetAsync("/api/cars?page=1&pageSize=100");
+            firstPageResponse.EnsureSuccessStatusCode();
             
-            // Backend retourneert PagedResult<Car>, niet List<Car>
-            var pagedResult = await response.Content.ReadFromJsonAsync<PagedResult<Car>>(_jsonOptions);
-            return pagedResult?.Items;
+            var firstPageResult = await firstPageResponse.Content.ReadFromJsonAsync<PagedResult<Car>>(_jsonOptions);
+            if (firstPageResult == null)
+                return new List<Car>();
+            
+            var allCars = new List<Car>(firstPageResult.Items);
+            
+            // Haal de resterende pagina's op
+            for (int page = 2; page <= firstPageResult.TotalPages; page++)
+            {
+                var response = await _httpClient.GetAsync($"/api/cars?page={page}&pageSize=100");
+                response.EnsureSuccessStatusCode();
+                
+                var pagedResult = await response.Content.ReadFromJsonAsync<PagedResult<Car>>(_jsonOptions);
+                if (pagedResult?.Items != null)
+                {
+                    allCars.AddRange(pagedResult.Items);
+                }
+            }
+            
+            return allCars;
         }
         catch (HttpRequestException ex)
         {
@@ -190,20 +208,89 @@ public class CarApiClient
 
     /// <summary>
     /// Haalt ML evaluatie resultaten op via GET /api/ml/evaluation
+    /// ML evaluatie kan lang duren (30-60 seconden), gebruik langere timeout
     /// </summary>
     public async Task<MlEvaluationResult?> GetMlEvaluationAsync()
     {
         try
         {
-            var response = await _httpClient.GetAsync("/api/ml/evaluation");
+            _logger.LogInformation("[CarApiClient] Start ML evaluatie request naar {BaseAddress}api/ml/evaluation", _httpClient.BaseAddress);
+            
+            // ML evaluatie kan lang duren, gebruik langere timeout (120 seconden)
+            // HttpClient timeout is al ingesteld op 120 seconden in Program.cs
+            // Gebruik POST voor langlopende operaties (beter dan GET voor processing)
+            var response = await _httpClient.PostAsync("/api/ml/evaluation", null);
+            
+            _logger.LogInformation("[CarApiClient] ML evaluatie response status: {StatusCode}", response.StatusCode);
+            
             response.EnsureSuccessStatusCode();
             
-            return await response.Content.ReadFromJsonAsync<MlEvaluationResult>(_jsonOptions);
+            var result = await response.Content.ReadFromJsonAsync<MlEvaluationResult>(_jsonOptions);
+            
+            if (result != null)
+            {
+                _logger.LogInformation("[CarApiClient] ML evaluatie resultaat ontvangen. IsValid: {IsValid}, TrainingSet: {TrainingSize}, TestSet: {TestSize}", 
+                    result.IsValid, result.TrainingSetSize, result.TestSetSize);
+            }
+            
+            return result;
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogError(ex, "[CarApiClient] Timeout bij ML evaluatie (duurt langer dan {Timeout} seconden). BaseAddress: {BaseAddress}", 
+                _httpClient.Timeout.TotalSeconds, _httpClient.BaseAddress);
+            throw new HttpRequestException($"ML evaluatie duurt te lang (timeout na {_httpClient.Timeout.TotalSeconds} seconden). Dit kan 30-60 seconden duren. Probeer het later opnieuw.", ex);
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Fout bij het ophalen van ML evaluatie resultaten");
+            _logger.LogError(ex, "[CarApiClient] HTTP fout bij ML evaluatie. BaseAddress: {BaseAddress}, URL: {Url}", 
+                _httpClient.BaseAddress, "/api/ml/evaluation");
             throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[CarApiClient] Onverwachte fout bij ML evaluatie. BaseAddress: {BaseAddress}", 
+                _httpClient.BaseAddress);
+            throw new HttpRequestException("Er is een onverwachte fout opgetreden bij het ophalen van ML evaluatie resultaten.", ex);
+        }
+    }
+
+    /// <summary>
+    /// Haalt ML model training status op via GET /api/ml/status
+    /// </summary>
+    public async Task<MlModelStatus?> GetMlStatusAsync()
+    {
+        try
+        {
+            _logger.LogInformation("[CarApiClient] Start ML status request naar {BaseAddress}api/ml/status", _httpClient.BaseAddress);
+            
+            var response = await _httpClient.GetAsync("/api/ml/status");
+            
+            _logger.LogInformation("[CarApiClient] ML status response status: {StatusCode}", response.StatusCode);
+            
+            response.EnsureSuccessStatusCode();
+            
+            var result = await response.Content.ReadFromJsonAsync<MlModelStatus>(_jsonOptions);
+            
+            if (result != null)
+            {
+                _logger.LogInformation("[CarApiClient] ML status ontvangen. IsTrained: {IsTrained}, LastTraining: {LastTraining}", 
+                    result.IsTrained, result.LastTrainingTime);
+            }
+            
+            return result;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "[CarApiClient] HTTP fout bij ML status. BaseAddress: {BaseAddress}, URL: {Url}", 
+                _httpClient.BaseAddress, "/api/ml/status");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[CarApiClient] Onverwachte fout bij ML status. BaseAddress: {BaseAddress}", 
+                _httpClient.BaseAddress);
+            throw new HttpRequestException("Er is een onverwachte fout opgetreden bij het ophalen van ML model status.", ex);
         }
     }
 

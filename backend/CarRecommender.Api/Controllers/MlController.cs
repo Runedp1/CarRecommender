@@ -17,6 +17,7 @@ namespace CarRecommender.Api.Controllers;
 public class MlController : ControllerBase
 {
     private readonly IMlEvaluationService _mlEvaluationService;
+    private readonly MlRecommendationService _mlRecommendationService;
     private readonly ILogger<MlController> _logger;
     
     /// <summary>
@@ -24,9 +25,11 @@ public class MlController : ControllerBase
     /// </summary>
     public MlController(
         IMlEvaluationService mlEvaluationService,
+        MlRecommendationService mlRecommendationService,
         ILogger<MlController> logger)
     {
         _mlEvaluationService = mlEvaluationService ?? throw new ArgumentNullException(nameof(mlEvaluationService));
+        _mlRecommendationService = mlRecommendationService ?? throw new ArgumentNullException(nameof(mlRecommendationService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
     
@@ -46,16 +49,20 @@ public class MlController : ControllerBase
     /// - Beste hyperparameter configuratie
     /// - Forecasting/trend analyse resultaten
     /// </summary>
-    [HttpGet("evaluation")]
+    [HttpPost("evaluation")]
+    [HttpGet("evaluation")] // Behoud GET voor backward compatibility
     [ProducesResponseType(typeof(MlEvaluationResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public IActionResult GetEvaluation()
+    public async Task<IActionResult> GetEvaluation()
     {
         try
         {
-            _logger.LogInformation("ML evaluatie wordt uitgevoerd...");
+            _logger.LogInformation("ML evaluatie wordt uitgevoerd... (dit kan 30-60 seconden duren)");
             
-            var result = _mlEvaluationService.EvaluateModel();
+            // ML evaluatie kan lang duren, gebruik async Task.Run om te voorkomen dat de request thread wordt geblokkeerd
+            // Timeout is standaard 30 seconden in Azure, maar ML evaluatie kan langer duren
+            // Gebruik async/await in plaats van GetAwaiter().GetResult() om deadlocks te voorkomen
+            var result = await Task.Run(() => _mlEvaluationService.EvaluateModel());
             
             if (!result.IsValid)
             {
@@ -74,7 +81,79 @@ public class MlController : ControllerBase
             throw; // Exception wordt opgevangen door globale exception handler
         }
     }
+    
+    /// <summary>
+    /// GET /api/ml/status
+    /// Haalt de status op van het ML.NET model training.
+    /// 
+    /// Retourneert:
+    /// - Of het model getraind is
+    /// - Wanneer het model voor het laatst getraind is
+    /// - Aantal training samples
+    /// - Of het model opgeslagen is op disk
+    /// </summary>
+    [HttpGet("status")]
+    [ProducesResponseType(typeof(MlModelStatus), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public IActionResult GetStatus()
+    {
+        try
+        {
+            var statistics = _mlRecommendationService.GetModelStatistics();
+            
+            var status = new MlModelStatus
+            {
+                IsTrained = statistics.IsTrained,
+                LastTrainingTime = statistics.LastTrainingTime,
+                TrainingDataCount = statistics.TrainingDataCount,
+                ModelExists = statistics.ModelExists,
+                ModelPath = statistics.ModelPath
+            };
+            
+            _logger.LogInformation("ML model status opgehaald. IsTrained: {IsTrained}, LastTraining: {LastTraining}", 
+                status.IsTrained, status.LastTrainingTime);
+            
+            return Ok(status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fout bij ophalen ML model status");
+            throw; // Exception wordt opgevangen door globale exception handler
+        }
+    }
 }
+
+/// <summary>
+/// ML model status response model.
+/// </summary>
+public class MlModelStatus
+{
+    /// <summary>
+    /// Of het model getraind is.
+    /// </summary>
+    public bool IsTrained { get; set; }
+    
+    /// <summary>
+    /// Wanneer het model voor het laatst getraind is.
+    /// </summary>
+    public DateTime LastTrainingTime { get; set; }
+    
+    /// <summary>
+    /// Aantal training samples gebruikt voor training.
+    /// </summary>
+    public int TrainingDataCount { get; set; }
+    
+    /// <summary>
+    /// Of het model opgeslagen is op disk.
+    /// </summary>
+    public bool ModelExists { get; set; }
+    
+    /// <summary>
+    /// Pad waar het model is opgeslagen (indien beschikbaar).
+    /// </summary>
+    public string? ModelPath { get; set; }
+}
+
 
 
 

@@ -123,3 +123,4 @@ if (merkIndex < 0 || modelIndex < 0)
 
 Als dit niet het geval is, toont de logging nu precies waar het probleem zit.
 
+

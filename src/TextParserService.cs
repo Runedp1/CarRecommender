@@ -288,7 +288,6 @@ public class TextParserService
     private void ExtractPowerPreference(string text, UserPreferences prefs)
     {
         double? powerValue = null;
-        double weight = 1.0;
 
         // 1️⃣ Eerst: expliciete PK (bv "200 pk", "minstens 180 pk")
         powerValue = ExtractExplicitPower(text);

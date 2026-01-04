@@ -7,7 +7,9 @@ builder.Services.AddRazorPages();
 
 // Configure HttpClient voor CarApiClient
 var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"] 
-    ?? throw new InvalidOperationException("ApiSettings:BaseUrl is niet geconfigureerd in appsettings.json");
+    ?? throw new InvalidOperationException(
+        $"ApiSettings:BaseUrl is niet geconfigureerd. Environment: {builder.Environment.EnvironmentName}. " +
+        $"Beschikbare configuratie keys: {string.Join(", ", builder.Configuration.AsEnumerable().Select(kvp => kvp.Key))}");
 
 // Zorg dat BaseAddress eindigt met een slash voor correct gebruik met relatieve URLs
 if (!apiBaseUrl.EndsWith("/"))
@@ -22,9 +24,11 @@ Console.WriteLine($"[FRONTEND] Environment: {builder.Environment.EnvironmentName
 builder.Services.AddHttpClient<CarApiClient>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(30);
+    // Verhoog timeout voor ML evaluatie die lang kan duren (30-60 seconden)
+    client.Timeout = TimeSpan.FromSeconds(120);
     // LOG: Bevestig configuratie
     Console.WriteLine($"[FRONTEND] HttpClient geconfigureerd met BaseAddress: {client.BaseAddress}");
+    Console.WriteLine($"[FRONTEND] HttpClient Timeout: {client.Timeout.TotalSeconds} seconden");
     Console.WriteLine($"[FRONTEND] Test URL zou zijn: {client.BaseAddress}api/health");
 });
 

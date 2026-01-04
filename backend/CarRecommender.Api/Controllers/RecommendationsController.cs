@@ -28,7 +28,6 @@ public class RecommendationsController : ControllerBase
 {
     private readonly IRecommendationService _recommendationService;
     private readonly ICarRepository _carRepository;
-    private readonly FeedbackTrackingService? _feedbackService;
     private readonly ILogger<RecommendationsController> _logger;
 
     /// <summary>
@@ -38,12 +37,10 @@ public class RecommendationsController : ControllerBase
     public RecommendationsController(
         IRecommendationService recommendationService,
         ICarRepository carRepository,
-        FeedbackTrackingService? feedbackService = null,
         ILogger<RecommendationsController>? logger = null)
     {
         _recommendationService = recommendationService ?? throw new ArgumentNullException(nameof(recommendationService));
         _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
-        _feedbackService = feedbackService;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -82,9 +79,6 @@ public class RecommendationsController : ControllerBase
 
             // Genereer recommendations via business logica service
             var recommendations = _recommendationService.RecommendSimilarCars(targetCar, top);
-
-            // Track recommendations voor feedback (zonder clicks - die worden apart getrackt)
-            TrackRecommendations(recommendations, "similar-cars");
 
             return Ok(recommendations);
         }
@@ -145,7 +139,7 @@ public class RecommendationsController : ControllerBase
             // Deze service gebruikt TextParserService voor NLP parsing en RecommendationEngine voor similarity berekening
             // Gebruik async versie voor collaborative filtering support
             // Timeout van 30 seconden om te voorkomen dat de request oneindig hangt
-            var recommendationsTask = ((RecommendationService)_recommendationService).RecommendFromTextAsync(request.Text, top);
+            var recommendationsTask = ((RecommendationService)_recommendationService).RecommendFromTextAsync(request.Text ?? string.Empty, top);
             var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
             
             var completedTask = await Task.WhenAny(recommendationsTask, timeoutTask);
@@ -159,9 +153,6 @@ public class RecommendationsController : ControllerBase
             var recommendations = await recommendationsTask;
             
             _logger.LogInformation("[Controller] RecommendFromTextAsync voltooid - {Count} recommendations", recommendations?.Count ?? 0);
-
-            // Track recommendations voor feedback
-            TrackRecommendations(recommendations, "text-based");
 
             return Ok(recommendations);
         }
@@ -242,9 +233,6 @@ public class RecommendationsController : ControllerBase
             // Genereer recommendations op basis van manuele filters via business logica service
             var recommendations = _recommendationService.RecommendFromManualFilters(request, top);
 
-            // Track recommendations voor feedback
-            TrackRecommendations(recommendations, "manual-filters");
-
             return Ok(recommendations);
         }
         catch (Exception ex)
@@ -256,20 +244,6 @@ public class RecommendationsController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Trackt recommendations voor feedback tracking (zonder clicks).
-    /// </summary>
-    private void TrackRecommendations(List<RecommendationResult> recommendations, string context)
-    {
-        if (_feedbackService == null || recommendations == null || recommendations.Count == 0)
-            return;
-
-        // Genereer session ID voor deze recommendation request
-        var sessionId = Guid.NewGuid().ToString();
-
-        // Recommendations worden al getrackt in RecommendationService
-        // Hier kunnen we extra tracking toevoegen indien nodig
-    }
 }
 
     /// <summary>

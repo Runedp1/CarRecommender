@@ -9,39 +9,32 @@ Een recommendation systeem voor auto's geschreven in C# gebaseerd op volgende AI
 ## Project Structuur (wordt nog aangepast)
 
 ```
-Recommendation System/
-├── src/                          # C# broncode
-│   ├── Program.cs               # Presentatie laag - Console UI en entry point
-│   ├── Car.cs                   # Data model laag - Domain entities
-│   ├── CarRepository.cs         # Data laag - CSV data toegang
-│   ├── RecommendationEngine.cs  # Business logica - Similarity algoritmes
-│   └── RecommendationService.cs # Business logica - Recommendation coordinatie
+Recommendation_System_New/
+├── backend/                      # Backend API
+│   ├── CarRecommender.Api/      # ASP.NET Core Web API
+│   │   ├── Controllers/         # API Controllers
+│   │   ├── Program.cs           # Dependency injection & configuratie
+│   │   └── appsettings.json     # Configuratie
+│   └── data/                    # Datasets
+│       ├── df_master_v8_def.csv # Hoofddataset
+│       └── car_image_mapping.json
 │
-├── data/                         # CSV datasets
-│   ├── Cleaned_Car_Data_For_App_Fully_Enriched.csv
-│   ├── vehicles.csv
-│   ├── car_price_prediction_.csv
-│   └── ...
+├── frontend/                     # Frontend Web App
+│   └── CarRecommender.Web/      # ASP.NET Core Razor Pages
 │
-├── notebooks/                    # Python notebooks voor analyse
-│   └── recommender.ipynb
-│
-├── scripts/                      # Python scripts voor data processing
-│   ├── merge_all_datasets_comprehensive.py  # Comprehensive merge script
-│   ├── merge_all_datasets.py                # Originele merge
-│   ├── merge_new_datasets.py                # Merge nieuwe datasets
-│   ├── link_images_to_cars.py               # Image koppeling
-│   └── test_database_quality.py             # Kwaliteitstests
+├── src/                          # Core Library (gedeelde business logic)
+│   ├── Domain/Models/           # Domain entities (Car, UserRating, etc.)
+│   ├── Data/                    # Data access (CarRepository, UserRatingRepository)
+│   ├── ML/                      # ML services (MlRecommendationService, MlEvaluationService)
+│   └── Services/                # Business logic services
 │
 ├── docs/                         # Documentatie
-│   ├── FRONTEND_IMAGE_GUIDE.md
-│   ├── MERGE_SUMMARY.md
-│   └── ...
+│   ├── AI_ENGINE_OVERVIEW.md    # AI architectuur uitleg
+│   ├── SCORING_LOGIC.md         # Scoring algoritme uitleg
+│   ├── COLLABORATIVE_FILTERING.md # Collaborative filtering uitleg
+│   └── ARCHITECTURE.md          # Systeem architectuur
 │
-└── images/                       # Auto afbeeldingen (lege map structuur)
-    └── {brand}/
-        └── {model}/
-            └── {id}.jpg
+└── CarRecommender.sln           # Visual Studio Solution
 ```
 
 ## Architectuur - Laag Scheiding

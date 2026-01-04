@@ -597,7 +597,7 @@ public class CarRepository : ICarRepository
     private List<Car> RemoveDuplicates(List<Car> cars)
     {
         if (cars == null || cars.Count == 0)
-            return cars;
+            return new List<Car>();
 
         // Gebruik een dictionary om de beste auto per unieke combinatie bij te houden
         // Key: Brand|Model|Year (case-insensitive), Value: Car object

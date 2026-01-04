@@ -1,4 +1,5 @@
 using CarRecommender;
+using CarRecommender.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,18 +17,30 @@ var configuredDataDirectory = builder.Configuration["DataSettings:DataDirectory"
 string? dataDirectory = null;
 
 // 1. Probeer vanuit assembly locatie (runtime - deployed)
+// In Azure staat het CSV bestand in data/ folder naast de DLL
 var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
 if (!string.IsNullOrEmpty(assemblyLocation))
 {
     var assemblyDir = Path.GetDirectoryName(assemblyLocation);
-    // Van bin/Debug/net8.0/CarRecommender.Api.dll naar backend/data
-    // bin/Debug/net8.0 -> bin -> Debug -> .. -> backend/CarRecommender.Api -> .. -> backend -> data
-    var testPath = Path.Combine(assemblyDir ?? "", "..", "..", "..", "..", "data");
-    testPath = Path.GetFullPath(testPath);
-    if (Directory.Exists(testPath) && File.Exists(Path.Combine(testPath, csvFileName)))
+    
+    // Eerst: probeer data/ folder direct naast de DLL (Azure deployment)
+    var dataPathNextToDll = Path.Combine(assemblyDir ?? "", "data");
+    if (Directory.Exists(dataPathNextToDll) && File.Exists(Path.Combine(dataPathNextToDll, csvFileName)))
     {
-        dataDirectory = testPath;
-        Console.WriteLine($"[CONFIG] Found backend/data from assembly location: {dataDirectory}");
+        dataDirectory = dataPathNextToDll;
+        Console.WriteLine($"[CONFIG] Found data folder next to DLL (Azure): {dataDirectory}");
+    }
+    else
+    {
+        // Fallback: zoek omhoog vanuit assembly directory (development)
+        // Van bin/Debug/net8.0/CarRecommender.Api.dll naar backend/data
+        var testPath = Path.Combine(assemblyDir ?? "", "..", "..", "..", "..", "data");
+        testPath = Path.GetFullPath(testPath);
+        if (Directory.Exists(testPath) && File.Exists(Path.Combine(testPath, csvFileName)))
+        {
+            dataDirectory = testPath;
+            Console.WriteLine($"[CONFIG] Found backend/data from assembly location: {dataDirectory}");
+        }
     }
 }
 
@@ -99,7 +112,29 @@ builder.Services.AddSingleton<ICarRepository>(sp => carRepository);
 // Registreer IRecommendationService als scoped (één per HTTP request)
 // Scoped betekent dat er één instantie is per HTTP request.
 // Dit is geschikt voor services die per request gebruikt worden.
-builder.Services.AddScoped<IRecommendationService, RecommendationService>();
+// Geef de gedeelde MlRecommendationService singleton door aan RecommendationService
+builder.Services.AddScoped<IRecommendationService>(sp => 
+    new RecommendationService(
+        sp.GetRequiredService<ICarRepository>(), 
+        sp.GetRequiredService<MlRecommendationService>()));
+
+// Registreer ML evaluatie services (voor /api/ml/evaluation endpoint)
+// Deze services zijn nodig voor de MlController
+builder.Services.AddScoped<HyperparameterTuningService>();
+builder.Services.AddScoped<ForecastingService>();
+builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
+
+// Registreer MlRecommendationService als singleton zodat alle services dezelfde instantie gebruiken
+// Dit zorgt ervoor dat het getrainde model gedeeld wordt tussen RecommendationService en de background service
+// Stel model directory in op data folder zodat het model wordt opgeslagen en geladen
+// Gebruik dezelfde dataDirectory die al eerder is bepaald voor CarRepository
+var mlModelDirectory = dataDirectory ?? Path.Combine(builder.Environment.ContentRootPath, "data");
+var mlRecommendationService = new MlRecommendationService(mlModelDirectory);
+builder.Services.AddSingleton<MlRecommendationService>(mlRecommendationService);
+
+// Registreer ML model training background service
+// Traint ML.NET model in achtergrond na applicatie opstart (blokkeert niet)
+builder.Services.AddHostedService<MlModelTrainingBackgroundService>();
 
 // ============================================================================
 // SWAGGER/OPENAPI CONFIGURATIE
@@ -114,12 +149,59 @@ builder.Services.AddSwaggerGen();
 // ============================================================================
 // CORS (Cross-Origin Resource Sharing) is nodig zodat de frontend (localhost:7000) 
 // kan verbinden met de backend API (localhost:5283)
+// In Azure: voeg frontend Azure URL toe aan WithOrigins
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:7000", "https://localhost:7001", "http://localhost:5000", "https://localhost:5001")
-              .AllowAnyHeader()
+        // Development origins
+        var origins = new List<string>
+        {
+            "http://localhost:7000",
+            "https://localhost:7001",
+            "http://localhost:5000",
+            "https://localhost:5001"
+        };
+        
+        // Azure frontend origins (uit configuratie of hardcoded voor nu)
+        // Voeg Azure frontend URL toe als die geconfigureerd is
+        var azureFrontendUrl = builder.Configuration["CorsSettings:AzureFrontendUrl"];
+        if (!string.IsNullOrEmpty(azureFrontendUrl))
+        {
+            origins.Add(azureFrontendUrl);
+            origins.Add(azureFrontendUrl.Replace("https://", "http://")); // Voeg ook HTTP versie toe
+        }
+        
+        // Voor Azure: sta ook alle azurewebsites.net subdomeinen toe (veiliger dan AllowAnyOrigin)
+        if (builder.Environment.IsProduction() || builder.Configuration["CorsSettings:AllowAzureOrigins"] == "true")
+        {
+            // Sta alle Azure App Service frontend URLs toe (pattern: *.azurewebsites.net)
+            // Dit is nodig omdat de frontend URL kan variëren per deployment
+            policy.SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrEmpty(origin))
+                    return false;
+                
+                var uri = new Uri(origin);
+                // Sta localhost toe (development)
+                if (uri.Host == "localhost" || uri.Host == "127.0.0.1")
+                    return true;
+                
+                // Sta Azure App Service URLs toe (*.azurewebsites.net)
+                if (uri.Host.EndsWith(".azurewebsites.net", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                
+                // Sta ook expliciet geconfigureerde origins toe
+                return origins.Any(o => origin.StartsWith(o, StringComparison.OrdinalIgnoreCase));
+            });
+        }
+        else
+        {
+            // Development: alleen specifieke origins
+            policy.WithOrigins(origins.ToArray());
+        }
+        
+        policy.AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
@@ -150,6 +232,14 @@ builder.Services.AddControllers()
             return new BadRequestObjectResult(new { error = "Ongeldige request parameters.", details = errors });
         };
     });
+
+// Configureer request timeout voor ML evaluatie endpoint (kan lang duren)
+// Azure App Service heeft standaard 230 seconden timeout, maar we configureren het expliciet
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
+{
+    options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(5);
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(5);
+});
 
 // ============================================================================
 // LOGGING CONFIGURATIE VOOR AZURE

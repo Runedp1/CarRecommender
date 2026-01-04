@@ -55,13 +55,25 @@ public class HealthController : ControllerBase
     public IActionResult GetInfo()
     {
         var cars = _carRepository?.GetAllCars() ?? new List<Car>();
+        
+        // Check if ML services are registered (for debugging Azure deployment)
+        var mlServiceRegistered = HttpContext.RequestServices.GetService(typeof(IMlEvaluationService)) != null;
+        var hyperparameterServiceRegistered = HttpContext.RequestServices.GetService(typeof(HyperparameterTuningService)) != null;
+        var forecastingServiceRegistered = HttpContext.RequestServices.GetService(typeof(ForecastingService)) != null;
+        
         var info = new HealthInfo
         {
             Status = "OK",
             TotalCars = cars.Count,
             DatasetLoaded = _carRepository != null,
             ExpectedCars = 65128, // Verwacht aantal uit df_master_v8_def.csv
-            Warning = cars.Count < 10000 ? $"⚠️ Slechts {cars.Count} auto's geladen - verwacht ~65128. Mogelijk wordt een oud/ander bestand geladen!" : null
+            Warning = cars.Count < 10000 ? $"⚠️ Slechts {cars.Count} auto's geladen - verwacht ~65128. Mogelijk wordt een oud/ander bestand geladen!" : null,
+            MlServicesRegistered = new MlServicesStatus
+            {
+                MlEvaluation = mlServiceRegistered,
+                HyperparameterTuning = hyperparameterServiceRegistered,
+                Forecasting = forecastingServiceRegistered
+            }
         };
 
         return Ok(info);
@@ -108,5 +120,20 @@ public class HealthInfo
     /// Waarschuwing als er een probleem is met de dataset.
     /// </summary>
     public string? Warning { get; set; }
+    
+    /// <summary>
+    /// Status van ML services registratie (voor debugging).
+    /// </summary>
+    public MlServicesStatus? MlServicesRegistered { get; set; }
+}
+
+/// <summary>
+/// ML services registratie status.
+/// </summary>
+public class MlServicesStatus
+{
+    public bool MlEvaluation { get; set; }
+    public bool HyperparameterTuning { get; set; }
+    public bool Forecasting { get; set; }
 }
 
