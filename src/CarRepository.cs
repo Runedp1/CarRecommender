@@ -36,9 +36,9 @@ public class CarRepository : ICarRepository
     /// </summary>
     private void LoadCarsFromCsv()
     {
-        Console.WriteLine($"[DEBUG] LoadCarsFromCsv gestart - Zoeken naar: {_csvFileName} in {_dataDirectory}");
+        // Console.WriteLine($"[DEBUG] LoadCarsFromCsv gestart - Zoeken naar: {_csvFileName} in {_dataDirectory}");
         string csvPath = FindCsvFile(_csvFileName, _dataDirectory);
-        Console.WriteLine($"[DEBUG] FindCsvFile resultaat: {csvPath ?? "NULL"}");
+        // Console.WriteLine($"[DEBUG] FindCsvFile resultaat: {csvPath ?? "NULL"}");
         
         // #region agent log
         try {
@@ -84,9 +84,9 @@ public class CarRepository : ICarRepository
 
         // Parse CSV naar Car objecten
         Console.WriteLine("[DEBUG] Aanroepen LoadCarsFromCsv(string csvPath)...");
-        Console.WriteLine($"[DATA_LOAD] ⏳ Start CSV parsing (dit kan even duren voor grote datasets)...");
+        // Console.WriteLine($"[DATA_LOAD] ⏳ Start CSV parsing (dit kan even duren voor grote datasets)...");
         var allCars = LoadCarsFromCsv(csvPath);
-        Console.WriteLine($"[DATA_LOAD] ✅ LoadCarsFromCsv voltooid - {allCars.Count} auto's geladen");
+        // Console.WriteLine($"[DATA_LOAD]  LoadCarsFromCsv voltooid - {allCars.Count} auto's geladen");
         
         // LOG: Toon voorbeeldrecords direct na inladen
         if (allCars.Count > 0)
@@ -100,10 +100,10 @@ public class CarRepository : ICarRepository
                 Prijs = c.Budget 
             }).ToList();
             
-            Console.WriteLine($"[DATA_LOAD] 📊 Voorbeeldrecords (eerste 5) direct na inladen:");
+            // Console.WriteLine($"[DATA_LOAD] 📊 Voorbeeldrecords (eerste 5) direct na inladen:");
             foreach (var sample in sampleCars)
             {
-                Console.WriteLine($"[DATA_LOAD]   ID={sample.Id}, Merk={sample.Merk}, Model={sample.Model}, Bouwjaar={sample.Bouwjaar}, Vermogen={sample.Vermogen} KW, Prijs=€{sample.Prijs:N0}");
+                // Console.WriteLine($"[DATA_LOAD]   ID={sample.Id}, Merk={sample.Merk}, Model={sample.Model}, Bouwjaar={sample.Bouwjaar}, Vermogen={sample.Vermogen} KW, Prijs=€{sample.Prijs:N0}");
             }
         }
         
@@ -131,7 +131,7 @@ public class CarRepository : ICarRepository
         int duplicateCount = originalCount - _cars.Count;
         Console.WriteLine($"[DEDUP] ✅ Deduplicatie voltooid: {duplicateCount} duplicaten verwijderd, {_cars.Count} unieke auto's over");
         
-        Console.WriteLine($"[DATA_LOAD] ✅ Dataset geladen in geheugen: {_cars.Count} auto's beschikbaar");
+        // Console.WriteLine($"[DATA_LOAD] ✅ Dataset geladen in geheugen: {_cars.Count} auto's beschikbaar");
         
         // #region agent log
         try
@@ -258,8 +258,8 @@ public class CarRepository : ICarRepository
             string[] headerColumns = ParseCsvLine(header);
             
             // LOG: Toon header kolommen voor debugging
-            Console.WriteLine($"[PARSE] Header kolommen gevonden: {string.Join(" | ", headerColumns)}");
-            Console.WriteLine($"[PARSE] Aantal kolommen: {headerColumns.Length}");
+            // Console.WriteLine($"[PARSE] Header kolommen gevonden: {string.Join(" | ", headerColumns)}");
+            // Console.WriteLine($"[PARSE] Aantal kolommen: {headerColumns.Length}");
             
             // NIEUWE DATASET STRUCTUUR: merk,model,bouwjaar,type_auto,brandstof,transmissie,vermogen,prijs
             // Gebruik exacte match eerst voor betrouwbaarheid
@@ -289,20 +289,20 @@ public class CarRepository : ICarRepository
             }
             
             // LOG: Toon gevonden kolom indices
-            Console.WriteLine($"[PARSE] Kolom indices - ID:{idIndex}, Merk:{merkIndex}, Model:{modelIndex}, Vermogen:{vermogenIndex}, Brandstof:{brandstofIndex}, Budget:{budgetIndex}, Bouwjaar:{bouwjaarIndex}");
+            // Console.WriteLine($"[PARSE] Kolom indices - ID:{idIndex}, Merk:{merkIndex}, Model:{modelIndex}, Vermogen:{vermogenIndex}, Brandstof:{brandstofIndex}, Budget:{budgetIndex}, Bouwjaar:{bouwjaarIndex}");
             
             // LOG: Toon eerste data rij voor verificatie
             if (lines.Length > 1)
             {
                 var firstDataLine = ParseCsvLine(lines[1]);
-                Console.WriteLine($"[PARSE] Eerste data rij heeft {firstDataLine.Length} kolommen:");
+                // Console.WriteLine($"[PARSE] Eerste data rij heeft {firstDataLine.Length} kolommen:");
                 for (int idx = 0; idx < firstDataLine.Length && idx < 10; idx++)
                 {
-                    Console.WriteLine($"[PARSE]   Kolom[{idx}] '{headerColumns[idx]}' = '{firstDataLine[idx]}'");
+                    // Console.WriteLine($"[PARSE]   Kolom[{idx}] '{headerColumns[idx]}' = '{firstDataLine[idx]}'");
                 }
                 if (vermogenIndex >= 0 && vermogenIndex < firstDataLine.Length)
                 {
-                    Console.WriteLine($"[PARSE] ⚠️ VERIFICATIE: Vermogen kolom[{vermogenIndex}] = '{firstDataLine[vermogenIndex]}'");
+                    // Console.WriteLine($"[PARSE] ⚠️ VERIFICATIE: Vermogen kolom[{vermogenIndex}] = '{firstDataLine[vermogenIndex]}'");
                 }
             }
             
@@ -318,7 +318,7 @@ public class CarRepository : ICarRepository
             // #endregion
 
             // Verwerk alle data regels (skip header)
-            Console.WriteLine($"[PARSE] Start verwerken van {lines.Length - 1} data regels...");
+            // Console.WriteLine($"[PARSE] Start verwerken van {lines.Length - 1} data regels...");
             for (int i = 1; i < lines.Length; i++)
             {
                 rowNumber = i + 1; // Voor foutmeldingen (1-gebaseerd)
@@ -326,7 +326,7 @@ public class CarRepository : ICarRepository
                 // Progress logging elke 10000 regels
                 if (i % 10000 == 0)
                 {
-                    Console.WriteLine($"[PARSE] ⏳ Verwerkt {i}/{lines.Length - 1} regels ({i * 100 / (lines.Length - 1)}%)...");
+                    // Console.WriteLine($"[PARSE] ⏳ Verwerkt {i}/{lines.Length - 1} regels ({i * 100 / (lines.Length - 1)}%)...");
                 }
 
                 try
@@ -346,8 +346,8 @@ public class CarRepository : ICarRepository
                     // LOG: Toon eerste 5 rijen voor debugging
                     if (i <= 5)
                     {
-                        Console.WriteLine($"[PARSE] Rij {i}: Aantal kolommen: {columns.Length}");
-                        Console.WriteLine($"[PARSE] Rij {i}: Kolommen: {string.Join(" | ", columns.Select((c, idx) => $"[{idx}]='{c}'"))}");
+                        // Console.WriteLine($"[PARSE] Rij {i}: Aantal kolommen: {columns.Length}");
+                        // Console.WriteLine($"[PARSE] Rij {i}: Kolommen: {string.Join(" | ", columns.Select((c, idx) => $"[{idx}]='{c}'"))}");
                     }
 
                     Car car = new Car();
@@ -385,8 +385,8 @@ public class CarRepository : ICarRepository
                         // LOG: Toon eerste 5 rijen voor debugging
                         if (i <= 5)
                         {
-                            Console.WriteLine($"[PARSE] Rij {i}: Vermogen kolom[{vermogenIndex}] = '{originalVermogenStr}' (origineel)");
-                            Console.WriteLine($"[PARSE] Rij {i}: Alle kolommen: {string.Join(" | ", columns.Select((c, idx) => $"[{idx}]={c}"))}");
+                            // Console.WriteLine($"[PARSE] Rij {i}: Vermogen kolom[{vermogenIndex}] = '{originalVermogenStr}' (origineel)");
+                            // Console.WriteLine($"[PARSE] Rij {i}: Alle kolommen: {string.Join(" | ", columns.Select((c, idx) => $"[{idx}]={c}"))}");
                         }
                         
                         // Parse als decimaal getal (CSV heeft 182.0 format)
@@ -397,7 +397,7 @@ public class CarRepository : ICarRepository
                             // LOG: Toon eerste 5 rijen
                             if (i <= 5)
                             {
-                                Console.WriteLine($"[PARSE] Rij {i}: Vermogen geparsed: {originalVermogenStr} -> {car.Power} KW");
+                                // Console.WriteLine($"[PARSE] Rij {i}: Vermogen geparsed: {originalVermogenStr} -> {car.Power} KW");
                             }
                         }
                         else
@@ -410,18 +410,18 @@ public class CarRepository : ICarRepository
                                 
                                 if (i <= 5)
                                 {
-                                    Console.WriteLine($"[PARSE] Rij {i}: Vermogen geparsed (fallback): {originalVermogenStr} -> {cleanedVermogen} -> {car.Power} KW");
+                                    // Console.WriteLine($"[PARSE] Rij {i}: Vermogen geparsed (fallback): {originalVermogenStr} -> {cleanedVermogen} -> {car.Power} KW");
                                 }
                             }
                             else if (i <= 5)
                             {
-                                Console.WriteLine($"[PARSE] Rij {i}: ⚠️ Vermogen kon niet worden geparsed: '{originalVermogenStr}'");
+                                // Console.WriteLine($"[PARSE] Rij {i}: ⚠️ Vermogen kon niet worden geparsed: '{originalVermogenStr}'");
                             }
                         }
                     }
                     else if (i <= 5)
                     {
-                        Console.WriteLine($"[PARSE] Rij {i}: ⚠️ VermogenIndex {vermogenIndex} is ongeldig (columns.Length={columns.Length})");
+                        // Console.WriteLine($"[PARSE] Rij {i}: ⚠️ VermogenIndex {vermogenIndex} is ongeldig (columns.Length={columns.Length})");
                     }
 
                     // Parse Brandstof (Fuel)
