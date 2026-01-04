@@ -113,24 +113,45 @@ builder.Services.AddSingleton<ICarRepository>(sp => carRepository);
 // Scoped betekent dat er één instantie is per HTTP request.
 // Dit is geschikt voor services die per request gebruikt worden.
 // Geef de gedeelde MlRecommendationService singleton door aan RecommendationService
-builder.Services.AddScoped<IRecommendationService>(sp => 
+
+
+/*builder.Services.AddScoped<IRecommendationService>(sp => 
     new RecommendationService(
         sp.GetRequiredService<ICarRepository>(), 
-        sp.GetRequiredService<MlRecommendationService>()));
+        sp.GetRequiredService<MlRecommendationService>()));*/
 
 // Registreer ML evaluatie services (voor /api/ml/evaluation endpoint)
 // Deze services zijn nodig voor de MlController
-builder.Services.AddScoped<HyperparameterTuningService>();
-builder.Services.AddScoped<ForecastingService>();
+//builder.Services.AddScoped<HyperparameterTuningService>();
+//builder.Services.AddScoped<ForecastingService>();
+//builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
+//builder.Services.AddScoped<ICarRepository, CarRepository>();
+//builder.Services.AddScoped<MlRecommendationService>();
+builder.Services.AddScoped<AdvancedScoringService>();
+builder.Services.AddScoped<KnnRecommendationService>();
 builder.Services.AddScoped<IMlEvaluationService, MlEvaluationService>();
+builder.Services.AddScoped<CarFeatureVectorFactory>();
+
+
+builder.Services.AddScoped<RuleBasedFilter>();
+builder.Services.AddScoped<SimilarityService>();
+builder.Services.AddScoped<RankingService>();
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
+
+
 
 // Registreer MlRecommendationService als singleton zodat alle services dezelfde instantie gebruiken
 // Dit zorgt ervoor dat het getrainde model gedeeld wordt tussen RecommendationService en de background service
 // Stel model directory in op data folder zodat het model wordt opgeslagen en geladen
 // Gebruik dezelfde dataDirectory die al eerder is bepaald voor CarRepository
-var mlModelDirectory = dataDirectory ?? Path.Combine(builder.Environment.ContentRootPath, "data");
-var mlRecommendationService = new MlRecommendationService(mlModelDirectory);
-builder.Services.AddSingleton<MlRecommendationService>(mlRecommendationService);
+builder.Services.AddSingleton<MlRecommendationService>(sp =>
+{
+    var env = sp.GetRequiredService<IWebHostEnvironment>();
+    var dataDir = Path.Combine(env.ContentRootPath, "data");
+    return new MlRecommendationService(dataDir);
+});
+
+
 
 // Registreer ML model training background service
 // Traint ML.NET model in achtergrond na applicatie opstart (blokkeert niet)

@@ -18,18 +18,14 @@ namespace CarRecommender;
 public class KnnRecommendationService
 {
     private readonly CarFeatureVectorFactory _featureVectorFactory;
-    private readonly int _k; // Aantal neighbors (standaard 5)
+    private readonly int _k;
 
-    /// <summary>
-    /// Constructor.
-    /// </summary>
-    /// <param name="k">Aantal nearest neighbors (standaard 5 voor top 5 recommendations)</param>
-    public KnnRecommendationService(int k = 5)
+    public KnnRecommendationService(CarFeatureVectorFactory featureVectorFactory, int k = 5)
     {
-        _featureVectorFactory = new CarFeatureVectorFactory();
+        _featureVectorFactory = featureVectorFactory;
         _k = k;
     }
-
+    
     /// <summary>
     /// Initialiseert de feature vector factory met alle beschikbare auto's.
     /// Moet worden aangeroepen voordat FindNearestNeighbors gebruikt kan worden.

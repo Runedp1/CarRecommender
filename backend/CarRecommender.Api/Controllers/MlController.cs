@@ -121,6 +121,76 @@ public class MlController : ControllerBase
             throw; // Exception wordt opgevangen door globale exception handler
         }
     }
+
+    /// <summary>
+    /// POST /api/ml/cross-validation
+    /// Voert cross-validation uit voor een specifiek algoritme.
+    /// 
+    /// Request body:
+    /// {
+    ///   "algorithmName": "mlnet" | "cosine" | "knn",
+    ///   "kFolds": 5,
+    ///   "topK": 10
+    /// }
+    /// </summary>
+    [HttpPost("cross-validation")]
+    [ProducesResponseType(typeof(CrossValidationResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CrossValidation([FromBody] CrossValidationRequest request)
+    {
+        try
+        {
+            _logger.LogInformation("Cross-validation voor {Algorithm} wordt uitgevoerd...", request.AlgorithmName);
+            
+            var result = await Task.Run(() => 
+                _mlEvaluationService.PerformCrossValidation(
+                    request.AlgorithmName, 
+                    request.KFolds, 
+                    request.TopK));
+            
+            _logger.LogInformation("Cross-validation voltooid. Precision: {Precision:P2}, Recall: {Recall:P2}", 
+                result.PrecisionAt10, result.RecallAt10);
+            
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fout bij cross-validation voor {Algorithm}", request.AlgorithmName);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// POST /api/ml/compare
+    /// Vergelijkt alle beschikbare algoritmes met cross-validation.
+    /// 
+    /// Request body:
+    /// {
+    ///   "kFolds": 5
+    /// }
+    /// </summary>
+    [HttpPost("compare")]
+    [ProducesResponseType(typeof(AlgorithmComparison), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CompareAlgorithms([FromBody] CompareRequest request)
+    {
+        try
+        {
+            _logger.LogInformation("Algoritme vergelijking wordt uitgevoerd met {KFolds} folds...", request.KFolds);
+            
+            var result = await Task.Run(() => 
+                _mlEvaluationService.CompareAllAlgorithms(request.KFolds));
+            
+            _logger.LogInformation("Vergelijking voltooid. Best by Precision: {Best}", result.BestByPrecision);
+            
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fout bij algoritme vergelijking");
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }
 
 /// <summary>
@@ -152,6 +222,24 @@ public class MlModelStatus
     /// Pad waar het model is opgeslagen (indien beschikbaar).
     /// </summary>
     public string? ModelPath { get; set; }
+}
+
+/// <summary>
+/// Request model voor cross-validation endpoint.
+/// </summary>
+public class CrossValidationRequest
+{
+    public string AlgorithmName { get; set; } = "mlnet";
+    public int KFolds { get; set; } = 5;
+    public int TopK { get; set; } = 10;
+}
+
+/// <summary>
+/// Request model voor compare endpoint.
+/// </summary>
+public class CompareRequest
+{
+    public int KFolds { get; set; } = 5;
 }
 
 

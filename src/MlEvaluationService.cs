@@ -1,426 +1,359 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Diagnostics;
+
 namespace CarRecommender;
 
 /// <summary>
-/// ML evaluatie service - implementeert train/test split, evaluatie metrics en hyperparameter tuning.
-/// 
-/// ML Pipeline Stappen:
-/// 1. DATA PREPROCESSING: Filter en valideer auto's met geldige waarden
-/// 2. TRAIN/TEST SPLIT: Split dataset in training (80%) en test (20%) sets
-/// 3. TRAINING: Train recommendation model op training set
-/// 4. EVALUATIE: Evalueer model op test set met verschillende metrics
-/// 5. HYPERPARAMETER TUNING: Optimaliseer similarity gewichten door meerdere configuraties te testen
-/// 
-/// Relevant voor ML & Forecasting vak:
-/// - Demonstreert standaard ML workflow: preprocessing → train → evaluate → tune
-/// - Gebruikt verschillende evaluatie metrics (Precision@K, Recall@K, MAE, RMSE)
-/// - Hyperparameter tuning toont hoe model parameters geoptimaliseerd worden
+/// Service voor ML evaluatie met cross-validation en algoritme vergelijking
 /// </summary>
 public class MlEvaluationService : IMlEvaluationService
 {
     private readonly ICarRepository _carRepository;
-    private readonly IRecommendationService _recommendationService;
-    private readonly HyperparameterTuningService _hyperparameterTuningService;
-    private readonly ForecastingService _forecastingService;
-    
-    // ML Pipeline configuratie
-    private const double TRAIN_TEST_SPLIT_RATIO = 0.8; // 80% training, 20% test
-    private const int PRECISION_RECALL_K = 10; // Top 10 recommendations voor Precision@K en Recall@K
-    
-    /// <summary>
-    /// Constructor - initialiseert services via dependency injection.
-    /// </summary>
+    private readonly MlRecommendationService _mlRecommendationService;
+    private readonly AdvancedScoringService _advancedScoringService;
+    private readonly KnnRecommendationService _knnRecommendationService;
+    private readonly CarFeatureVectorFactory _featureVectorFactory;
+
     public MlEvaluationService(
         ICarRepository carRepository,
-        IRecommendationService recommendationService,
-        HyperparameterTuningService hyperparameterTuningService,
-        ForecastingService forecastingService)
+        MlRecommendationService mlRecommendationService,
+        AdvancedScoringService advancedScoringService,
+        KnnRecommendationService knnRecommendationService,
+        CarFeatureVectorFactory featureVectorFactory)
     {
-        _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
-        _recommendationService = recommendationService ?? throw new ArgumentNullException(nameof(recommendationService));
-        _hyperparameterTuningService = hyperparameterTuningService ?? throw new ArgumentNullException(nameof(hyperparameterTuningService));
-        _forecastingService = forecastingService ?? throw new ArgumentNullException(nameof(forecastingService));
+        _carRepository = carRepository;
+        _mlRecommendationService = mlRecommendationService;
+        _advancedScoringService = advancedScoringService;
+        _knnRecommendationService = knnRecommendationService;
+        _featureVectorFactory = featureVectorFactory;
     }
+
+    // ============================================================================
+    // OUDE METHODES (backwards compatibility - simpele implementaties)
+    // ============================================================================
     
-    /// <summary>
-    /// Voert volledige ML evaluatie uit: train/test split, traint model, evalueert metrics en voert hyperparameter tuning uit.
-    /// 
-    /// ML Pipeline Stap 1-5: Complete evaluatie workflow
-    /// </summary>
     public MlEvaluationResult EvaluateModel()
     {
-        Console.WriteLine("[ML EVALUATION] Starting ML evaluation pipeline...");
-        
-        // ML Pipeline Stap 1: DATA PREPROCESSING
-        // Filter auto's met geldige waarden voor ML training
-        Console.WriteLine("[ML EVALUATION] Step 1: Loading and preprocessing dataset...");
-        var allCars = _carRepository.GetAllCars();
-        Console.WriteLine($"[ML EVALUATION] Total cars loaded: {allCars?.Count ?? 0}");
-        var validCars = allCars
-            .Where(c => c.Power > 0 && c.Budget > 0 && c.Year >= 1900 && c.Year <= DateTime.Now.Year + 1)
-            .ToList();
-        Console.WriteLine($"[ML EVALUATION] Valid cars after filtering: {validCars.Count}");
-        
-        if (validCars.Count < 20)
+        try
         {
-            // Te weinig data voor train/test split
-            // Geef diagnostische informatie voor debugging
-            Console.WriteLine($"[ML EVALUATION] ERROR: Insufficient data for evaluation (minimum 20 cars required)");
+            // Gebruik nieuwe cross-validation voor ML.NET
+            var cvResult = PerformCrossValidation("mlnet", kFolds: 5);
+            
+            return new MlEvaluationResult
+            {
+                IsValid = true,
+                Precision = cvResult.PrecisionAt10,
+                Recall = cvResult.RecallAt10,
+                PrecisionAtK = cvResult.PrecisionAt10,
+                RecallAtK = cvResult.RecallAt10,
+                MAE = 0, // Niet van toepassing voor recommendation task
+                RMSE = 0,
+                TrainingSetSize = cvResult.TotalTestCases * 4, // 80% train in 5-fold
+                TestSetSize = cvResult.TotalTestCases,
+                Message = $"Cross-validation completed with {cvResult.TotalTestCases} test cases. " +
+                        $"Average response time: {cvResult.AverageResponseTimeMs:F2}ms"
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MlEval] Error in EvaluateModel: {ex.Message}");
             return new MlEvaluationResult
             {
                 IsValid = false,
-                ErrorMessage = $"Onvoldoende data voor ML evaluatie (minimaal 20 auto's vereist). Totaal auto's: {allCars?.Count ?? 0}, Geldige auto's: {validCars.Count}. Mogelijk is de dataset niet correct geladen in Azure."
+                ErrorMessage = ex.Message,
+                Message = "Evaluation failed"
             };
         }
-        
-        // ML Pipeline Stap 2: TRAIN/TEST SPLIT
-        // Split dataset in training (80%) en test (20%) sets
-        // Gebruik stratified split op basis van bouwjaar ranges voor betere representatie
-        Console.WriteLine("[ML EVALUATION] Step 2: Performing train/test split (80/20)...");
-        var splitResult = PerformTrainTestSplit(validCars);
-        var trainingCars = splitResult.TrainingSet;
-        var testCars = splitResult.TestSet;
-        Console.WriteLine($"[ML EVALUATION] Training set size: {trainingCars.Count} cars ({trainingCars.Count * 100.0 / validCars.Count:F1}%)");
-        Console.WriteLine($"[ML EVALUATION] Test set size: {testCars.Count} cars ({testCars.Count * 100.0 / validCars.Count:F1}%)");
-        
-        // ML Pipeline Stap 3: TRAINING
-        // Voor dit project gebruiken we de bestaande recommendation service
-        // In een echte ML pipeline zou hier een model getraind worden op de training set
-        // We simuleren training door recommendations te genereren voor training auto's
-        Console.WriteLine("[ML EVALUATION] Step 3: Training skipped (using existing recommendation service)");
-        
-        // ML Pipeline Stap 4: EVALUATIE
-        // Evalueer recommendations op test set met verschillende metrics
-        Console.WriteLine("[ML EVALUATION] Step 4: Evaluating recommendations with metrics (Precision@K, Recall@K, MAE, RMSE)...");
-        var evaluationMetrics = EvaluateRecommendations(trainingCars, testCars);
-        Console.WriteLine($"[ML EVALUATION] Evaluation metrics computed:");
-        Console.WriteLine($"[ML EVALUATION]   Precision@K: {evaluationMetrics.PrecisionAtK:F4}");
-        Console.WriteLine($"[ML EVALUATION]   Recall@K: {evaluationMetrics.RecallAtK:F4}");
-        Console.WriteLine($"[ML EVALUATION]   MAE: {evaluationMetrics.MAE:F2}");
-        Console.WriteLine($"[ML EVALUATION]   RMSE: {evaluationMetrics.RMSE:F2}");
-        
-        // ML Pipeline Stap 5: HYPERPARAMETER TUNING
-        // Optimaliseer similarity gewichten door meerdere configuraties te testen
-        Console.WriteLine("[ML EVALUATION] Step 5: Hyperparameter tuning (testing 3 configurations)...");
-        var hyperparameterResults = _hyperparameterTuningService.TuneHyperparameters(trainingCars, testCars);
-        Console.WriteLine($"[ML EVALUATION] Hyperparameter tuning completed. Tested {hyperparameterResults.AllResults.Count} configurations.");
-        
-        // Forecasting/Trend analyse
-        Console.WriteLine("[ML EVALUATION] Computing forecasting/trend analysis...");
-        var forecastingResults = _forecastingService.AnalyzeTrends(validCars);
-        Console.WriteLine("[ML EVALUATION] Forecasting analysis completed.");
-        
-        Console.WriteLine("[ML EVALUATION] ML evaluation pipeline completed successfully.");
-        
-        return new MlEvaluationResult
-        {
-            IsValid = true,
-            TrainingSetSize = trainingCars.Count,
-            TestSetSize = testCars.Count,
-            PrecisionAtK = evaluationMetrics.PrecisionAtK,
-            RecallAtK = evaluationMetrics.RecallAtK,
-            MeanAbsoluteError = evaluationMetrics.MAE,
-            RootMeanSquaredError = evaluationMetrics.RMSE,
-            BestHyperparameters = hyperparameterResults.BestConfiguration,
-            HyperparameterResults = hyperparameterResults.AllResults,
-            ForecastingResults = forecastingResults,
-            EvaluationTimestamp = DateTime.UtcNow
-        };
     }
     
-    /// <summary>
-    /// ML Pipeline Stap 2: TRAIN/TEST SPLIT
-    /// Split dataset in training en test sets met stratified sampling op basis van bouwjaar ranges.
-    /// 
-    /// Stratified sampling zorgt voor betere representatie van verschillende bouwjaren in beide sets.
-    /// Dit is belangrijk voor ML omdat het voorkomt dat het model alleen leert op bepaalde jaren.
-    /// </summary>
-    private TrainTestSplitResult PerformTrainTestSplit(List<Car> cars)
+    public double CalculatePrecisionAtK(List<RecommendationResult> recommendations, List<Car> relevantCars, int k)
     {
-        // Stratified split: groep auto's per bouwjaar range
-        var yearRanges = new[]
+        var topK = recommendations.Take(k).ToList();
+        var relevantIds = relevantCars.Select(c => c.Id).ToHashSet();
+        var recommendedIds = topK.Select(r => r.Car.Id).ToHashSet();
+        
+        var truePositives = recommendedIds.Intersect(relevantIds).Count();
+        return k > 0 ? (double)truePositives / k : 0;
+    }
+    
+    public double CalculateRecallAtK(List<RecommendationResult> recommendations, List<Car> relevantCars, int k)
+    {
+        var topK = recommendations.Take(k).ToList();
+        var relevantIds = relevantCars.Select(c => c.Id).ToHashSet();
+        var recommendedIds = topK.Select(r => r.Car.Id).ToHashSet();
+        
+        var truePositives = recommendedIds.Intersect(relevantIds).Count();
+        return relevantIds.Count > 0 ? (double)truePositives / relevantIds.Count : 0;
+    }
+    
+    public double CalculateMeanAbsoluteError(List<Car> predicted, List<Car> actual)
+    {
+        if (predicted.Count != actual.Count) return 0;
+        
+        // Gebruik Budget in plaats van Price
+        var errors = predicted.Zip(actual, (p, a) => Math.Abs((double)(p.Budget - a.Budget))).ToList();
+        return errors.Any() ? errors.Average() : 0;
+    }
+
+    public double CalculateRootMeanSquaredError(List<Car> predicted, List<Car> actual)
+    {
+        if (predicted.Count != actual.Count) return 0;
+        
+        // Gebruik Budget in plaats van Price
+        var squaredErrors = predicted.Zip(actual, (p, a) => Math.Pow((double)(p.Budget - a.Budget), 2)).ToList();
+        return squaredErrors.Any() ? Math.Sqrt(squaredErrors.Average()) : 0;
+    }
+
+    // ============================================================================
+    // NIEUWE CROSS-VALIDATION METHODES
+    // ============================================================================
+    
+    public CrossValidationResult PerformCrossValidation(string algorithmName, int kFolds = 5, int topK = 10)
+    {
+        Console.WriteLine($"[MlEval] Starting cross-validation for {algorithmName}...");
+        
+        var allCars = _carRepository.GetAllCars();
+        var folds = CreateFolds(allCars, kFolds);
+        var foldResults = new List<FoldMetrics>();
+        var responseTimes = new List<double>();
+
+        for (int i = 0; i < kFolds; i++)
         {
-            (MinYear: 1990, MaxYear: 2000),
-            (MinYear: 2001, MaxYear: 2010),
-            (MinYear: 2011, MaxYear: 2015),
-            (MinYear: 2016, MaxYear: 2020),
-            (MinYear: 2021, MaxYear: 2025)
-        };
-        
-        var trainingSet = new List<Car>();
-        var testSet = new List<Car>();
-        
-        var random = new Random(42); // Fixed seed voor reproduceerbaarheid
-        
-        // Split per jaar range voor stratified sampling
-        foreach (var range in yearRanges)
-        {
-            var carsInRange = cars.Where(c => c.Year >= range.MinYear && c.Year <= range.MaxYear).ToList();
+            Console.WriteLine($"[MlEval] Processing fold {i + 1}/{kFolds}...");
             
-            // Shuffle voor randomisatie
-            var shuffled = carsInRange.OrderBy(x => random.Next()).ToList();
+            var trainSet = folds.Where((_, idx) => idx != i).SelectMany(f => f).ToList();
+            var testSet = folds[i];
+
+            var (metrics, avgTime) = EvaluateFold(algorithmName, trainSet, testSet, topK, i + 1);
             
-            int splitIndex = (int)(shuffled.Count * TRAIN_TEST_SPLIT_RATIO);
-            
-            trainingSet.AddRange(shuffled.Take(splitIndex));
-            testSet.AddRange(shuffled.Skip(splitIndex));
+            foldResults.Add(metrics);
+            responseTimes.Add(avgTime);
         }
-        
-        // Als er auto's zijn buiten de ranges, voeg ze toe aan training set
-        var carsInRanges = trainingSet.Concat(testSet).Select(c => c.Id).ToHashSet();
-        var remainingCars = cars.Where(c => !carsInRanges.Contains(c.Id)).ToList();
-        trainingSet.AddRange(remainingCars.Take((int)(remainingCars.Count * TRAIN_TEST_SPLIT_RATIO)));
-        testSet.AddRange(remainingCars.Skip((int)(remainingCars.Count * TRAIN_TEST_SPLIT_RATIO)));
-        
-        return new TrainTestSplitResult
+
+        return new CrossValidationResult
         {
-            TrainingSet = trainingSet,
-            TestSet = testSet
+            AlgorithmName = algorithmName,
+            PrecisionAt10 = foldResults.Average(f => f.Precision),
+            RecallAt10 = foldResults.Average(f => f.Recall),
+            F1Score = foldResults.Average(f => f.F1Score),
+            AverageResponseTimeMs = responseTimes.Average(),
+            TotalTestCases = foldResults.Sum(f => f.TestSize),
+            FoldResults = foldResults
         };
     }
-    
-    /// <summary>
-    /// ML Pipeline Stap 4: EVALUATIE
-    /// Evalueer recommendations op test set met Precision@K, Recall@K, MAE en RMSE metrics.
-    /// 
-    /// Evaluatie metrics zijn essentieel voor ML om te meten hoe goed een model presteert.
-    /// - Precision@K: Hoeveel van de top K recommendations zijn relevant?
-    /// - Recall@K: Hoeveel relevante items zitten in de top K?
-    /// - MAE/RMSE: Hoe goed voorspelt het model prijzen?
-    /// </summary>
-    private EvaluationMetrics EvaluateRecommendations(List<Car> trainingCars, List<Car> testCars)
+
+    public AlgorithmComparison CompareAllAlgorithms(int kFolds = 5)
     {
-        var allPrecisionScores = new List<double>();
-        var allRecallScores = new List<double>();
-        var pricePredictions = new List<(Car Predicted, Car Actual)>();
-        
-        // OPTIMALISATIE: Gebruik alleen training set voor recommendations (veel sneller!)
-        // In plaats van alle auto's te doorzoeken, gebruiken we alleen de training set
-        // Dit is correct voor ML evaluatie: we testen of het model goede recommendations kan maken
-        // op basis van alleen de training data
-        var trainingSampleForEvaluation = trainingCars.Take(Math.Min(500, trainingCars.Count)).ToList();
-        Console.WriteLine($"[ML EVALUATION]   Using {trainingSampleForEvaluation.Count} training cars for similarity calculations (from {trainingCars.Count} total training cars)");
-        
-        // Evalueer voor elke test auto - beperk voor performance (Azure timeout)
-        // Gebruik kleinere sample voor snellere evaluatie
-        int evaluationCount = Math.Min(20, testCars.Count); // Verlaagd van 50 naar 20 voor performance
-        var testSample = testCars.Take(evaluationCount).ToList();
-        Console.WriteLine($"[ML EVALUATION]   Evaluating on {testSample.Count} test cars (from {testCars.Count} total test cars)");
-        
-        int processed = 0;
-        foreach (var testCar in testSample)
+        var algorithms = new[] { "mlnet", "knn" };
+        var results = new Dictionary<string, CrossValidationResult>();
+
+        foreach (var algo in algorithms)
         {
-            processed++;
-            Console.WriteLine($"[ML EVALUATION]   Processing test car {processed}/{testSample.Count} (ID: {testCar.Id}, {testCar.Brand} {testCar.Model})...");
-            
-            // OPTIMALISATIE: Gebruik efficiënte RecommendSimilarCarsFromSet in plaats van RecommendSimilarCars
-            // Dit is veel sneller omdat we alleen door training set itereren, niet door alle auto's
-            Console.WriteLine($"[ML EVALUATION]     Calling RecommendSimilarCarsFromSet (optimized for ML evaluation)...");
-            List<RecommendationResult> recommendations;
+            Console.WriteLine($"\n[MlEval] === Evaluating {algo.ToUpper()} ===");
             try
             {
-                var recommendationService = _recommendationService as RecommendationService;
-                if (recommendationService != null)
-                {
-                    recommendations = recommendationService.RecommendSimilarCarsFromSet(testCar, trainingSampleForEvaluation, PRECISION_RECALL_K);
-                }
-                else
-                {
-                    Console.WriteLine($"[ML EVALUATION]     WARNING: RecommendationService cast failed, using fallback RecommendSimilarCars");
-                    recommendations = _recommendationService.RecommendSimilarCars(testCar, PRECISION_RECALL_K); // Fallback
-                }
+                results[algo] = PerformCrossValidation(algo, kFolds);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ML EVALUATION]     ERROR: Exception during recommendation generation: {ex.Message}");
-                Console.WriteLine($"[ML EVALUATION]     Stack trace: {ex.StackTrace}");
-                // Gebruik fallback als er een error is
-                recommendations = _recommendationService.RecommendSimilarCars(testCar, PRECISION_RECALL_K);
-            }
-            Console.WriteLine($"[ML EVALUATION]     Received {recommendations.Count} recommendations");
-            
-            // Bepaal relevante auto's (auto's met vergelijkbare prijs ± 20%)
-            // In een echte ML setup zou dit gebaseerd zijn op echte user feedback/interacties
-            decimal priceThreshold = testCar.Budget * 0.20m;
-            var relevantCars = trainingCars
-                .Where(c => Math.Abs(c.Budget - testCar.Budget) <= priceThreshold && c.Id != testCar.Id)
-                .ToList();
-            
-            if (relevantCars.Count > 0)
-            {
-                // Berekent Precision@K en Recall@K
-                double precision = CalculatePrecisionAtK(recommendations, relevantCars, PRECISION_RECALL_K);
-                double recall = CalculateRecallAtK(recommendations, relevantCars, PRECISION_RECALL_K);
-                
-                allPrecisionScores.Add(precision);
-                allRecallScores.Add(recall);
-            }
-            
-            // Voor prijsvoorspelling: gebruik gemiddelde prijs van top recommendations als voorspelling
-            if (recommendations.Count > 0)
-            {
-                var predictedPrice = recommendations.Select(r => r.Car.Budget).Average();
-                var predictedCar = new Car { Budget = (decimal)predictedPrice };
-                pricePredictions.Add((predictedCar, testCar));
+                Console.WriteLine($"[MlEval] Error evaluating {algo}: {ex.Message}");
             }
         }
-        
-        // Bereken gemiddelde metrics
-        double avgPrecision = allPrecisionScores.Count > 0 ? allPrecisionScores.Average() : 0.0;
-        double avgRecall = allRecallScores.Count > 0 ? allRecallScores.Average() : 0.0;
-        
-        // Bereken MAE en RMSE voor prijsvoorspellingen
-        double mae = 0.0;
-        double rmse = 0.0;
-        
-        if (pricePredictions.Count > 0)
+
+        return new AlgorithmComparison
         {
-            var predictedCars = pricePredictions.Select(p => p.Predicted).ToList();
-            var actualCars = pricePredictions.Select(p => p.Actual).ToList();
-            
-            mae = CalculateMeanAbsoluteError(predictedCars, actualCars);
-            rmse = CalculateRootMeanSquaredError(predictedCars, actualCars);
-        }
-        
-        return new EvaluationMetrics
-        {
-            PrecisionAtK = avgPrecision,
-            RecallAtK = avgRecall,
-            MAE = mae,
-            RMSE = rmse
+            Results = results,
+            BestByPrecision = results.OrderByDescending(r => r.Value.PrecisionAt10).First().Key,
+            BestByRecall = results.OrderByDescending(r => r.Value.RecallAt10).First().Key,
+            BestBySpeed = results.OrderBy(r => r.Value.AverageResponseTimeMs).First().Key
         };
     }
+
+    // ============================================================================
+    // PRIVATE HELPER METHODES
+    // ============================================================================
     
-    /// <summary>
-    /// Berekent Precision@K metric voor recommendations.
-    /// Precision@K = aantal relevante items in top K / K
-    /// 
-    /// Precision@K is een belangrijke metric voor recommendation systems.
-    /// Het meet de accuraatheid van de top K recommendations (hoeveel zijn relevant?).
-    /// Hoger is beter (1.0 = alle top K zijn relevant).
-    /// </summary>
-    public double CalculatePrecisionAtK(List<RecommendationResult> recommendations, List<Car> relevantCars, int k)
+    private (FoldMetrics metrics, double avgResponseTime) EvaluateFold(
+        string algorithmName,
+        List<Car> trainSet,
+        List<Car> testSet,
+        int topK,
+        int foldNumber)
     {
-        if (recommendations.Count == 0 || relevantCars.Count == 0)
-            return 0.0;
-        
-        var relevantCarIds = relevantCars.Select(c => c.Id).ToHashSet();
-        var topK = recommendations.Take(k).ToList();
-        
-        int relevantCount = topK.Count(r => relevantCarIds.Contains(r.Car.Id));
-        
-        return (double)relevantCount / k;
-    }
-    
-    /// <summary>
-    /// Berekent Recall@K metric voor recommendations.
-    /// Recall@K = aantal relevante items in top K / totaal aantal relevante items
-    /// 
-    /// Recall@K meet de volledigheid van de recommendations (hoeveel relevante items worden gevonden?).
-    /// Hoger is beter (1.0 = alle relevante items zitten in top K).
-    /// </summary>
-    public double CalculateRecallAtK(List<RecommendationResult> recommendations, List<Car> relevantCars, int k)
-    {
-        if (recommendations.Count == 0 || relevantCars.Count == 0)
-            return 0.0;
-        
-        var relevantCarIds = relevantCars.Select(c => c.Id).ToHashSet();
-        var topK = recommendations.Take(k).ToList();
-        
-        int relevantInTopK = topK.Count(r => relevantCarIds.Contains(r.Car.Id));
-        
-        return (double)relevantInTopK / relevantCars.Count;
-    }
-    
-    /// <summary>
-    /// Berekent Mean Absolute Error (MAE) voor prijsvoorspellingen.
-    /// MAE = gemiddelde absolute fout tussen voorspelde en werkelijke prijzen
-    /// 
-    /// MAE is een veelgebruikte metric voor regressie problemen (zoals prijsvoorspelling).
-    /// Het meet de gemiddelde absolute afwijking tussen voorspellingen en werkelijke waarden.
-    /// Lager is beter (0.0 = perfecte voorspellingen).
-    /// </summary>
-    public double CalculateMeanAbsoluteError(List<Car> predicted, List<Car> actual)
-    {
-        if (predicted.Count != actual.Count || predicted.Count == 0)
-            return 0.0;
-        
-        double totalError = 0.0;
-        for (int i = 0; i < predicted.Count; i++)
+        var precisionScores = new List<double>();
+        var recallScores = new List<double>();
+        var responseTimes = new List<double>();
+
+        // Limiteer test set voor snelheid (max 50 auto's per fold)
+        var testSample = testSet.Take(50).ToList();
+
+        foreach (var testCar in testSample)
         {
-            totalError += Math.Abs((double)(predicted[i].Budget - actual[i].Budget));
+            var sw = Stopwatch.StartNew();
+            var recommendations = GetRecommendations(algorithmName, testCar, topK, trainSet);
+            sw.Stop();
+            
+            responseTimes.Add(sw.Elapsed.TotalMilliseconds);
+
+            var relevantCars = GetGroundTruth(testCar, trainSet);
+            var recommendedIds = recommendations.Select(r => r.Id).ToHashSet();
+            var relevantIds = relevantCars.Select(c => c.Id).ToHashSet();
+
+            var truePositives = recommendedIds.Intersect(relevantIds).Count();
+            var precision = recommendedIds.Count > 0 ? (double)truePositives / recommendedIds.Count : 0;
+            var recall = relevantIds.Count > 0 ? (double)truePositives / relevantIds.Count : 0;
+
+            precisionScores.Add(precision);
+            recallScores.Add(recall);
         }
-        
-        return totalError / predicted.Count;
-    }
-    
-    /// <summary>
-    /// Berekent Root Mean Squared Error (RMSE) voor prijsvoorspellingen.
-    /// RMSE = vierkantswortel van gemiddelde kwadratische fout
-    /// 
-    /// RMSE is gevoeliger voor grote fouten dan MAE (grote fouten worden zwaarder bestraft).
-    /// Dit is nuttig wanneer grote fouten problematischer zijn dan kleine fouten.
-    /// Lager is beter (0.0 = perfecte voorspellingen).
-    /// </summary>
-    public double CalculateRootMeanSquaredError(List<Car> predicted, List<Car> actual)
-    {
-        if (predicted.Count != actual.Count || predicted.Count == 0)
-            return 0.0;
-        
-        double totalSquaredError = 0.0;
-        for (int i = 0; i < predicted.Count; i++)
+
+        var avgPrecision = precisionScores.Average();
+        var avgRecall = recallScores.Average();
+        var f1 = avgPrecision + avgRecall > 0
+            ? 2 * (avgPrecision * avgRecall) / (avgPrecision + avgRecall)
+            : 0;
+
+        return (new FoldMetrics
         {
-            double error = (double)(predicted[i].Budget - actual[i].Budget);
-            totalSquaredError += error * error;
+            FoldNumber = foldNumber,
+            Precision = avgPrecision,
+            Recall = avgRecall,
+            F1Score = f1,
+            TestSize = testSample.Count
+        }, responseTimes.Average());
+    }
+
+    private List<Car> GetRecommendations(string algorithmName, Car queryCar, int topK, List<Car> trainSet)
+    {
+        try
+        {
+            switch (algorithmName.ToLower())
+            {
+                case "mlnet":
+                    // ML.NET: Gebruik PredictScore voor elke auto en sorteer
+                    var mlScores = trainSet
+                        .Select(car => new 
+                        { 
+                            Car = car, 
+                            Score = _mlRecommendationService.PredictScore(car, trainSet) 
+                        })
+                        .OrderByDescending(x => x.Score)
+                        .Take(topK)
+                        .Select(x => x.Car)
+                        .ToList();
+                    return mlScores;
+
+                case "cosine":
+                    // Cosine Similarity: Gebruik simpele feature matching score
+                    var cosineScores = trainSet
+                        .Select(car => new
+                        {
+                            Car = car,
+                            Score = CalculateSimpleCosineSimilarity(queryCar, car)
+                        })
+                        .OrderByDescending(x => x.Score)
+                        .Take(topK)
+                        .Select(x => x.Car)
+                        .ToList();
+                    return cosineScores;
+
+                case "knn":
+                    // KNN: Gebruik FindNearestNeighbors
+                    _featureVectorFactory.Initialize(trainSet);
+                    var knnResults = _knnRecommendationService.FindNearestNeighbors(queryCar, trainSet);
+                    return knnResults
+                        .Take(topK)
+                        .Select(r => r.Car)
+                        .ToList();
+
+                default:
+                    throw new ArgumentException($"Unknown algorithm: {algorithmName}");
+            }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MlEval] Error in GetRecommendations for {algorithmName}: {ex.Message}");
+            return new List<Car>();
+        }
+    }
+
+    private double CalculateSimpleCosineSimilarity(Car car1, Car car2)
+    {
+        double score = 0;
+        int totalFeatures = 7;
         
-        double meanSquaredError = totalSquaredError / predicted.Count;
-        return Math.Sqrt(meanSquaredError);
+        // Categorical features (0 or 1)
+        if (car1.Brand == car2.Brand) score += 1;
+        if (car1.Fuel == car2.Fuel) score += 1;
+        if (car1.Transmission == car2.Transmission) score += 1;
+        if (car1.BodyType == car2.BodyType) score += 1;
+        
+        // Numeric features (normalized similarity 0-1)
+        // Budget similarity
+        var budgetDiff = Math.Abs((double)(car1.Budget - car2.Budget));
+        var budgetMax = (double)Math.Max(car1.Budget, car2.Budget);
+        score += budgetMax > 0 ? (1 - Math.Min(budgetDiff / budgetMax, 1)) : 0;
+        
+        // Power similarity
+        var powerDiff = Math.Abs(car1.Power - car2.Power);
+        var powerMax = Math.Max(car1.Power, car2.Power);
+        score += powerMax > 0 ? (1 - Math.Min((double)powerDiff / powerMax, 1)) : 0;
+        
+        // Year similarity
+        var yearDiff = Math.Abs(car1.Year - car2.Year);
+        score += 1 - Math.Min(yearDiff / 10.0, 1); // Max 10 jaar verschil
+        
+        return score / totalFeatures; // Normalize to 0-1
     }
-    
-    /// <summary>
-    /// Helper class voor train/test split resultaat.
-    /// </summary>
-    private class TrainTestSplitResult
+
+    private List<Car> GetGroundTruth(Car queryCar, List<Car> candidateCars)
     {
-        public List<Car> TrainingSet { get; set; } = new();
-        public List<Car> TestSet { get; set; } = new();
+        var relevant = new List<Car>();
+
+        foreach (var car in candidateCars)
+        {
+            if (car.Id == queryCar.Id) continue;
+
+            int matches = 0;
+            
+            // Tel exacte matches op categorische features
+            if (car.Brand == queryCar.Brand) matches++;
+            if (car.Fuel == queryCar.Fuel) matches++;
+            if (car.Transmission == queryCar.Transmission) matches++;
+            if (car.BodyType == queryCar.BodyType) matches++;
+
+            // Numerieke proximity (gebruik Budget in plaats van Price!)
+            var budgetSimilar = Math.Abs(car.Budget - queryCar.Budget) < queryCar.Budget * 0.2m; // ±20%
+            var yearSimilar = Math.Abs(car.Year - queryCar.Year) <= 3; // ±3 jaar
+            var powerSimilar = Math.Abs(car.Power - queryCar.Power) < queryCar.Power * 0.15; // ±15%
+
+            // Auto is relevant als 3+ matches OF 2+ matches + alle numeriek
+            if (matches >= 3 || (matches >= 2 && budgetSimilar && yearSimilar && powerSimilar))
+            {
+                relevant.Add(car);
+            }
+        }
+
+        return relevant.Take(20).ToList(); // Max 20 relevante auto's
     }
-    
-    /// <summary>
-    /// Helper class voor evaluatie metrics.
-    /// </summary>
-    private class EvaluationMetrics
+
+    private List<List<Car>> CreateFolds(List<Car> cars, int k)
     {
-        public double PrecisionAtK { get; set; }
-        public double RecallAtK { get; set; }
-        public double MAE { get; set; }
-        public double RMSE { get; set; }
+        var shuffled = cars.OrderBy(_ => Guid.NewGuid()).ToList();
+        var folds = new List<List<Car>>();
+        var foldSize = cars.Count / k;
+
+        for (int i = 0; i < k; i++)
+        {
+            var fold = shuffled
+                .Skip(i * foldSize)
+                .Take(i == k - 1 ? cars.Count - (i * foldSize) : foldSize)
+                .ToList();
+            folds.Add(fold);
+        }
+
+        return folds;
     }
 }
-
-/// <summary>
-/// Resultaat model voor ML evaluatie.
-/// Bevat alle metrics, hyperparameter resultaten en forecasting data.
-/// </summary>
-public class MlEvaluationResult
-{
-    public bool IsValid { get; set; }
-    public string? ErrorMessage { get; set; }
-    public int TrainingSetSize { get; set; }
-    public int TestSetSize { get; set; }
-    public double PrecisionAtK { get; set; }
-    public double RecallAtK { get; set; }
-    public double MeanAbsoluteError { get; set; }
-    public double RootMeanSquaredError { get; set; }
-    public HyperparameterConfiguration? BestHyperparameters { get; set; }
-    public List<HyperparameterResult> HyperparameterResults { get; set; } = new();
-    public ForecastingResult? ForecastingResults { get; set; }
-    public DateTime EvaluationTimestamp { get; set; }
-}
-
-
-
-
-
-
-

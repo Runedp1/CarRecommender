@@ -42,27 +42,33 @@ public class RecommendationService : IRecommendationService
     /// <summary>
     /// Constructor - initialiseert alle services met dependency injection.
     /// </summary>
-    public RecommendationService(ICarRepository carRepository, MlRecommendationService? mlService = null)
+    public RecommendationService(
+        ICarRepository carRepository,
+        RuleBasedFilter ruleBasedFilter,
+        CarFeatureVectorFactory featureVectorFactory,
+        SimilarityService similarityService,
+        KnnRecommendationService knnService,
+        RankingService rankingService,
+        MlRecommendationService mlService,
+        AdvancedScoringService advancedScoringService)
     {
         _carRepository = carRepository ?? throw new ArgumentNullException(nameof(carRepository));
-        _engine = new RecommendationEngine(); // Used by RecommendSimilarCars (legacy endpoint)
+
+        // Legacy / stateless helpers (mogen met new)
+        _engine = new RecommendationEngine();
         _textParser = new TextParserService();
-        _explanationBuilder = new ExplanationBuilder(); // No longer needs CollaborativeFilteringService
-        
-        // Initialize core AI components
-        _ruleBasedFilter = new RuleBasedFilter();
-        _featureVectorFactory = new CarFeatureVectorFactory();
-        _similarityService = new SimilarityService();
-        _knnService = new KnnRecommendationService(k: 5);  //K=5 voor top 5 recommendations
-        _rankingService = new RankingService();
-        // Gebruik de gedeelde singleton instantie als die beschikbaar is, anders maak een nieuwe
-        _mlService = mlService ?? new MlRecommendationService();
-        _advancedScoringService = new AdvancedScoringService(
-            featureVectorFactory: _featureVectorFactory,
-            similarityService: _similarityService,
-            mlService: _mlService,
-            carRepository: _carRepository);
+        _explanationBuilder = new ExplanationBuilder();
+
+        // Core AI components via DI (GEEN new)
+        _ruleBasedFilter = ruleBasedFilter;
+        _featureVectorFactory = featureVectorFactory;
+        _similarityService = similarityService;
+        _knnService = knnService;
+        _rankingService = rankingService;
+        _mlService = mlService;
+        _advancedScoringService = advancedScoringService;
     }
+
 
     /// <summary>
     /// Initialiseert de feature vector factory met alle auto's.

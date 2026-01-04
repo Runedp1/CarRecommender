@@ -1,659 +1,324 @@
 @page
-@model MlOverviewModel
+@model CarRecommender.Web.Pages.MlOverviewModel
 @{
-    ViewData["Title"] = "ML Evaluatie Overzicht";
+    ViewData["Title"] = "ML Evaluatie & Algoritme Vergelijking";
 }
 
-@section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script>
-        // Prijs trend grafiek
-        document.addEventListener('DOMContentLoaded', function() {
-            @if (Model.EvaluationResult?.ForecastingResults?.PeriodTrends != null && Model.EvaluationResult.ForecastingResults.PeriodTrends.Any())
-            {
-                <text>
-                const ctx = document.getElementById('priceTrendChart');
-                if (ctx) {
-                    const periods = @Html.Raw(Json.Serialize(Model.EvaluationResult.ForecastingResults.PeriodTrends.Select(t => t.PeriodName)));
-                    const prices = @Html.Raw(Json.Serialize(Model.EvaluationResult.ForecastingResults.PeriodTrends.Select(t => t.AveragePrice)));
-                    
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: periods,
-                            datasets: [{
-                                label: 'Gemiddelde prijs (€)',
-                                data: prices,
-                                borderColor: '#4A148C',
-                                backgroundColor: 'rgba(74, 20, 140, 0.2)',
-                                tension: 0.3,
-                                borderWidth: 3
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    labels: {
-                                        font: {
-                                            size: 14,
-                                            weight: '600'
-                                        },
-                                        color: '#4A148C'
-                                    }
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Prijs trend over de jaren',
-                                    font: {
-                                        size: 16,
-                                        weight: '600'
-                                    },
-                                    color: '#4A148C'
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: false,
-                                    ticks: {
-                                        callback: function(value) {
-                                            return '€' + value.toLocaleString('nl-NL', {maximumFractionDigits: 0});
-                                        },
-                                        color: '#666',
-                                        font: {
-                                            size: 12
-                                        }
-                                    },
-                                    grid: {
-                                        color: 'rgba(74, 20, 140, 0.1)'
-                                    }
-                                },
-                                x: {
-                                    ticks: {
-                                        color: '#666',
-                                        font: {
-                                            size: 12
-                                        }
-                                    },
-                                    grid: {
-                                        color: 'rgba(74, 20, 140, 0.1)'
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
-                </text>
-            }
-        });
-    </script>
-}
+<div class="container-fluid mt-4">
+    <h1 class="mb-4">ML Evaluatie & Cross-Validation</h1>
+    
+    <div class="row">
+        <!-- Configuratie Sectie -->
+        <div class="col-md-3">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">⚙️ Configuratie</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Aantal Folds:</label>
+                        <input type="number" id="kfolds" class="form-control" value="3" min="2" max="10">
+                        <small class="text-muted">2-10 folds (3 = snel, 5 = nauwkeurig)</small>
+                    </div>
 
-<style>
-    :root {
-        --deep-purple: #4A148C;
-        --purple-dark: #311B92;
-        --purple-light: #7B1FA2;
-        --purple-accent: #9C27B0;
-    }
+                    <button class="btn btn-success w-100 mb-2" onclick="runComparison()">
+                        <span id="btnIcon">▶️</span>
+                        <span id="btnText">Start Vergelijking</span>
+                    </button>
 
-    .hero-header {
-        background: linear-gradient(135deg, #000000 0%, var(--deep-purple) 50%, var(--purple-dark) 100%);
-        color: white;
-        padding: 4rem 0;
-        margin: -1rem -15px 3rem -15px;
-        border-radius: 0 0 30px 30px;
-    }
+                    <div id="loadingInfo" class="alert alert-info d-none mt-3">
+                        <div class="spinner-border spinner-border-sm me-2"></div>
+                        <small>Cross-validation loopt... (~1-2 min)</small>
+                    </div>
+                </div>
+            </div>
 
-    .hero-header h1 {
-        font-size: 3rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
+            <!-- Metrics Uitleg -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">Metrics Uitleg</h6>
+                </div>
+                <div class="card-body small">
+                    <p class="mb-2"><strong>Precision@10:</strong> % correcte auto's in top-10</p>
+                    <p class="mb-2"><strong>Recall@10:</strong> % relevante auto's gevonden</p>
+                    <p class="mb-2"><strong>F1-Score:</strong> Harmonic mean van P&R</p>
+                    <p class="mb-0"><strong>Response Time:</strong> Snelheid per query (ms)</p>
+                </div>
+            </div>
+        </div>
 
-    .hero-header .lead {
-        font-size: 1.3rem;
-        opacity: 0.95;
-    }
+        <!-- Resultaten Sectie -->
+        <div class="col-md-9">
+            <div id="errorState" class="alert alert-danger d-none">
+                <strong>Error:</strong> <span id="errorMessage"></span>
+            </div>
 
-    .content-wrapper {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 0 2rem;
-    }
+            <div id="resultsSection" class="d-none">
+                <!-- Best Performers Card -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0">🏆 Best Performing Algorithms</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-4">
+                                <h6>Highest Precision</h6>
+                                <h3 class="text-primary" id="bestPrecision">-</h3>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Highest Recall</h6>
+                                <h3 class="text-success" id="bestRecall">-</h3>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Fastest</h6>
+                                <h3 class="text-info" id="bestSpeed">-</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    .card {
-        border: none;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(74, 20, 140, 0.1);
-        border-left: 5px solid var(--deep-purple);
-        margin-bottom: 2rem;
-        overflow: hidden;
-    }
+                <!-- Vergelijkingstabel -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Algoritme Vergelijking</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Algoritme</th>
+                                        <th>Precision@10</th>
+                                        <th>Recall@10</th>
+                                        <th>F1-Score</th>
+                                        <th>Avg Response (ms)</th>
+                                        <th>Test Cases</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="comparisonTableBody">
+                                    <!-- Dynamisch gevuld -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
 
-    .card-header {
-        background: linear-gradient(135deg, var(--deep-purple) 0%, var(--purple-accent) 100%);
-        border: none;
-        padding: 1.5rem;
-        color: white;
-    }
+                <!-- Charts -->
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-dark text-white">
+                                <h6 class="mb-0">📈 Accuracy Metrics</h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="accuracyChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-dark text-white">
+                                <h6 class="mb-0">Performance (Response Time)</h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="performanceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    .card-header.bg-success {
-        background: linear-gradient(135deg, #2e7d32 0%, #43a047 100%) !important;
-    }
-
-    .card-header.bg-warning {
-        background: linear-gradient(135deg, #f57c00 0%, #fb8c00 100%) !important;
-        color: white !important;
-    }
-
-    .card-header.bg-info {
-        background: linear-gradient(135deg, #0277bd 0%, #0288d1 100%) !important;
-    }
-
-    .card-header h3 {
-        font-weight: 600;
-        font-size: 1.5rem;
-        margin: 0;
-    }
-
-    .card-body {
-        padding: 2.5rem;
-    }
-
-    .card-body h5 {
-        color: var(--deep-purple);
-        font-weight: 600;
-        font-size: 1.3rem;
-        margin-bottom: 1rem;
-    }
-
-    .card-body h6 {
-        color: var(--deep-purple);
-        font-weight: 600;
-        font-size: 1.1rem;
-    }
-
-    .table {
-        margin-top: 1rem;
-    }
-
-    .table th {
-        color: var(--deep-purple);
-        font-weight: 600;
-        border-bottom: 2px solid var(--deep-purple);
-    }
-
-    .table td strong {
-        color: var(--deep-purple);
-    }
-
-    .badge.bg-info {
-        background: linear-gradient(135deg, var(--deep-purple) 0%, var(--purple-accent) 100%) !important;
-        cursor: help;
-    }
-
-    .display-6 {
-        color: var(--deep-purple);
-        font-weight: 600;
-    }
-
-    .text-muted {
-        color: #666 !important;
-    }
-
-    .text-muted small {
-        line-height: 1.6;
-    }
-
-    .bg-light {
-        background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%) !important;
-        border-left: 4px solid var(--deep-purple) !important;
-        border-radius: 8px;
-    }
-
-    .bg-light .card-body {
-        padding: 1.5rem;
-    }
-
-    .bg-light h6 {
-        color: var(--deep-purple);
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-
-    .alert-danger {
-        background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
-        border: none;
-        border-left: 4px solid #d32f2f;
-        color: #333;
-        border-radius: 8px;
-        padding: 1rem 1.5rem;
-    }
-
-    .table-striped tbody tr:nth-of-type(odd) {
-        background-color: rgba(74, 20, 140, 0.05);
-    }
-
-    .table-bordered {
-        border: 1px solid rgba(74, 20, 140, 0.2);
-    }
-
-    .table-bordered th,
-    .table-bordered td {
-        border: 1px solid rgba(74, 20, 140, 0.1);
-    }
-
-    canvas {
-        margin-top: 1.5rem;
-    }
-
-    @@media (max-width: 992px) {
-        .hero-header h1 {
-            font-size: 2rem;
-        }
-        
-        .hero-header .lead {
-            font-size: 1.1rem;
-        }
-
-        .card-body {
-            padding: 1.5rem;
-        }
-    }
-</style>
-
-<div class="hero-header">
-    <div class="container-fluid">
-        <div class="text-center">
-            <h1>ML Evaluatie Overzicht</h1>
-            <p class="lead">Machine Learning evaluatie metrics, hyperparameter optimalisatie en trend analyse</p>
+                <!-- Fold Details -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0">📋 Fold Details (voor stabiliteitsanalyse)</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="foldDetails">
+                            <!-- Dynamisch gevuld -->
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="content-wrapper">
-    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
-    {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong>Fout:</strong> @Model.ErrorMessage
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const API_BASE_URL = 'http://localhost:5283';
 
-    <!-- ML Model Training Status Sectie -->
-    @if (Model.ModelStatus != null)
-    {
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header @(Model.ModelStatus.IsTrained ? "bg-success" : "bg-warning") text-white">
-                        <h3 class="card-title mb-0">
-                            @if (Model.ModelStatus.IsTrained)
-                            {
-                                <span>✅ ML.NET Model Status - Getraind</span>
-                            }
-                            else
-                            {
-                                <span>⚠️ ML.NET Model Status - Niet Getraind</span>
-                            }
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5>Training Informatie</h5>
-                                <table class="table table-striped">
-                                    <tbody>
-                                        <tr>
-                                            <td><strong>Status</strong></td>
-                                            <td>
-                                                @if (Model.ModelStatus.IsTrained)
-                                                {
-                                                    <span class="badge bg-success">Getraind</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="badge bg-warning">Niet Getraind</span>
-                                                }
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td><strong>Laatste Training</strong></td>
-                                            <td>
-                                                @if (Model.ModelStatus.LastTrainingTime != DateTime.MinValue)
-                                                {
-                                                    @Model.ModelStatus.LastTrainingTime.ToString("dd/MM/yyyy HH:mm:ss")
-                                                }
-                                                else
-                                                {
-                                                    <span class="text-muted">Nog niet getraind</span>
-                                                }
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td><strong>Training Samples</strong></td>
-                                            <td>@Model.ModelStatus.TrainingDataCount</td>
-                                        </tr>
-                                        <tr>
-                                            <td><strong>Model Opgeslagen</strong></td>
-                                            <td>
-                                                @if (Model.ModelStatus.ModelExists)
-                                                {
-                                                    <span class="badge bg-success">Ja</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="badge bg-secondary">Nee</span>
-                                                }
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="col-md-6">
-                                <h5>Uitleg</h5>
-                                <p class="text-muted">
-                                    Het ML.NET model wordt automatisch getraind in de achtergrond na het opstarten van de applicatie.
-                                    Het model leert van recommendation patterns om de kwaliteit van recommendations te verbeteren.
-                                </p>
-                                @if (Model.ModelStatus.IsTrained)
-                                {
-                                    <div class="alert alert-success">
-                                        <strong>✅ Model is actief!</strong> Het ML.NET model wordt gebruikt in recommendations om scores te optimaliseren.
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="alert alert-warning">
-                                        <strong>⏳ Training in progress...</strong> Het model wordt momenteel getraind in de achtergrond. Dit kan enkele minuten duren.
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
+        let accuracyChart = null;
+        let performanceChart = null;
 
-    @if (Model.EvaluationResult != null && Model.EvaluationResult.IsValid)
-    {
-        <!-- Evaluatie Metrics Sectie -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header text-white">
-                        <h3 class="card-title mb-0">Evaluatie Metrics</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5>Train/Test Split</h5>
-                                <p>
-                                    @{
-                                        var totalSplitSize = Model.EvaluationResult.TrainingSetSize + Model.EvaluationResult.TestSetSize;
-                                        var trainingPercentage = totalSplitSize > 0 ? (Model.EvaluationResult.TrainingSetSize * 100.0 / totalSplitSize) : 0;
-                                        var testPercentage = totalSplitSize > 0 ? (Model.EvaluationResult.TestSetSize * 100.0 / totalSplitSize) : 0;
-                                    }
-                                    <strong>Training set:</strong> @Model.EvaluationResult.TrainingSetSize auto's (@trainingPercentage.ToString("F1")%)<br>
-                                    <strong>Test set:</strong> @Model.EvaluationResult.TestSetSize auto's (@testPercentage.ToString("F1")%)
-                                </p>
-                                <p class="text-muted">
-                                    <small>De dataset is gesplitst in een training set (om het model te trainen) en een test set (om te evalueren) met stratified sampling. 
-                                    Dit is een standaard ML techniek om te voorkomen dat het model overfitted op de training data.</small>
-                                </p>
-                            </div>
-                            <div class="col-md-6">
-                                <h5>Recommendation Metrics</h5>
-                                <table class="table table-striped">
-                                    <tbody>
-                                        <tr>
-                                            <td><strong>Precision@K</strong></td>
-                                            <td>@(Model.EvaluationResult.PrecisionAtK.ToString("F3"))</td>
-                                            <td>
-                                                <span class="badge bg-info" data-bs-toggle="tooltip" title="Precision@K meet hoeveel van de top K recommendations relevant zijn. Hoger is beter (max 1.0).">
-                                                    Info
-                                                </span>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td><strong>Recall@K</strong></td>
-                                            <td>@(Model.EvaluationResult.RecallAtK.ToString("F3"))</td>
-                                            <td>
-                                                <span class="badge bg-info" data-bs-toggle="tooltip" title="Recall@K meet hoeveel relevante items gevonden worden in de top K. Hoger is beter (max 1.0).">
-                                                    Info
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                                <p class="text-muted">
-                                    <small><strong>Precision@K:</strong> Meet de accuraatheid van de top K recommendations (hoeveel zijn relevant?).<br>
-                                    <strong>Recall@K:</strong> Meet de volledigheid (hoeveel relevante items worden gevonden?).</small>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        async function runComparison() {
+            // UI updates
+            document.getElementById('btnIcon').textContent = '⏳';
+            document.getElementById('btnText').textContent = 'Bezig...';
+            document.getElementById('loadingInfo').classList.remove('d-none');
+            document.getElementById('resultsSection').classList.add('d-none');
+            document.getElementById('errorState').classList.add('d-none');
 
-        <!-- Prijsvoorspelling Metrics -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-success text-white">
-                        <h3 class="card-title mb-0">Prijsvoorspelling Metrics</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5>Mean Absolute Error (MAE)</h5>
-                                <p class="display-6">€@(Model.EvaluationResult.MeanAbsoluteError.ToString("N2"))</p>
-                                <p class="text-muted">
-                                    <small>MAE meet de gemiddelde absolute fout tussen voorspelde en werkelijke prijzen. 
-                                    Lager is beter. Deze metric geeft een gemiddelde afwijking in euro's.</small>
-                                </p>
-                            </div>
-                            <div class="col-md-6">
-                                <h5>Root Mean Squared Error (RMSE)</h5>
-                                <p class="display-6">€@(Model.EvaluationResult.RootMeanSquaredError.ToString("N2"))</p>
-                                <p class="text-muted">
-                                    <small>RMSE is gevoeliger voor grote fouten dan MAE. Grote fouten worden zwaarder bestraft. 
-                                    Lager is beter. Deze metric wordt gebruikt wanneer grote fouten problematischer zijn.</small>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+            const kfolds = parseInt(document.getElementById('kfolds').value);
 
-        <!-- Hyperparameter Tuning Sectie -->
-        @if (Model.EvaluationResult.BestHyperparameters != null)
-        {
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header bg-warning text-dark">
-                            <h3 class="card-title mb-0">Hyperparameter Optimalisatie</h3>
-                        </div>
-                        <div class="card-body">
-                            <h5>Beste Configuratie</h5>
-                            <p>De volgende similarity gewichten zijn geoptimaliseerd voor de beste resultaten:</p>
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>Feature</th>
-                                        <th>Gewicht</th>
-                                        <th>Percentage</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td><strong>Vermogen (Power)</strong></td>
-                                        <td>@(Model.EvaluationResult.BestHyperparameters.PowerWeight.ToString("F3"))</td>
-                                        <td>@((Model.EvaluationResult.BestHyperparameters.PowerWeight * 100).ToString("F1"))%</td>
-                                    </tr>
-                                    <tr>
-                                        <td><strong>Budget/Prijs</strong></td>
-                                        <td>@(Model.EvaluationResult.BestHyperparameters.BudgetWeight.ToString("F3"))</td>
-                                        <td>@((Model.EvaluationResult.BestHyperparameters.BudgetWeight * 100).ToString("F1"))%</td>
-                                    </tr>
-                                    <tr>
-                                        <td><strong>Bouwjaar (Year)</strong></td>
-                                        <td>@(Model.EvaluationResult.BestHyperparameters.YearWeight.ToString("F3"))</td>
-                                        <td>@((Model.EvaluationResult.BestHyperparameters.YearWeight * 100).ToString("F1"))%</td>
-                                    </tr>
-                                    <tr>
-                                        <td><strong>Brandstof (Fuel)</strong></td>
-                                        <td>@(Model.EvaluationResult.BestHyperparameters.FuelWeight.ToString("F3"))</td>
-                                        <td>@((Model.EvaluationResult.BestHyperparameters.FuelWeight * 100).ToString("F1"))%</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <p class="text-muted">
-                                <small>Hyperparameter tuning test verschillende combinaties van similarity gewichten om de beste configuratie te vinden. 
-                                Dit is een belangrijk onderdeel van ML model optimalisatie.</small>
-                            </p>
-                            
-                            @if (Model.EvaluationResult.HyperparameterResults != null && Model.EvaluationResult.HyperparameterResults.Any())
-                            {
-                                <h5 class="mt-4">Alle Geteste Configuraties</h5>
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th>Power</th>
-                                                <th>Budget</th>
-                                                <th>Year</th>
-                                                <th>Fuel</th>
-                                                <th>Score</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var result in Model.EvaluationResult.HyperparameterResults.OrderByDescending(r => r.Score).Take(10))
-                                            {
-                                                <tr>
-                                                    <td>@(result.Configuration.PowerWeight.ToString("F2"))</td>
-                                                    <td>@(result.Configuration.BudgetWeight.ToString("F2"))</td>
-                                                    <td>@(result.Configuration.YearWeight.ToString("F2"))</td>
-                                                    <td>@(result.Configuration.FuelWeight.ToString("F2"))</td>
-                                                    <td>@(result.Score.ToString("F3"))</td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            }
-                        </div>
-                    </div>
-                </div>
-            </div>
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/ml/compare`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ kFolds: kfolds })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'API call failed');
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (error) {
+                document.getElementById('errorState').classList.remove('d-none');
+                document.getElementById('errorMessage').textContent = error.message;
+            } finally {
+                document.getElementById('btnIcon').textContent = '▶️';
+                document.getElementById('btnText').textContent = 'Start Vergelijking';
+                document.getElementById('loadingInfo').classList.add('d-none');
+            }
         }
 
-        <!-- Forecasting/Trend Analyse Sectie -->
-        @if (Model.EvaluationResult.ForecastingResults != null && Model.EvaluationResult.ForecastingResults.IsValid)
-        {
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header bg-info text-white">
-                            <h3 class="card-title mb-0">Trend Analyse & Forecasting</h3>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted">
-                                <small>Deze analyse toont trends in de auto dataset op basis van bouwjaar. 
-                                Dit kan geïnterpreteerd worden als seizoensanalyse (verschillende periodes) of trendanalyse (algemene ontwikkelingen).</small>
-                            </p>
+        function displayResults(data) {
+            document.getElementById('resultsSection').classList.remove('d-none');
 
-                            @if (Model.EvaluationResult.ForecastingResults.GeneralTrends != null)
-                            {
-                                <h5>Algemene Trends</h5>
-                                <div class="row">
-                                    <div class="col-md-4 mb-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6>Prijs Trend</h6>
-                                                <p>@Model.EvaluationResult.ForecastingResults.GeneralTrends.PriceTrend</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6>Vermogen Trend</h6>
-                                                <p>@Model.EvaluationResult.ForecastingResults.GeneralTrends.PowerTrend</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6>Brandstof Trend</h6>
-                                                <p>@Model.EvaluationResult.ForecastingResults.GeneralTrends.FuelTrend</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
+            // Best performers
+            document.getElementById('bestPrecision').textContent = data.bestByPrecision.toUpperCase();
+            document.getElementById('bestRecall').textContent = data.bestByRecall.toUpperCase();
+            document.getElementById('bestSpeed').textContent = data.bestBySpeed.toUpperCase();
 
-                            @if (Model.EvaluationResult.ForecastingResults.PeriodTrends != null && Model.EvaluationResult.ForecastingResults.PeriodTrends.Any())
-                            {
-                                <h5 class="mt-4">Prijs Trend per Periode</h5>
-                                <canvas id="priceTrendChart" style="max-height: 400px;"></canvas>
+            // Vergelijkingstabel
+            const tbody = document.getElementById('comparisonTableBody');
+            tbody.innerHTML = '';
 
-                                <h5 class="mt-4">Gedetailleerde Periode Analyse</h5>
-                                <div class="table-responsive">
-                                    <table class="table table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th>Periode</th>
-                                                <th>Auto's</th>
-                                                <th>Gem. Prijs</th>
-                                                <th>Gem. Vermogen</th>
-                                                <th>Top Brandstof Types</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var trend in Model.EvaluationResult.ForecastingResults.PeriodTrends)
-                                            {
-                                                <tr>
-                                                    <td><strong>@trend.PeriodName</strong></td>
-                                                    <td>@trend.CarCount</td>
-                                                    <td>€@(trend.AveragePrice.ToString("N0"))</td>
-                                                    <td>@(trend.AveragePower.ToString("F0")) KW</td>
-                                                    <td>
-                                                        @string.Join(", ", trend.FuelDistribution.Take(3).Select(f => $"{f.FuelType} ({f.Percentage:F1}%)"))
-                                                    </td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            }
-                        </div>
-                    </div>
-                </div>
-            </div>
+            const algorithms = Object.keys(data.results);
+            algorithms.forEach(algo => {
+                const result = data.results[algo];
+                const row = `
+                    <tr>
+                        <td><strong>${algo.toUpperCase()}</strong></td>
+                        <td>${(result.precisionAt10 * 100).toFixed(2)}%</td>
+                        <td>${(result.recallAt10 * 100).toFixed(2)}%</td>
+                        <td>${result.f1Score.toFixed(3)}</td>
+                        <td>${result.averageResponseTimeMs.toFixed(1)}</td>
+                        <td>${result.totalTestCases}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            // Fold details
+            displayFoldDetails(data.results);
+
+            // Charts
+            createCharts(data.results);
         }
 
-        <!-- Evaluatie Timestamp -->
-        <div class="row mt-4 mb-4">
-            <div class="col-12">
-                <p class="text-muted text-end">
-                    <small>Evaluatie uitgevoerd op: @Model.EvaluationResult.EvaluationTimestamp.ToString("dd-MM-yyyy HH:mm:ss") UTC</small>
-                </p>
-            </div>
-        </div>
-    }
-</div>
+        function displayFoldDetails(results) {
+            const container = document.getElementById('foldDetails');
+            container.innerHTML = '';
 
+            Object.keys(results).forEach(algo => {
+                const result = results[algo];
+                const foldRows = result.foldResults.map(fold => `
+                    <tr>
+                        <td>Fold ${fold.foldNumber}</td>
+                        <td>${(fold.precision * 100).toFixed(2)}%</td>
+                        <td>${(fold.recall * 100).toFixed(2)}%</td>
+                        <td>${fold.f1Score.toFixed(3)}</td>
+                        <td>${fold.testSize}</td>
+                    </tr>
+                `).join('');
 
+                const table = `
+                    <h6 class="mt-3">${algo.toUpperCase()}</h6>
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Fold</th>
+                                <th>Precision</th>
+                                <th>Recall</th>
+                                <th>F1</th>
+                                <th>Test Size</th>
+                            </tr>
+                        </thead>
+                        <tbody>${foldRows}</tbody>
+                    </table>
+                `;
+                container.innerHTML += table;
+            });
+        }
 
+        function createCharts(results) {
+            const algorithms = Object.keys(results);
 
+            // Accuracy Chart
+            if (accuracyChart) accuracyChart.destroy();
+            const accuracyCtx = document.getElementById('accuracyChart').getContext('2d');
+            accuracyChart = new Chart(accuracyCtx, {
+                type: 'bar',
+                data: {
+                    labels: algorithms.map(a => a.toUpperCase()),
+                    datasets: [
+                        {
+                            label: 'Precision@10',
+                            data: algorithms.map(a => results[a].precisionAt10 * 100),
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)'
+                        },
+                        {
+                            label: 'Recall@10',
+                            data: algorithms.map(a => results[a].recallAt10 * 100),
+                            backgroundColor: 'rgba(255, 99, 132, 0.7)'
+                        },
+                        {
+                            label: 'F1-Score',
+                            data: algorithms.map(a => results[a].f1Score * 100),
+                            backgroundColor: 'rgba(75, 192, 192, 0.7)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: { display: true, text: 'Score (%)' }
+                        }
+                    }
+                }
+            });
 
-
-
+            // Performance Chart
+            if (performanceChart) performanceChart.destroy();
+            const perfCtx = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(perfCtx, {
+                type: 'bar',
+                data: {
+                    labels: algorithms.map(a => a.toUpperCase()),
+                    datasets: [{
+                        label: 'Avg Response Time (ms)',
+                        data: algorithms.map(a => results[a].averageResponseTimeMs),
+                        backgroundColor: 'rgba(255, 206, 86, 0.7)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Time (ms)' }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+}
