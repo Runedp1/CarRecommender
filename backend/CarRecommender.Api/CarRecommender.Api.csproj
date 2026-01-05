@@ -25,6 +25,10 @@
       <Link>data\df_master_v8_def.csv</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- Zorg dat ML model wordt meegenomen tijdens deployment -->
+    <Content Include="data\recommendation_model.mlnet" Condition="Exists('data\recommendation_model.mlnet')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   
   <!-- Zorg dat images folder wordt meegenomen tijdens deployment -->

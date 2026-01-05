@@ -18,6 +18,9 @@ public class CarRepository : ICarRepository
     private readonly string _csvFileName;
     private readonly string _dataDirectory;
     private Dictionary<string, List<string>> _imageMapping = new Dictionary<string, List<string>>();
+    // OPTIMALISATIE: Alleen debug logging in Development (niet in Production/Azure)
+    // Dit bespaart honderden File.AppendAllText operaties tijdens CSV parsing
+    private readonly bool _enableDebugLogging;
 
     /// <summary>
     /// Constructor - laadt auto's uit CSV bij initialisatie.
@@ -27,6 +30,8 @@ public class CarRepository : ICarRepository
     {
         _csvFileName = csvFileName;
         _dataDirectory = dataDirectory;
+        // Alleen debug logging in Development
+        _enableDebugLogging = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
         LoadCarsFromCsv();
     }
 
@@ -40,16 +45,20 @@ public class CarRepository : ICarRepository
         string csvPath = FindCsvFile(_csvFileName, _dataDirectory);
         // Console.WriteLine($"[DEBUG] FindCsvFile resultaat: {csvPath ?? "NULL"}");
         
-        // #region agent log
-        try {
-            var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            File.AppendAllText(logPath, 
-                $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"CarRepository.cs:37\",\"message\":\"CSV file path found\",\"data\":{{\"csvFileName\":\"{_csvFileName}\",\"dataDirectory\":\"{_dataDirectory}\",\"csvPath\":\"{csvPath}\",\"fileExists\":{(!string.IsNullOrEmpty(csvPath) && File.Exists(csvPath)).ToString().ToLower()}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
-        } catch { }
-        // #endregion
+        // OPTIMALISATIE: Debug logging alleen in Development
+        if (_enableDebugLogging)
+        {
+            // #region agent log
+            try {
+                var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
+                var logDir = Path.GetDirectoryName(logPath);
+                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                    Directory.CreateDirectory(logDir);
+                File.AppendAllText(logPath, 
+                    $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"CarRepository.cs:37\",\"message\":\"CSV file path found\",\"data\":{{\"csvFileName\":\"{_csvFileName}\",\"dataDirectory\":\"{_dataDirectory}\",\"csvPath\":\"{csvPath}\",\"fileExists\":{(!string.IsNullOrEmpty(csvPath) && File.Exists(csvPath)).ToString().ToLower()}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
+            } catch { }
+            // #endregion
+        }
         
         if (string.IsNullOrEmpty(csvPath) || !File.Exists(csvPath))
         {
@@ -107,22 +116,26 @@ public class CarRepository : ICarRepository
             }
         }
         
-        // #region agent log
-        try
+        // OPTIMALISATIE: Debug logging alleen in Development
+        if (_enableDebugLogging)
         {
-            var audiCountBeforeDedup = allCars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
-            var audiModelsBeforeDedup = allCars.Where(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true).Select(c => c.Model).Distinct().ToList();
-            Console.WriteLine($"[DEBUG] Audi count VOOR deduplicatie: {audiCountBeforeDedup} (totaal auto's: {allCars.Count})");
-            Console.WriteLine($"[DEBUG] Audi modellen VOOR deduplicatie: {string.Join(", ", audiModelsBeforeDedup)}");
-            var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            File.AppendAllText(logPath, 
-                $"{{\"location\":\"CarRepository.cs:53\",\"message\":\"Audi count VOOR deduplicatie\",\"data\":{{\"count\":{audiCountBeforeDedup},\"models\":{JsonSerializer.Serialize(audiModelsBeforeDedup)},\"totalCars\":{allCars.Count}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
+            // #region agent log
+            try
+            {
+                var audiCountBeforeDedup = allCars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
+                var audiModelsBeforeDedup = allCars.Where(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true).Select(c => c.Model).Distinct().ToList();
+                Console.WriteLine($"[DEBUG] Audi count VOOR deduplicatie: {audiCountBeforeDedup} (totaal auto's: {allCars.Count})");
+                Console.WriteLine($"[DEBUG] Audi modellen VOOR deduplicatie: {string.Join(", ", audiModelsBeforeDedup)}");
+                var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
+                var logDir = Path.GetDirectoryName(logPath);
+                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                    Directory.CreateDirectory(logDir);
+                File.AppendAllText(logPath, 
+                    $"{{\"location\":\"CarRepository.cs:53\",\"message\":\"Audi count VOOR deduplicatie\",\"data\":{{\"count\":{audiCountBeforeDedup},\"models\":{JsonSerializer.Serialize(audiModelsBeforeDedup)},\"totalCars\":{allCars.Count}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
+            }
+            catch { /* Fail silently in production */ }
+            // #endregion
         }
-        catch { /* Fail silently in production */ }
-        // #endregion
         
         // Verwijder duplicaten (Brand+Model+Year combinatie, behoud hoogste prijs)
         int originalCount = allCars.Count;
@@ -133,22 +146,30 @@ public class CarRepository : ICarRepository
         
         // Console.WriteLine($"[DATA_LOAD] ✅ Dataset geladen in geheugen: {_cars.Count} auto's beschikbaar");
         
-        // #region agent log
-        try
+        // OPTIMALISATIE: Debug logging alleen in Development
+        if (_enableDebugLogging)
         {
-            var audiCountAfterDedup = _cars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
-            var audiModelsAfterDedup = _cars.Where(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true).Select(c => c.Model).Distinct().ToList();
-            Console.WriteLine($"[DEBUG] Audi count NA deduplicatie: {audiCountAfterDedup} (totaal auto's: {_cars.Count})");
-            Console.WriteLine($"[DEBUG] Audi modellen NA deduplicatie: {string.Join(", ", audiModelsAfterDedup)}");
-            var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            File.AppendAllText(logPath, 
-                $"{{\"location\":\"CarRepository.cs:57\",\"message\":\"Audi count NA deduplicatie\",\"data\":{{\"count\":{audiCountAfterDedup},\"models\":{JsonSerializer.Serialize(audiModelsAfterDedup)},\"totalCars\":{_cars.Count}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
+            // OPTIMALISATIE: Debug logging alleen in Development
+            if (_enableDebugLogging)
+            {
+                // #region agent log
+                try
+                {
+                    var audiCountAfterDedup = _cars.Count(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true);
+                    var audiModelsAfterDedup = _cars.Where(c => c.Brand?.Equals("Audi", StringComparison.OrdinalIgnoreCase) == true).Select(c => c.Model).Distinct().ToList();
+                    Console.WriteLine($"[DEBUG] Audi count NA deduplicatie: {audiCountAfterDedup} (totaal auto's: {_cars.Count})");
+                    Console.WriteLine($"[DEBUG] Audi modellen NA deduplicatie: {string.Join(", ", audiModelsAfterDedup)}");
+                    var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
+                    var logDir = Path.GetDirectoryName(logPath);
+                    if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                        Directory.CreateDirectory(logDir);
+                    File.AppendAllText(logPath, 
+                        $"{{\"location\":\"CarRepository.cs:57\",\"message\":\"Audi count NA deduplicatie\",\"data\":{{\"count\":{audiCountAfterDedup},\"models\":{JsonSerializer.Serialize(audiModelsAfterDedup)},\"totalCars\":{_cars.Count}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
+                }
+                catch { /* Fail silently in production */ }
+                // #endregion
+            }
         }
-        catch { /* Fail silently in production */ }
-        // #endregion
         
         if (duplicateCount > 0)
         {
@@ -190,29 +211,37 @@ public class CarRepository : ICarRepository
             }
         }
         
-        // #region agent log
-        try
+        // OPTIMALISATIE: Debug logging alleen in Development
+        if (_enableDebugLogging)
         {
-            var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            
-            // Log first 5 cars with vermogen before returning
-            var first5Cars = _cars.Take(5).Select(c => new { 
-                id = c.Id, 
-                brand = c.Brand, 
-                model = c.Model, 
-                bouwjaar = c.Year, 
-                vermogen = c.Power, 
-                prijs = c.Budget 
-            }).ToList();
-            
-            File.AppendAllText(logPath, 
-                $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\",\"location\":\"CarRepository.cs:118\",\"message\":\"GetAllCars called - first 5 cars with vermogen\",\"data\":{{\"totalCars\":{_cars.Count},\"first5Cars\":{JsonSerializer.Serialize(first5Cars)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
+            // OPTIMALISATIE: Debug logging alleen in Development
+            if (_enableDebugLogging)
+            {
+                // #region agent log
+                try
+                {
+                    var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
+                    var logDir = Path.GetDirectoryName(logPath);
+                    if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                        Directory.CreateDirectory(logDir);
+                    
+                    // Log first 5 cars with vermogen before returning
+                    var first5Cars = _cars.Take(5).Select(c => new { 
+                        id = c.Id, 
+                        brand = c.Brand, 
+                        model = c.Model, 
+                        bouwjaar = c.Year, 
+                        vermogen = c.Power, 
+                        prijs = c.Budget 
+                    }).ToList();
+                    
+                    File.AppendAllText(logPath, 
+                        $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\",\"location\":\"CarRepository.cs:118\",\"message\":\"GetAllCars called - first 5 cars with vermogen\",\"data\":{{\"totalCars\":{_cars.Count},\"first5Cars\":{JsonSerializer.Serialize(first5Cars)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
+                }
+                catch { /* Fail silently in production */ }
+                // #endregion
+            }
         }
-        catch { /* Fail silently in production */ }
-        // #endregion
         return _cars;
     }
 
@@ -309,16 +338,24 @@ public class CarRepository : ICarRepository
                 }
             }
             
-            // #region agent log
-            try {
-                var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-                var logDir = Path.GetDirectoryName(logPath);
-                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                    Directory.CreateDirectory(logDir);
-                File.AppendAllText(logPath, 
-                    $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"E\",\"location\":\"CarRepository.cs:179\",\"message\":\"Column indices detected\",\"data\":{{\"headerLine\":\"{lines[0].Substring(0, Math.Min(200, lines[0].Length))}\",\"idIndex\":{idIndex},\"merkIndex\":{merkIndex},\"modelIndex\":{modelIndex},\"vermogenIndex\":{vermogenIndex},\"brandstofIndex\":{brandstofIndex},\"budgetIndex\":{budgetIndex},\"bouwjaarIndex\":{bouwjaarIndex},\"headerColumns\":{JsonSerializer.Serialize(headerColumns)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
-            } catch { }
-            // #endregion
+            // OPTIMALISATIE: Debug logging alleen in Development
+            if (_enableDebugLogging)
+            {
+                // OPTIMALISATIE: Debug logging alleen in Development
+                if (_enableDebugLogging)
+                {
+                    // #region agent log
+                    try {
+                        var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
+                        var logDir = Path.GetDirectoryName(logPath);
+                        if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                            Directory.CreateDirectory(logDir);
+                        File.AppendAllText(logPath, 
+                            $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"E\",\"location\":\"CarRepository.cs:179\",\"message\":\"Column indices detected\",\"data\":{{\"headerLine\":\"{lines[0].Substring(0, Math.Min(200, lines[0].Length))}\",\"idIndex\":{idIndex},\"merkIndex\":{merkIndex},\"modelIndex\":{modelIndex},\"vermogenIndex\":{vermogenIndex},\"brandstofIndex\":{brandstofIndex},\"budgetIndex\":{budgetIndex},\"bouwjaarIndex\":{bouwjaarIndex},\"headerColumns\":{JsonSerializer.Serialize(headerColumns)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
+                    } catch { }
+                    // #endregion
+                }
+            }
 
             // Verwerk alle data regels (skip header)
             // Console.WriteLine($"[PARSE] Start verwerken van {lines.Length - 1} data regels...");
@@ -526,9 +563,10 @@ public class CarRepository : ICarRepository
                     // Voeg alleen toe als merk en model bestaan EN waarden realistisch zijn
                     if (!string.IsNullOrWhiteSpace(car.Brand) && !string.IsNullOrWhiteSpace(car.Model))
                     {
-                        // #region agent log
-                        if (car.Brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
+                        // OPTIMALISATIE: Debug logging alleen in Development
+                        if (_enableDebugLogging && car.Brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
                         {
+                            // #region agent log
                             try
                             {
                                 var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
@@ -540,14 +578,15 @@ public class CarRepository : ICarRepository
                                     $"{{\"location\":\"CarRepository.cs:258\",\"message\":\"Audi gevonden in CSV (voor IsCarRealistic)\",\"data\":{JsonSerializer.Serialize(logData)},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}}\n");
                             }
                             catch { /* Fail silently in production */ }
+                            // #endregion
                         }
-                        // #endregion
                         // Filter onrealistische waarden
                         if (IsCarRealistic(car))
                         {
-                            // #region agent log
-                            if (car.Brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
+                            // OPTIMALISATIE: Debug logging alleen in Development
+                            if (_enableDebugLogging && car.Brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
                             {
+                                // #region agent log
                                 try
                                 {
                                     var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
@@ -559,8 +598,8 @@ public class CarRepository : ICarRepository
                                         $"{{\"location\":\"CarRepository.cs:268\",\"message\":\"Audi passeert IsCarRealistic\",\"data\":{JsonSerializer.Serialize(logData)},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}}\n");
                                 }
                                 catch { /* Fail silently in production */ }
+                                // #endregion
                             }
-                            // #endregion
                             // Genereer ImageUrl voor belangrijke modellen
                             car.ImageUrl = GenerateImageUrl(car);
                             cars.Add(car);
@@ -653,9 +692,10 @@ public class CarRepository : ICarRepository
             if (uniqueCarsMap.TryGetValue(uniqueKey, out Car? existingCar))
             {
                 // Als er al een auto is, behoud degene met de hoogste prijs
-                // #region agent log
-                if (brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
+                // OPTIMALISATIE: Debug logging alleen in Development
+                if (_enableDebugLogging && brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
                 {
+                    // #region agent log
                     try
                     {
                         var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
@@ -667,8 +707,8 @@ public class CarRepository : ICarRepository
                             $"{{\"location\":\"CarRepository.cs:292\",\"message\":\"Audi duplicaat gevonden in RemoveDuplicates\",\"data\":{JsonSerializer.Serialize(logData)},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
                     }
                     catch { /* Fail silently in production */ }
+                    // #endregion
                 }
-                // #endregion
                 if (car.Budget > existingCar.Budget)
                 {
                     uniqueCarsMap[uniqueKey] = car;
@@ -677,9 +717,10 @@ public class CarRepository : ICarRepository
             else
             {
                 // Nieuwe unieke combinatie, voeg toe
-                // #region agent log
-                if (brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
+                // OPTIMALISATIE: Debug logging alleen in Development
+                if (_enableDebugLogging && brand.Equals("Audi", StringComparison.OrdinalIgnoreCase))
                 {
+                    // #region agent log
                     try
                     {
                         var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
@@ -691,8 +732,8 @@ public class CarRepository : ICarRepository
                             $"{{\"location\":\"CarRepository.cs:302\",\"message\":\"Nieuwe Audi unieke combinatie toegevoegd\",\"data\":{JsonSerializer.Serialize(logData)},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}}\n");
                     }
                     catch { /* Fail silently in production */ }
+                    // #endregion
                 }
-                // #endregion
                 uniqueCarsMap.Add(uniqueKey, car);
             }
         }
@@ -1065,16 +1106,20 @@ public class CarRepository : ICarRepository
         // Probeer elk pad (source directories hebben prioriteit)
         foreach (string testPath in pathsToTry)
         {
-            // #region agent log
-            try {
-                var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-                var logDir = Path.GetDirectoryName(logPath);
-                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                    Directory.CreateDirectory(logDir);
-                File.AppendAllText(logPath, 
-                    $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"CarRepository.cs:790\",\"message\":\"Testing CSV path\",\"data\":{{\"testPath\":\"{testPath}\",\"exists\":{File.Exists(testPath).ToString().ToLower()},\"fileName\":\"{fileName}\"}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
-            } catch { }
-            // #endregion
+            // OPTIMALISATIE: Debug logging alleen in Development
+            if (_enableDebugLogging)
+            {
+                // #region agent log
+                try {
+                    var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
+                    var logDir = Path.GetDirectoryName(logPath);
+                    if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                        Directory.CreateDirectory(logDir);
+                    File.AppendAllText(logPath, 
+                        $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"CarRepository.cs:790\",\"message\":\"Testing CSV path\",\"data\":{{\"testPath\":\"{testPath}\",\"exists\":{File.Exists(testPath).ToString().ToLower()},\"fileName\":\"{fileName}\"}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
+                } catch { }
+                // #endregion
+            }
             
             if (File.Exists(testPath))
             {
@@ -1082,31 +1127,39 @@ public class CarRepository : ICarRepository
                 string foundFileName = Path.GetFileName(testPath);
                 if (foundFileName.Equals(fileName, StringComparison.OrdinalIgnoreCase))
                 {
-                    // #region agent log
-                    try {
-                        var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-                        var logDir = Path.GetDirectoryName(logPath);
-                        if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                            Directory.CreateDirectory(logDir);
-                        File.AppendAllText(logPath, 
-                            $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"CarRepository.cs:800\",\"message\":\"CSV file FOUND and verified\",\"data\":{{\"foundPath\":\"{testPath}\",\"fileName\":\"{fileName}\",\"foundFileName\":\"{foundFileName}\"}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
-                    } catch { }
-                    // #endregion
+                    // OPTIMALISATIE: Debug logging alleen in Development
+                    if (_enableDebugLogging)
+                    {
+                        // #region agent log
+                        try {
+                            var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
+                            var logDir = Path.GetDirectoryName(logPath);
+                            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                                Directory.CreateDirectory(logDir);
+                            File.AppendAllText(logPath, 
+                                $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"CarRepository.cs:800\",\"message\":\"CSV file FOUND and verified\",\"data\":{{\"foundPath\":\"{testPath}\",\"fileName\":\"{fileName}\",\"foundFileName\":\"{foundFileName}\"}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
+                        } catch { }
+                        // #endregion
+                    }
                     return testPath;
                 }
             }
         }
 
-        // #region agent log
-        try {
-            var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            File.AppendAllText(logPath, 
-                $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"CarRepository.cs:810\",\"message\":\"CSV file NOT FOUND\",\"data\":{{\"fileName\":\"{fileName}\",\"pathsTried\":{JsonSerializer.Serialize(pathsToTry)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
-        } catch { }
-        // #endregion
+        // OPTIMALISATIE: Debug logging alleen in Development
+        if (_enableDebugLogging)
+        {
+            // #region agent log
+            try {
+                var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
+                var logDir = Path.GetDirectoryName(logPath);
+                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                    Directory.CreateDirectory(logDir);
+                File.AppendAllText(logPath, 
+                    $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"CarRepository.cs:810\",\"message\":\"CSV file NOT FOUND\",\"data\":{{\"fileName\":\"{fileName}\",\"pathsTried\":{JsonSerializer.Serialize(pathsToTry)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
+            } catch { }
+            // #endregion
+        }
 
         return string.Empty;
     }

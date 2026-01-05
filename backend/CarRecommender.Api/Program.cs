@@ -164,12 +164,14 @@ builder.Services.AddSingleton<MlRecommendationService>(sp =>
         // Probeer verschillende manieren om D:\home te vinden
         string? homePath = null;
         
-        // Methode 1: Ga van D:\home\site\wwwroot naar D:\home (2 levels omhoog)
+        // Methode 1: Ga van C:\home\site\wwwroot of D:\home\site\wwwroot naar C:\home of D:\home (2 levels omhoog)
         if (env.ContentRootPath.Contains("site"))
         {
             var tempPath = Path.GetDirectoryName(Path.GetDirectoryName(env.ContentRootPath));
             if (!string.IsNullOrEmpty(tempPath) && Directory.Exists(tempPath) && 
-                (tempPath.Contains("home") || tempPath.StartsWith(@"D:\", StringComparison.OrdinalIgnoreCase)))
+                (tempPath.Contains("home") || 
+                 tempPath.StartsWith(@"D:\", StringComparison.OrdinalIgnoreCase) ||
+                 tempPath.StartsWith(@"C:\", StringComparison.OrdinalIgnoreCase)))
             {
                 homePath = tempPath;
             }
@@ -199,6 +201,16 @@ builder.Services.AddSingleton<MlRecommendationService>(sp =>
             }
         }
         
+        // Methode 4: Probeer expliciet C:\home (sommige Azure omgevingen gebruiken C:\)
+        if (homePath == null)
+        {
+            var explicitHomePath = @"C:\home";
+            if (Directory.Exists(explicitHomePath))
+            {
+                homePath = explicitHomePath;
+            }
+        }
+        
         if (!string.IsNullOrEmpty(homePath))
         {
             dataDir = Path.Combine(homePath, "data");
@@ -206,7 +218,7 @@ builder.Services.AddSingleton<MlRecommendationService>(sp =>
         }
         else
         {
-            Console.WriteLine($"[ML] ⚠️ Azure detectie: kon D:\\home niet vinden, gebruik ContentRootPath: {dataDir}");
+            Console.WriteLine($"[ML] ⚠️ Azure detectie: kon D:\\home of C:\\home niet vinden, gebruik ContentRootPath: {dataDir}");
             Console.WriteLine($"[ML] ⚠️ ContentRootPath: {env.ContentRootPath}");
         }
     }

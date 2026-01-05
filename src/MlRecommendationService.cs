@@ -499,6 +499,7 @@ public class MlRecommendationService
 
     /// <summary>
     /// Laadt een getraind model van disk.
+    /// Zoekt eerst in de opgegeven directory, dan in wwwroot/data (deployment locatie), en ten slotte in persistente locatie.
     /// </summary>
     /// <param name="modelPath">Pad naar het opgeslagen model. Als null, gebruikt het de standaard locatie.</param>
     public bool LoadModel(string? modelPath = null)
@@ -510,14 +511,84 @@ public class MlRecommendationService
 
         try
         {
-            var path = modelPath ?? GetModelPath();
-            
-            if (!File.Exists(path))
+            // Als expliciet pad gegeven, probeer die eerst
+            if (!string.IsNullOrEmpty(modelPath) && File.Exists(modelPath))
             {
-                Console.WriteLine($"[ML] Model bestand niet gevonden: {path}");
-                return false;
+                return LoadModelFromPath(modelPath);
             }
 
+            // Zoek in meerdere locaties (voor Azure: eerst wwwroot/data, dan persistente locatie)
+            var pathsToTry = new List<string>();
+            
+            // 1. Standaard locatie (zoals geconfigureerd)
+            var defaultPath = GetModelPath();
+            if (!string.IsNullOrEmpty(defaultPath))
+            {
+                pathsToTry.Add(defaultPath);
+            }
+            
+            // 2. In Azure: probeer eerst wwwroot/data (waar het wordt gedeployed)
+            var currentDir = Directory.GetCurrentDirectory();
+            if (currentDir.Contains("site\\wwwroot", StringComparison.OrdinalIgnoreCase) || 
+                currentDir.Contains("site/wwwroot", StringComparison.OrdinalIgnoreCase))
+            {
+                var wwwrootDataPath = Path.Combine(currentDir, "data", "recommendation_model.mlnet");
+                if (!pathsToTry.Contains(wwwrootDataPath))
+                {
+                    pathsToTry.Insert(0, wwwrootDataPath); // Prioriteit: probeer eerst
+                }
+            }
+            
+            // 3. In Azure: probeer persistente locatie (C:\home\data of D:\home\data)
+            if (currentDir.Contains("home", StringComparison.OrdinalIgnoreCase))
+            {
+                // Probeer C:\home\data
+                var cHomeDataPath = Path.Combine(@"C:\home", "data", "recommendation_model.mlnet");
+                if (Directory.Exists(Path.GetDirectoryName(cHomeDataPath)) && !pathsToTry.Contains(cHomeDataPath))
+                {
+                    pathsToTry.Add(cHomeDataPath);
+                }
+                
+                // Probeer D:\home\data
+                var dHomeDataPath = Path.Combine(@"D:\home", "data", "recommendation_model.mlnet");
+                if (Directory.Exists(Path.GetDirectoryName(dHomeDataPath)) && !pathsToTry.Contains(dHomeDataPath))
+                {
+                    pathsToTry.Add(dHomeDataPath);
+                }
+            }
+
+            // Probeer elk pad
+            foreach (var path in pathsToTry)
+            {
+                if (File.Exists(path))
+                {
+                    Console.WriteLine($"[ML] Model gevonden op: {path}");
+                    return LoadModelFromPath(path);
+                }
+                else
+                {
+                    Console.WriteLine($"[ML] Model niet gevonden op: {path}");
+                }
+            }
+
+            Console.WriteLine($"[ML] Model bestand niet gevonden in alle geprobeerde locaties");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ML] Fout bij laden van model: {ex.Message}");
+            _isModelTrained = false;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Laadt het model van een specifiek pad.
+    /// </summary>
+    private bool LoadModelFromPath(string path)
+    {
+        try
+        {
             // Laad model van disk
             DataViewSchema schema;
             _trainedModel = _mlContext.Model.Load(path, out schema);
@@ -532,12 +603,12 @@ public class MlRecommendationService
             _lastTrainingTime = fileInfo.LastWriteTimeUtc;
             _trainingDataCount = 0; // We weten niet hoeveel training data gebruikt werd
             
-            Console.WriteLine($"[ML] Model geladen van: {path}");
+            Console.WriteLine($"[ML] ✅ Model succesvol geladen van: {path}");
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ML] Fout bij laden van model: {ex.Message}");
+            Console.WriteLine($"[ML] ❌ Fout bij laden van model van {path}: {ex.Message}");
             _isModelTrained = false;
             return false;
         }
