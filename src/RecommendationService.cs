@@ -141,40 +141,10 @@ public class RecommendationService : IRecommendationService
     /// Vindt de meest vergelijkbare auto's voor een target auto.
     /// Sorteert op similarity en geeft top N terug.
     /// </summary>
-    private static string GetLogPath()
-    {
-        var possiblePaths = new[]
-        {
-            @".cursor\debug.log",
-            Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log"),
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log"),
-            @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log"
-        };
-        foreach (var path in possiblePaths)
-        {
-            try
-            {
-                var dir = Path.GetDirectoryName(path);
-                if (dir != null && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                return Path.GetFullPath(path);
-            }
-            catch { }
-        }
-        return possiblePaths[0];
-    }
-
     public List<RecommendationResult> RecommendSimilarCars(Car target, int n)
     {
-        // #region agent log
-        var logPath = GetLogPath();
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:170", message = "RecommendSimilarCars Entry", data = new { targetId = target?.Id, targetBrand = target?.Brand, targetModel = target?.Model, n }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
         List<Car> allCars = _carRepository.GetAllCars();
         List<RecommendationResult> results = new List<RecommendationResult>();
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:173", message = "After GetAllCars", data = new { allCarsCount = allCars?.Count ?? 0 }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
 
         // Null check
         if (allCars == null || target == null)
@@ -183,15 +153,9 @@ public class RecommendationService : IRecommendationService
         // Bereken min/max waarden voor normalisatie (alleen voor auto's met geldige waarden)
         // Dit is nodig voor de similarity berekening
         var validCars = allCars.Where(c => c.Power > 0 && c.Budget > 0 && c.Year > 1900).ToList();
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:177", message = "After validCars filter", data = new { validCarsCount = validCars.Count }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
         
         if (validCars.Count == 0)
         {
-            // #region agent log
-            try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:181", message = "No valid cars", data = new { }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-            // #endregion
             return results; // Geen geldige data
         }
 
@@ -202,9 +166,6 @@ public class RecommendationService : IRecommendationService
         decimal maxBudget = validCars.Max(c => c.Budget);
         int minYear = validCars.Min(c => c.Year);
         int maxYear = validCars.Max(c => c.Year);
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:190", message = "MinMax values", data = new { minPower, maxPower, minBudget = (double)minBudget, maxBudget = (double)maxBudget, minYear, maxYear, powerRange = maxPower - minPower, budgetRange = (double)(maxBudget - minBudget), yearRange = maxYear - minYear }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
 
         // Bereken similarity voor elke auto (behalve de target zelf)
         foreach (Car car in allCars)
@@ -231,10 +192,6 @@ public class RecommendationService : IRecommendationService
                 SimilarityScore = similarity
             });
         }
-
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:218", message = "Before sorting", data = new { resultsCount = results.Count, resultsWithScore0 = results.Count(r => r.SimilarityScore == 0.0), resultsWithScoreNaN = results.Count(r => double.IsNaN(r.SimilarityScore)) }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
         // Sorteer op similarity, verwijder dubbele modellen (behoud hoogste similarity per merk+model), en pak top N
         var finalResults = results
             .OrderByDescending(r => r.SimilarityScore)
@@ -242,9 +199,6 @@ public class RecommendationService : IRecommendationService
             .Select(g => g.OrderByDescending(r => r.SimilarityScore).First()) // Behoud de auto met de hoogste similarity per groep
             .Take(n)
             .ToList();
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "E", location = "RecommendationService.cs:224", message = "RecommendSimilarCars Exit", data = new { finalResultsCount = finalResults.Count }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
         return finalResults;
     }
 
@@ -430,30 +384,7 @@ public class RecommendationService : IRecommendationService
             .Take(n)
             .ToList();
         
-        Console.WriteLine($"[RecommendFromTextAsync] ✅ Klaar! {finalResults.Count} recommendations gegenereerd.");
-
-        // #region agent log
-        try {
-            var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            
-            // Log final results with vermogen before returning
-            var finalCarsData = finalResults.Take(5).Select(r => new { 
-                id = r.Car.Id, 
-                brand = r.Car.Brand, 
-                model = r.Car.Model, 
-                bouwjaar = r.Car.Year, 
-                vermogen = r.Car.Power, 
-                prijs = r.Car.Budget,
-                score = r.SimilarityScore
-            }).ToList();
-            
-            System.IO.File.AppendAllText(logPath, 
-                $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"D\",\"location\":\"RecommendationService.cs:786\",\"message\":\"RecommendFromManualFilters final results - first 5 with vermogen\",\"data\":{{\"totalResults\":{finalResults.Count},\"cars\":{System.Text.Json.JsonSerializer.Serialize(finalCarsData)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
-        } catch { }
-        // #endregion
+        Console.WriteLine($"[RecommendFromTextAsync] Klaar! {finalResults.Count} recommendations gegenereerd.");
 
         return finalResults;
     }

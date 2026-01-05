@@ -14,28 +14,6 @@ public class UserRatingRepository : IUserRatingRepository
 
     public UserRatingRepository(string? dbPath = null)
     {
-        // #region agent log
-        try
-        {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                location = "UserRatingRepository.cs:15",
-                message = "UserRatingRepository constructor start",
-                data = new { dbPath },
-                sessionId = "debug-session",
-                runId = "startup",
-                hypothesisId = "A"
-            });
-            File.AppendAllText(logPath, logEntry + Environment.NewLine);
-        }
-        catch { }
-        // #endregion
         try
         {
             // Standaard: gebruik database in data directory
@@ -113,26 +91,6 @@ public class UserRatingRepository : IUserRatingRepository
 
             _connectionString = $"Data Source={_dbPath}";
             
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "UserRatingRepository.cs:92",
-                    message = "UserRatingRepository constructor success",
-                    data = new { dbPath = _dbPath, connectionString = _connectionString },
-                    sessionId = "debug-session",
-                    runId = "startup",
-                    hypothesisId = "A"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
-            
             // Log database locatie voor debugging (alleen als Console beschikbaar is)
             try
             {
@@ -145,25 +103,6 @@ public class UserRatingRepository : IUserRatingRepository
         }
         catch (Exception ex)
         {
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "UserRatingRepository.cs:104",
-                    message = "UserRatingRepository constructor exception",
-                    data = new { error = ex.Message, stackTrace = ex.StackTrace },
-                    sessionId = "debug-session",
-                    runId = "startup",
-                    hypothesisId = "A"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             // Als alles faalt, gebruik temp path als laatste redmiddel
             _dbPath = Path.Combine(Path.GetTempPath(), $"user_ratings_{Guid.NewGuid()}.db");
             _connectionString = $"Data Source={_dbPath}";
@@ -185,27 +124,7 @@ public class UserRatingRepository : IUserRatingRepository
     public string DatabasePath => _dbPath;
 
     public async Task InitializeDatabaseAsync()
-    {
-        // #region agent log
-        try
-        {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                location = "UserRatingRepository.cs:187",
-                message = "InitializeDatabaseAsync start",
-                data = new { dbPath = _dbPath },
-                sessionId = "debug-session",
-                runId = "startup",
-                hypothesisId = "A"
-            });
-            File.AppendAllText(logPath, logEntry + Environment.NewLine);
-        }
-        catch { }
-        // #endregion
-        
+    {   
         // Zorg dat directory bestaat - probeer meerdere keren met fallbacks
         string? finalDbPath = _dbPath;
         try
@@ -289,25 +208,6 @@ public class UserRatingRepository : IUserRatingRepository
         }
         catch (Exception ex)
         {
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "UserRatingRepository.cs:186",
-                    message = "InitializeDatabaseAsync failed",
-                    data = new { error = ex.Message, stackTrace = ex.StackTrace },
-                    sessionId = "debug-session",
-                    runId = "startup",
-                    hypothesisId = "A"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             // Log maar gooi niet - laat app niet crashen
             Console.WriteLine($"Waarschuwing: Database initialisatie gefaald: {ex.Message}");
             throw; // Re-throw zodat caller weet dat het gefaald is
@@ -393,50 +293,9 @@ public class UserRatingRepository : IUserRatingRepository
 
     public async Task AddRatingAsync(UserRating rating)
     {
-        // #region agent log
-        try
-        {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                location = "UserRatingRepository.cs:AddRatingAsync",
-                message = "AddRatingAsync start",
-                data = new { carId = rating.CarId, rating = rating.Rating, dbPath = _dbPath },
-                sessionId = "debug-session",
-                runId = "runtime",
-                hypothesisId = "E"
-            });
-            File.AppendAllText(logPath, logEntry + Environment.NewLine);
-        }
-        catch { }
-        // #endregion
         try
         {
             using var connection = new SqliteConnection(_connectionString);
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "UserRatingRepository.cs:AddRatingAsync",
-                    message = "Opening database connection",
-                    data = new { connectionString = _connectionString },
-                    sessionId = "debug-session",
-                    runId = "runtime",
-                    hypothesisId = "E"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             await connection.OpenAsync();
 
         var insertCommand = @"
@@ -452,67 +311,10 @@ public class UserRatingRepository : IUserRatingRepository
         command.Parameters.AddWithValue("@RecommendationContext", (object?)rating.RecommendationContext ?? DBNull.Value);
         command.Parameters.AddWithValue("@Timestamp", rating.Timestamp);
 
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "UserRatingRepository.cs:AddRatingAsync",
-                    message = "Executing insert command",
-                    data = new { },
-                    sessionId = "debug-session",
-                    runId = "runtime",
-                    hypothesisId = "E"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             await command.ExecuteNonQueryAsync();
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "UserRatingRepository.cs:AddRatingAsync",
-                    message = "AddRatingAsync success",
-                    data = new { },
-                    sessionId = "debug-session",
-                    runId = "runtime",
-                    hypothesisId = "E"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
         }
         catch (Exception ex)
         {
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "UserRatingRepository.cs:AddRatingAsync",
-                    message = "AddRatingAsync failed",
-                    data = new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name, dbPath = _dbPath },
-                    sessionId = "debug-session",
-                    runId = "runtime",
-                    hypothesisId = "E"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             throw;
         }
     }
@@ -589,28 +391,6 @@ public class UserRatingRepository : IUserRatingRepository
 
     public async Task<AggregatedRating?> GetAggregatedRatingForCarAsync(int carId)
     {
-        // #region agent log
-        try
-        {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                location = "UserRatingRepository.cs:GetAggregatedRatingForCarAsync",
-                message = "GetAggregatedRatingForCarAsync start",
-                data = new { carId, dbPath = _dbPath },
-                sessionId = "debug-session",
-                runId = "runtime",
-                hypothesisId = "E"
-            });
-            File.AppendAllText(logPath, logEntry + Environment.NewLine);
-        }
-        catch { }
-        // #endregion
         try
         {
             using var connection = new SqliteConnection(_connectionString);
@@ -638,25 +418,6 @@ public class UserRatingRepository : IUserRatingRepository
             if (await reader.ReadAsync())
             {
                 var avgRating = reader.GetDouble(1);
-                // #region agent log
-                try
-                {
-                    var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                    var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                        timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                        location = "UserRatingRepository.cs:GetAggregatedRatingForCarAsync",
-                        message = "GetAggregatedRatingForCarAsync found ratings",
-                        data = new { carId, avgRating, totalRatings = reader.GetInt32(2) },
-                        sessionId = "debug-session",
-                        runId = "runtime",
-                        hypothesisId = "E"
-                    });
-                    File.AppendAllText(logPath, logEntry + Environment.NewLine);
-                }
-                catch { }
-                // #endregion
                 return new AggregatedRating
                 {
                     CarId = carId,
@@ -670,49 +431,10 @@ public class UserRatingRepository : IUserRatingRepository
                     NormalizedRating = (avgRating - 1) / 4.0 // Normaliseer 1-5 naar 0-1
                 };
             }
-
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "UserRatingRepository.cs:GetAggregatedRatingForCarAsync",
-                    message = "GetAggregatedRatingForCarAsync no ratings found",
-                    data = new { carId },
-                    sessionId = "debug-session",
-                    runId = "runtime",
-                    hypothesisId = "E"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             return null;
         }
         catch (Exception ex)
         {
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "UserRatingRepository.cs:GetAggregatedRatingForCarAsync",
-                    message = "GetAggregatedRatingForCarAsync failed",
-                    data = new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name, carId, dbPath = _dbPath },
-                    sessionId = "debug-session",
-                    runId = "runtime",
-                    hypothesisId = "E"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             throw;
         }
     }

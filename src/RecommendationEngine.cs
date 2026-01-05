@@ -6,28 +6,6 @@ namespace CarRecommender;
 /// </summary>
 public class RecommendationEngine
 {
-    private static string GetLogPath()
-    {
-        var possiblePaths = new[]
-        {
-            @".cursor\debug.log",
-            Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log"),
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".cursor", "debug.log"),
-            @"c:\Users\runed\OneDrive - Thomas More\Recommendation_System_New\.cursor\debug.log"
-        };
-        foreach (var path in possiblePaths)
-        {
-            try
-            {
-                var dir = Path.GetDirectoryName(path);
-                if (dir != null && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                return Path.GetFullPath(path);
-            }
-            catch { }
-        }
-        return possiblePaths[0];
-    }
     /// <summary>
     /// Berekent hoe vergelijkbaar twee auto's zijn (0-1 score).
     /// Vergelijkt vermogen, prijs, bouwjaar en brandstof.
@@ -56,11 +34,6 @@ public class RecommendationEngine
         // Null checks
         if (car1 == null || car2 == null)
             return 0.0;
-        
-        // #region agent log
-        var logPath = GetLogPath();
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "B", location = "RecommendationEngine.cs:50", message = "CalculateSimilarity Entry", data = new { car1Id = car1?.Id, car2Id = car2?.Id, minPower, maxPower, minBudget = (double)minBudget, maxBudget = (double)maxBudget, minYear, maxYear, weightPower, weightBudget, weightYear, weightFuel }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
         // Normaliseer gewichten (zorg dat ze optellen tot 1.0)
         double totalWeight = weightPower + weightBudget + weightYear + weightFuel;
         if (totalWeight > 0)
@@ -109,14 +82,9 @@ public class RecommendationEngine
         }
 
         // Brandstof vergelijken
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "A", location = "RecommendationEngine.cs:104", message = "Before Fuel Trim", data = new { car1FuelNull = car1.Fuel == null, car2FuelNull = car2.Fuel == null, car1FuelValue = car1.Fuel ?? "(null)", car2FuelValue = car2.Fuel ?? "(null)" }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
         string fuel1 = car1.Fuel?.Trim().ToLower() ?? string.Empty;
         string fuel2 = car2.Fuel?.Trim().ToLower() ?? string.Empty;
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "A", location = "RecommendationEngine.cs:108", message = "After Fuel Trim", data = new { fuel1Empty = string.IsNullOrEmpty(fuel1), fuel2Empty = string.IsNullOrEmpty(fuel2), fuel1Value = fuel1, fuel2Value = fuel2 }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
+
         
         if (!string.IsNullOrEmpty(fuel1) && !string.IsNullOrEmpty(fuel2))
         {
@@ -146,13 +114,8 @@ public class RecommendationEngine
                                  (budgetSimilarity * weightBudget) +
                                  (yearSimilarity * weightYear) +
                                  (fuelSimilarity * weightFuel);
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "C", location = "RecommendationEngine.cs:124", message = "Before Final Score", data = new { powerSimilarity, budgetSimilarity, yearSimilarity, fuelSimilarity, weightPower, weightBudget, weightYear, weightFuel, totalSimilarity, isNaN = double.IsNaN(totalSimilarity), isInfinity = double.IsInfinity(totalSimilarity) }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
+
         var finalScore = Math.Max(0.0, Math.Min(1.0, totalSimilarity)); // Zorg dat score tussen 0 en 1 is
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPath, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "C", location = "RecommendationEngine.cs:128", message = "CalculateSimilarity Exit", data = new { finalScore, car1Id = car1?.Id, car2Id = car2?.Id }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
         return finalScore;
     }
 
@@ -161,18 +124,11 @@ public class RecommendationEngine
     /// </summary>
     public double NormalizeValue(double value, double min, double max)
     {
-        // #region agent log
-        var logPathNorm = GetLogPath();
-        try { System.IO.File.AppendAllText(logPathNorm, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "D", location = "RecommendationEngine.cs:166", message = "NormalizeValue", data = new { value, min, max, maxLessEqualMin = max <= min }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
         if (max <= min)
             return 0.0; // Voorkom delen door nul fout
 
         // Min-max normalisatie: (value - min) / (max - min)
         var normalized = (value - min) / (max - min);
-        // #region agent log
-        try { System.IO.File.AppendAllText(logPathNorm, System.Text.Json.JsonSerializer.Serialize(new { sessionId = "debug-session", runId = "run1", hypothesisId = "D", location = "RecommendationEngine.cs:172", message = "NormalizeValue Result", data = new { normalized, isNaN = double.IsNaN(normalized), isInfinity = double.IsInfinity(normalized) }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }) + "\n"); } catch { }
-        // #endregion
         return normalized;
     }
 }

@@ -93,28 +93,6 @@ public class CarsController : ControllerBase
                 .Take(pageSize)
                 .ToList();
 
-            // #region agent log
-            try {
-                var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-                var logDir = Path.GetDirectoryName(logPath);
-                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                    Directory.CreateDirectory(logDir);
-                
-                // Log IDs and vermogen of cars right before API returns
-                var carsData = pagedCars.Take(5).Select(c => new { 
-                    id = c.Id, 
-                    brand = c.Brand, 
-                    model = c.Model, 
-                    bouwjaar = c.Year, 
-                    vermogen = c.Power, 
-                    prijs = c.Budget 
-                }).ToList();
-                
-                System.IO.File.AppendAllText(logPath, 
-                    $"{{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"D\",\"location\":\"CarsController.cs:77\",\"message\":\"Cars returned by API - first 5 with vermogen\",\"data\":{{\"page\":{page},\"pageSize\":{pageSize},\"totalCount\":{totalCount},\"returnedCount\":{pagedCars.Count},\"cars\":{System.Text.Json.JsonSerializer.Serialize(carsData)}}},\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}\n");
-            } catch { }
-            // #endregion
-
             // Maak response met paginatie metadata
             var result = new PagedResult<Car>
             {

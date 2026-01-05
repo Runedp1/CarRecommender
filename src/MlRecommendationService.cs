@@ -83,79 +83,17 @@ public class MlRecommendationService
     {
         if (_isInitialized)
             return _initializationError == null;
-
-        // #region agent log
-        try
-        {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-            var logDir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
-                Directory.CreateDirectory(logDir);
-            var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                location = "MlRecommendationService.cs:EnsureInitialized",
-                message = "MLContext lazy initialization start",
-                data = new { },
-                sessionId = "debug-session",
-                runId = "startup",
-                hypothesisId = "B"
-            });
-            File.AppendAllText(logPath, logEntry + Environment.NewLine);
-        }
-        catch { }
-        // #endregion
-
         try
         {
             _mlContext = new MLContext(seed: 0);
             _isInitialized = true;
             _initializationError = null;
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "MlRecommendationService.cs:EnsureInitialized",
-                    message = "MLContext lazy initialization success",
-                    data = new { },
-                    sessionId = "debug-session",
-                    runId = "startup",
-                    hypothesisId = "B"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             return true;
         }
         catch (Exception ex)
         {
             _isInitialized = true;
             _initializationError = ex;
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".cursor", "debug.log");
-                var logEntry = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    id = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    location = "MlRecommendationService.cs:EnsureInitialized",
-                    message = "MLContext lazy initialization failed - ML.NET disabled",
-                    data = new { error = ex.Message, stackTrace = ex.StackTrace, type = ex.GetType().Name },
-                    sessionId = "debug-session",
-                    runId = "startup",
-                    hypothesisId = "B"
-                });
-                File.AppendAllText(logPath, logEntry + Environment.NewLine);
-            }
-            catch { }
-            // #endregion
             return false; // ML.NET niet beschikbaar, maar app kan doorgaan
         }
     }
