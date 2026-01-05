@@ -142,12 +142,97 @@ builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 
 // Registreer MlRecommendationService als singleton zodat alle services dezelfde instantie gebruiken
 // Dit zorgt ervoor dat het getrainde model gedeeld wordt tussen RecommendationService en de background service
-// Stel model directory in op data folder zodat het model wordt opgeslagen en geladen
-// Gebruik dezelfde dataDirectory die al eerder is bepaald voor CarRepository
+// OPTIMALISATIE: Gebruik persistente locatie in Azure (D:\home\data) zodat model behouden blijft tussen deployments
+// wwwroot wordt gewist bij elke deployment, maar D:\home blijft behouden
 builder.Services.AddSingleton<MlRecommendationService>(sp =>
 {
     var env = sp.GetRequiredService<IWebHostEnvironment>();
+    
+    // Standaard: gebruik ContentRootPath/data (voor lokale ontwikkeling)
     var dataDir = Path.Combine(env.ContentRootPath, "data");
+    
+    // Detecteer Azure App Service: ContentRootPath bevat meestal "site\wwwroot" of "site/wwwroot"
+    // Of check expliciet voor D:\home\site\wwwroot patroon
+    bool isAzure = env.ContentRootPath.Contains("site\\wwwroot", StringComparison.OrdinalIgnoreCase) || 
+                   env.ContentRootPath.Contains("site/wwwroot", StringComparison.OrdinalIgnoreCase) ||
+                   env.ContentRootPath.StartsWith(@"D:\home\", StringComparison.OrdinalIgnoreCase) ||
+                   env.ContentRootPath.StartsWith(@"/home/", StringComparison.OrdinalIgnoreCase);
+    
+    if (isAzure)
+    {
+        // Azure App Service: gebruik persistente locatie D:\home\data
+        // Probeer verschillende manieren om D:\home te vinden
+        string? homePath = null;
+        
+        // Methode 1: Ga van D:\home\site\wwwroot naar D:\home (2 levels omhoog)
+        if (env.ContentRootPath.Contains("site"))
+        {
+            var tempPath = Path.GetDirectoryName(Path.GetDirectoryName(env.ContentRootPath));
+            if (!string.IsNullOrEmpty(tempPath) && Directory.Exists(tempPath) && 
+                (tempPath.Contains("home") || tempPath.StartsWith(@"D:\", StringComparison.OrdinalIgnoreCase)))
+            {
+                homePath = tempPath;
+            }
+        }
+        
+        // Methode 2: Direct D:\home gebruiken als ContentRootPath begint met D:\home
+        if (homePath == null && env.ContentRootPath.StartsWith(@"D:\home\", StringComparison.OrdinalIgnoreCase))
+        {
+            var parts = env.ContentRootPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (parts.Length >= 2 && parts[0].Length == 1 && parts[1].Equals("home", StringComparison.OrdinalIgnoreCase))
+            {
+                homePath = $"{parts[0]}:\\{parts[1]}";
+                if (!Directory.Exists(homePath))
+                {
+                    homePath = null;
+                }
+            }
+        }
+        
+        // Methode 3: Probeer expliciet D:\home
+        if (homePath == null)
+        {
+            var explicitHomePath = @"D:\home";
+            if (Directory.Exists(explicitHomePath))
+            {
+                homePath = explicitHomePath;
+            }
+        }
+        
+        if (!string.IsNullOrEmpty(homePath))
+        {
+            dataDir = Path.Combine(homePath, "data");
+            Console.WriteLine($"[ML] ✅ Azure detectie: gebruik persistente data directory voor ML model: {dataDir}");
+        }
+        else
+        {
+            Console.WriteLine($"[ML] ⚠️ Azure detectie: kon D:\\home niet vinden, gebruik ContentRootPath: {dataDir}");
+            Console.WriteLine($"[ML] ⚠️ ContentRootPath: {env.ContentRootPath}");
+        }
+    }
+    else
+    {
+        Console.WriteLine($"[ML] Lokale omgeving: gebruik ContentRootPath voor ML model: {dataDir}");
+    }
+    
+    // Zorg dat directory bestaat
+    if (!Directory.Exists(dataDir))
+    {
+        try
+        {
+            Directory.CreateDirectory(dataDir);
+            Console.WriteLine($"[ML] ML model data directory aangemaakt: {dataDir}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ML] ⚠️ Kon ML model data directory niet aanmaken: {ex.Message}");
+            // Fallback naar ContentRootPath als backup niet werkt
+            dataDir = Path.Combine(env.ContentRootPath, "data");
+            Console.WriteLine($"[ML] Fallback naar ContentRootPath: {dataDir}");
+        }
+    }
+    
+    Console.WriteLine($"[ML] ML Model directory: {dataDir}");
     return new MlRecommendationService(dataDir);
 });
 
