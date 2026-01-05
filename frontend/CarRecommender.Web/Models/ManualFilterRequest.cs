@@ -8,7 +8,6 @@ namespace CarRecommender.Web.Models;
 /// - Tekst modus: TextParserService parseert vrije tekst naar UserPreferences
 /// - Manuele modus: Gebruiker geeft direct alle waarden op, geen parsing nodig
 /// - Alle velden zijn optioneel (null = geen filter)
-/// - Geen km-stand ondersteund (zoals gevraagd)
 /// </summary>
 public class ManualFilterRequest
 {
@@ -44,9 +43,6 @@ public class ManualFilterRequest
     
     /// <summary>Aantal recommendations om terug te geven (optioneel, standaard 5)</summary>
     public int? Top { get; set; }
-    
-    // NOTE: km-stand wordt NIET ondersteund in deze versie
-    // Dit veld is opzettelijk weggelaten zoals gevraagd door de gebruiker
 }
 
 
