@@ -155,8 +155,9 @@ public class CarRepository : ICarRepository
             Console.WriteLine($"Duplicaten verwijderd: {duplicateCount} auto's (oorspronkelijk {originalCount}, na verwijdering {_cars.Count})");
         }
 
-        // Laad image mapping
-        LoadImageMapping();
+        // OPTIMALISATIE: Image mapping tijdelijk uitgeschakeld voor snellere startup
+        // De images werken momenteel toch niet, dus dit bespaart ~60-180 seconden startup tijd
+        // LoadImageMapping();
 
         // Genereer image paths (gebruikt mapping voor eerste image)
         AssignImagePaths(_cars);
