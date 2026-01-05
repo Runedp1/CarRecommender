@@ -4,31 +4,6 @@
     ViewData["Title"] = "Tekst Zoeken";
 }
 
-@*
-    BUG FIXES GESCHIEDENIS:
-    ========================
-    
-    PROBLEEM 1: Alle kaarten toonden dezelfde afbeelding
-    OORZAAK: Razor variabelen (imageUrl, fallbackUrl) werden mogelijk hergebruikt tussen foreach iteraties,
-            of de ImageUrl property was leeg/hetzelfde voor alle auto's, waardoor alle kaarten dezelfde
-            fallback URL gebruikten.
-    OPLOSSING: 
-    - Expliciete lokale variabelen (carId, carBrand, carModel) per iteratie om uniekheid te garanderen
-    - Image URL generatie gebeurt nu expliciet per auto met unieke fallback op basis van merk + model
-    - Variabelen worden binnen de foreach loop gedeclareerd om scoping issues te voorkomen
-    
-    PROBLEEM 2: Alle links gingen naar dezelfde detailpagina (bmw x5)
-    OORZAAK: Mogelijk dat recommendation.Car.Id dezelfde waarde had voor alle recommendations, of
-            Razor was niet correct de ID waarde aan het interpoleren in de href/onclick attributen.
-    OPLOSSING:
-    - Expliciete carId variabele per iteratie
-    - Gebruik van carId variabele in plaats van recommendation.Car.Id in alle href en onclick attributen
-    - Dit garandeert dat elke kaart naar de juiste detailpagina linkt
-    
-    BESTANDEN AANGEPAST:
-    - frontend/CarRecommender.Web/Pages/Index.cshtml
-*@
-
 @functions {
     string FormatTransmission(string? transmission)
     {
@@ -48,16 +23,10 @@
         return char.ToUpper(transmission[0]) + (transmission.Length > 1 ? transmission.Substring(1).ToLower() : "");
     }
     
-    /// <summary>
-    /// Converteert vermogen van KW naar PK (paardenkracht).
-    /// Dataset bevat vermogen in KW, maar we tonen het in PK voor gebruikers.
-    /// Conversie: 1 KW = 1.35962 PK (afgerond naar 1.36)
-    /// </summary>
     int ConvertKwToHp(int powerKw)
     {
-        // 1 KW = 1.35962 PK (metrische paardenkracht)
-        // Afgerond naar 1.36 voor eenvoud
-        return (int)Math.Round(powerKw * 1.35962);
+        // Niet meer nodig dus simpel * 1.0
+        return (int)Math.Round(powerKw * 1.0);
     }
 
     /// <summary>

@@ -180,13 +180,11 @@ public class AdvancedFiltersModel : PageModel
     }
     
     /// <summary>
-    /// Converteert vermogen van KW naar PK (paardenkracht).
-    /// Dataset bevat vermogen in KW, maar we tonen het in PK voor gebruikers.
-    /// Conversie: 1 KW = 1.35962 PK (afgerond naar 1.36)
+    /// Dit is niet meer nodig dus simpel op * 1.0 gezet
     /// </summary>
     public int ConvertKwToHp(int powerKw)
     {
-        return (int)Math.Round(powerKw * 1.35962);
+        return (int)Math.Round(powerKw * 1.0);
     }
 
     /// <summary>

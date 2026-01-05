@@ -27,7 +27,7 @@ public class ExplanationBuilder
             {
                 double brandWeight = prefs.PreferenceWeights.GetValueOrDefault("brand", 1.0);
                 string weightText = GetWeightDescription(brandWeight);
-                reasons.Add($"{brandMatch} (belangrijkheid: {weightText})");
+                reasons.Add($"{brandMatch}");
             }
         }
 
@@ -38,7 +38,7 @@ public class ExplanationBuilder
             {
                 double fuelWeight = prefs.PreferenceWeights.GetValueOrDefault("fuel", 1.0);
                 string weightText = GetWeightDescription(fuelWeight);
-                reasons.Add($"{fuelMatch} (belangrijkheid: {weightText})");
+                reasons.Add($"{fuelMatch}");
             }
         }
 
@@ -46,10 +46,10 @@ public class ExplanationBuilder
         {
             double budgetWeight = prefs.PreferenceWeights.GetValueOrDefault("budget", 1.0);
             string weightText = GetWeightDescription(budgetWeight);
-            reasons.Add($"blijft onder je budget van €{prefs.MaxBudget.Value:N0} (belangrijkheid: {weightText})");
+            reasons.Add($"blijft onder je budget van €{prefs.MaxBudget.Value:N0}");
         }
 
-        // Power check - kan score zijn (0-1) of exacte KW
+        // Power check - kan score zijn (0-1) of exacte PK
         if (prefs.MinPower.HasValue && car.Power > 0)
         {
             double powerWeight = prefs.PreferenceWeights.GetValueOrDefault("power", 1.0);
@@ -61,7 +61,7 @@ public class ExplanationBuilder
                 // Score - check of vermogen voldoende is
                 powerMatches = true; // Voor nu altijd true bij score
                 string powerDesc = GetInformalPowerDescription(prefs.MinPower.Value);
-                reasons.Add($"heeft {car.Power} KW vermogen (past bij '{powerDesc}' - {weightText})");
+                reasons.Add($"heeft {car.Power} PK vermogen");
             }
             else
             {
@@ -69,13 +69,13 @@ public class ExplanationBuilder
                 powerMatches = car.Power >= prefs.MinPower.Value;
                 if (powerMatches)
                 {
-                    reasons.Add($"heeft {car.Power} KW vermogen (minstens {prefs.MinPower.Value} KW - {weightText})");
+                    reasons.Add($"heeft {car.Power} PK vermogen");
                 }
             }
         }
         else if (car.Power > 0)
         {
-            reasons.Add($"heeft {car.Power} KW vermogen");
+            reasons.Add($"heeft {car.Power} PK vermogen");
         }
 
         if (prefs.BodyTypePreference != null)
@@ -85,7 +85,7 @@ public class ExplanationBuilder
             {
                 double bodyWeight = prefs.PreferenceWeights.GetValueOrDefault("bodytype", 1.0);
                 string weightText = GetWeightDescription(bodyWeight);
-                reasons.Add($"{bodyMatch} (belangrijkheid: {weightText})");
+                reasons.Add($"{bodyMatch}");
             }
         }
         // Als er geen voorkeur is maar de auto heeft wel een body type, toon het als informatie
@@ -94,7 +94,7 @@ public class ExplanationBuilder
             string bodyTypeName = GetBodyTypeName(car.BodyType);
             if (!string.IsNullOrEmpty(bodyTypeName))
             {
-                reasons.Add($"heeft {bodyTypeName} koetswerk");
+                reasons.Add($"heeft {bodyTypeName} carrosserie");
             }
         }
 
@@ -111,7 +111,7 @@ public class ExplanationBuilder
             if (carIsAutomatic == userWantsAutomatic)
             {
                 string transText = userWantsAutomatic ? "automaat" : "schakel";
-                reasons.Add($"heeft {transText} transmissie (belangrijkheid: {weightText})");
+                reasons.Add($"heeft {transText} transmissie");
             }
         }
         // Als er geen voorkeur is maar de auto heeft wel transmissie info, toon het als informatie
@@ -136,9 +136,7 @@ public class ExplanationBuilder
             explanation += " op basis van algemene similarity";
         }
 
-        // Collaborative filtering is disabled for performance
-
-        explanation += $". Similarity score: {similarityScore:F3}";
+        explanation += $". Match: {(similarityScore * 100):F1}%";
 
         return explanation;
     }

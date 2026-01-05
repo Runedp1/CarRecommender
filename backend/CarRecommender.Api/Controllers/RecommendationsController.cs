@@ -55,7 +55,7 @@ public class RecommendationsController : ControllerBase
     /// </summary>
 
     /// <summary>
-    /// KNN-gebaseerde recommendations (Les 4: Spotify style).
+    /// KNN-gebaseerde recommendations 
     /// </summary>
     [HttpPost("from-text-knn")]
     public ActionResult<List<RecommendationResult>> RecommendFromTextKnn([FromBody] TextRecommendationRequest request)  // ← Gebruik TextRecommendationRequest ipv dynamic
