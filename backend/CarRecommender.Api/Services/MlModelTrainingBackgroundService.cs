@@ -76,10 +76,10 @@ public class MlModelTrainingBackgroundService : BackgroundService
                     return;
                 }
 
-                // Genereer training data (kleinere sample voor performance)
+                // Genereer training data (voldoende sample voor goed ML model)
                 // Gebruik random sampling voor betere representatie van de dataset
                 var trainingResults = new List<RecommendationResult>();
-                var sampleSize = Math.Min(10, allCars.Count); // Max 50 auto's voor training
+                var sampleSize = Math.Min(100, allCars.Count); // 100 auto's voor betere training data (~500-1000 samples)
                 
                 // Filter eerst geldige auto's (met geldige data)
                 var validCars = allCars
