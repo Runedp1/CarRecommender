@@ -233,7 +233,11 @@ public class MlEvaluationService : IMlEvaluationService
             {
                 case "mlnet":
                     // ML.NET: Gebruik PredictScore voor elke auto en sorteer
-                    var mlScores = trainSet
+                    // OPTIMALISATIE: Beperk trainSet voor evaluatie (max 500 auto's voor snelheid)
+                    // Dit versnelt evaluatie drastisch zonder training te verkleinen
+                    var limitedTrainSet = trainSet.Take(500).ToList();
+                    
+                    var mlScores = limitedTrainSet
                         .Select(car => new 
                         { 
                             Car = car, 
